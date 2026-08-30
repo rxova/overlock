@@ -48,7 +48,7 @@ importers:
         specifier: ^8.65.0
         version: 8.68.0(eslint@10.9.1(jiti@2.6.1))(typescript@6.0.3)
 
-  packages/patchfinder:
+  packages/overlock:
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: ^0.18.5

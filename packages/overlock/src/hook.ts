@@ -50,7 +50,7 @@ export function stopHookOutcome(report: Report, payload: StopPayload): HookOutco
     return {
       exitCode: 0,
       stdout: '',
-      stderr: `${reason}\n\n(patchfinder: already retried once, not blocking again.)\n`,
+      stderr: `${reason}\n\n(overlock: already retried once, not blocking again.)\n`,
     };
   }
 

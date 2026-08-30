@@ -7,14 +7,14 @@ import { compact, human, json, useColor } from './report.js';
 import { run } from './run.js';
 import type { Severity } from './types.js';
 
-const VERSION = typeof __PATCHFINDER_VERSION__ === 'string' ? __PATCHFINDER_VERSION__ : '0.0.0';
+const VERSION = typeof __OVERLOCK_VERSION__ === 'string' ? __OVERLOCK_VERSION__ : '0.0.0';
 
-const USAGE = `patchfinder ${VERSION} — find out what your coding agent did to your tests.
+const USAGE = `overlock ${VERSION} — find out what your coding agent did to your tests.
 
 USAGE
-  patchfinder [check] [options]     Check the current patch (default command)
-  patchfinder hook claude           Run as a Claude Code Stop hook (reads stdin)
-  patchfinder init <agent>          Wire it into an agent: ${AGENTS.join(', ')}
+  overlock [check] [options]     Check the current patch (default command)
+  overlock hook claude           Run as a Claude Code Stop hook (reads stdin)
+  overlock init <agent>          Wire it into an agent: ${AGENTS.join(', ')}
 
 CHECK OPTIONS
   --base <ref>       Diff against this ref. Default: auto
@@ -26,12 +26,12 @@ CHECK OPTIONS
   --limit <n>        Findings shown in --compact. Default: 3
   --test-glob <re>   Extra regex marking a path as a test file (repeatable)
   --cwd <dir>        Run against this directory
-  --no-ledger        Do not record this run in ~/.patchfinder/ledger.jsonl
+  --no-ledger        Do not record this run in ~/.overlock/ledger.jsonl
 
 EXIT CODES
   0  nothing at or above --fail-on
   1  findings at or above --fail-on
-  2  patchfinder could not run
+  2  overlock could not run
 
 Findings are advisory. The tool reads a diff; it never edits your code, and it
 makes no network calls.`;
@@ -204,10 +204,10 @@ export function main(argv: string[], io: Io): number {
     return report.ok ? 0 : 1;
   } catch (error) {
     if (error instanceof GitError) {
-      io.stderr(`patchfinder: ${error.message}. Is this a git repository?\n`);
+      io.stderr(`overlock: ${error.message}. Is this a git repository?\n`);
       return 2;
     }
-    io.stderr(`patchfinder: ${error instanceof Error ? error.message : String(error)}\n`);
+    io.stderr(`overlock: ${error instanceof Error ? error.message : String(error)}\n`);
     return 2;
   }
 }
@@ -215,7 +215,7 @@ export function main(argv: string[], io: Io): number {
 function runInit(args: ParsedArgs, io: Io): number {
   const agent = args.target as Agent | undefined;
   if (agent === undefined || !AGENTS.includes(agent)) {
-    io.stderr(`patchfinder init needs one of: ${AGENTS.join(', ')}\n`);
+    io.stderr(`overlock init needs one of: ${AGENTS.join(', ')}\n`);
     return 2;
   }
 
@@ -235,14 +235,14 @@ function runInit(args: ParsedArgs, io: Io): number {
 }
 
 /* c8 ignore start -- process wiring; the e2e suite drives the real binary */
-if (process.env.PATCHFINDER_NO_AUTORUN !== '1') {
+if (process.env.OVERLOCK_NO_AUTORUN !== '1') {
   process.exitCode = main(process.argv.slice(2), {
     stdout: (text) => process.stdout.write(text),
     stderr: (text) => process.stderr.write(text),
     readStdin: () => {
       try {
         // fd 0 as a file read: a hook is always given its payload on a pipe, and
-        // when it is not (someone ran `patchfinder hook claude` by hand at a
+        // when it is not (someone ran `overlock hook claude` by hand at a
         // terminal) this throws rather than hanging forever waiting for EOF.
         return readFileSync(0, 'utf8');
       } catch {

@@ -22,7 +22,7 @@ const changed = execFileSync('git', ['diff', '--name-only', `${base}...${head}`]
 
 const touchesPackage = changed.some(
   (file) =>
-    file.startsWith('packages/patchfinder/') &&
+    file.startsWith('packages/overlock/') &&
     !file.endsWith('.md') &&
     !file.includes('/e2e/') &&
     !file.endsWith('.test.ts'),

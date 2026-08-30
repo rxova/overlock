@@ -12,17 +12,17 @@ const report = analyze({
 
 describe('ledgerPath', () => {
   it('prefers an explicit override', () => {
-    expect(ledgerPath({ PATCHFINDER_LEDGER: '/x/y.jsonl' })).toBe('/x/y.jsonl');
+    expect(ledgerPath({ OVERLOCK_LEDGER: '/x/y.jsonl' })).toBe('/x/y.jsonl');
   });
 
-  it('otherwise sits under the patchfinder home', () => {
-    expect(ledgerPath({ PATCHFINDER_HOME: '/home/me/.patchfinder' })).toBe(
-      '/home/me/.patchfinder/ledger.jsonl',
+  it('otherwise sits under the overlock home', () => {
+    expect(ledgerPath({ OVERLOCK_HOME: '/home/me/.overlock' })).toBe(
+      '/home/me/.overlock/ledger.jsonl',
     );
   });
 
   it('falls back to the user home directory', () => {
-    expect(ledgerPath({})).toMatch(/\.patchfinder\/ledger\.jsonl$/);
+    expect(ledgerPath({})).toMatch(/\.overlock\/ledger\.jsonl$/);
   });
 });
 
@@ -45,7 +45,7 @@ describe('toEntry', () => {
 
 describe('appendLedger', () => {
   it('appends one JSON object per line', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'patchfinder-ledger-'));
+    const dir = mkdtempSync(join(tmpdir(), 'overlock-ledger-'));
     const path = join(dir, 'nested', 'ledger.jsonl');
     const entry = toEntry({ report, repo: '/repo', branch: 'main', mode: 'check', blocked: false });
 
@@ -62,7 +62,7 @@ describe('appendLedger', () => {
   });
 
   it('reports failure instead of throwing — evidence must never break the gate', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'patchfinder-ledger-'));
+    const dir = mkdtempSync(join(tmpdir(), 'overlock-ledger-'));
     // A file where a directory would have to be: mkdir fails with ENOTDIR
     // immediately, which is the cheapest way to prove the write is guarded.
     const blocker = join(dir, 'blocker');

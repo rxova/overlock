@@ -1,5 +1,5 @@
 {
-  "name": "patchfinder-monorepo",
+  "name": "overlock-monorepo",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.9.0",
@@ -16,11 +16,11 @@
     "format:check": "prettier --check . --cache --cache-location node_modules/.cache/prettier/.prettiercache",
     "audit:check": "pnpm audit --audit-level=high",
     "dedupe:check": "pnpm dedupe --check",
-    "check:exports": "turbo run check:exports --filter=patchfinder",
-    "pack:smoke": "turbo run pack:smoke --concurrency=1 --filter=patchfinder",
-    "e2e": "turbo run build --filter=patchfinder && pnpm --filter patchfinder run e2e",
+    "check:exports": "turbo run check:exports --filter=overlock",
+    "pack:smoke": "turbo run pack:smoke --concurrency=1 --filter=overlock",
+    "e2e": "turbo run build --filter=overlock && pnpm --filter overlock run e2e",
     "verify": "node --import tsx ./packages/tooling/verify.ts",
-    "release": "turbo run build --filter=patchfinder && changeset publish",
+    "release": "turbo run build --filter=overlock && changeset publish",
     "prepare": "husky"
   },
   "lint-staged": {

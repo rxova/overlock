@@ -26,7 +26,7 @@ interface RunResult {
   stderr: string;
 }
 
-function patchfinder(
+function overlock(
   args: string[],
   options: { cwd: string; stdin?: string } = { cwd: '.' },
 ): RunResult {
@@ -37,7 +37,7 @@ function patchfinder(
     env: {
       ...process.env,
       // Never touch the developer's real ledger from a test run.
-      PATCHFINDER_LEDGER: join(options.cwd, '.patchfinder-ledger.jsonl'),
+      OVERLOCK_LEDGER: join(options.cwd, '.overlock-ledger.jsonl'),
       NO_COLOR: '1',
     },
   });
@@ -64,10 +64,10 @@ function cleanRepo(): TempRepo {
   return r;
 }
 
-describe('patchfinder check', () => {
+describe('overlock check', () => {
   it('exits 1 and names the rule when a test was skipped', () => {
     const r = weakenedRepo();
-    const result = patchfinder(['check', '--base', 'auto'], { cwd: r.dir });
+    const result = overlock(['check', '--base', 'auto'], { cwd: r.dir });
 
     expect(result.status).toBe(1);
     expect(result.stdout).toContain('TEST_SKIPPED_ADDED');
@@ -76,7 +76,7 @@ describe('patchfinder check', () => {
 
   it('exits 0 on a patch that touches no tests', () => {
     const r = cleanRepo();
-    const result = patchfinder(['check', '--base', 'auto'], { cwd: r.dir });
+    const result = overlock(['check', '--base', 'auto'], { cwd: r.dir });
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('nothing weakened');
@@ -84,7 +84,7 @@ describe('patchfinder check', () => {
 
   it('emits a parseable report under --json', () => {
     const r = weakenedRepo();
-    const result = patchfinder(['check', '--base', 'auto', '--json'], { cwd: r.dir });
+    const result = overlock(['check', '--base', 'auto', '--json'], { cwd: r.dir });
 
     const report = JSON.parse(result.stdout) as {
       schema: number;
@@ -100,63 +100,63 @@ describe('patchfinder check', () => {
 
   it('keeps --compact short enough to read on a phone', () => {
     const r = weakenedRepo();
-    const result = patchfinder(['check', '--base', 'auto', '--compact'], { cwd: r.dir });
+    const result = overlock(['check', '--base', 'auto', '--compact'], { cwd: r.dir });
 
     const lines = result.stdout.trim().split('\n');
     expect(lines.length).toBeLessThanOrEqual(12);
     expect(lines.every((l) => l.length <= 120)).toBe(true);
-    expect(result.stdout).toContain('patchfinder:');
+    expect(result.stdout).toContain('overlock:');
   });
 
   it('respects --fail-on', () => {
     const r = weakenedRepo();
-    expect(
-      patchfinder(['check', '--base', 'auto', '--fail-on', 'none'], { cwd: r.dir }).status,
-    ).toBe(0);
+    expect(overlock(['check', '--base', 'auto', '--fail-on', 'none'], { cwd: r.dir }).status).toBe(
+      0,
+    );
   });
 
   it('checks only what is staged with --staged', () => {
     const r = weakenedRepo();
-    expect(patchfinder(['check', '--staged'], { cwd: r.dir }).status).toBe(0);
+    expect(overlock(['check', '--staged'], { cwd: r.dir }).status).toBe(0);
 
     r.git(['add', '-A']);
-    expect(patchfinder(['check', '--staged'], { cwd: r.dir }).status).toBe(1);
+    expect(overlock(['check', '--staged'], { cwd: r.dir }).status).toBe(1);
   });
 
   it('writes one ledger line per run', () => {
     const r = weakenedRepo();
-    patchfinder(['check', '--base', 'auto'], { cwd: r.dir });
-    patchfinder(['check', '--base', 'auto'], { cwd: r.dir });
+    overlock(['check', '--base', 'auto'], { cwd: r.dir });
+    overlock(['check', '--base', 'auto'], { cwd: r.dir });
 
-    const lines = readFileSync(join(r.dir, '.patchfinder-ledger.jsonl'), 'utf8').trim().split('\n');
+    const lines = readFileSync(join(r.dir, '.overlock-ledger.jsonl'), 'utf8').trim().split('\n');
     expect(lines).toHaveLength(2);
     expect(JSON.parse(lines[0] as string)).toMatchObject({ mode: 'check', ok: false });
   });
 
   it('exits 2 with a usable message outside a repository', () => {
-    const result = patchfinder(['check'], { cwd: '/' });
+    const result = overlock(['check'], { cwd: '/' });
     expect(result.status).toBe(2);
     expect(result.stderr).toContain('git repository');
   });
 
   it('exits 2 on an unknown option and prints usage', () => {
     const r = cleanRepo();
-    const result = patchfinder(['check', '--nope'], { cwd: r.dir });
+    const result = overlock(['check', '--nope'], { cwd: r.dir });
     expect(result.status).toBe(2);
     expect(result.stderr).toContain('Unknown option');
     expect(result.stderr).toContain('USAGE');
   });
 
   it('answers --version and --help without a repository', () => {
-    expect(patchfinder(['--version'], { cwd: '/' }).stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
-    expect(patchfinder(['--help'], { cwd: '/' }).stdout).toContain('USAGE');
+    expect(overlock(['--version'], { cwd: '/' }).stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
+    expect(overlock(['--help'], { cwd: '/' }).stdout).toContain('USAGE');
   });
 });
 
-describe('patchfinder hook claude', () => {
+describe('overlock hook claude', () => {
   it('blocks with exit 2 and the documented JSON on stdout', () => {
     const r = weakenedRepo();
-    const result = patchfinder(['hook', 'claude'], { cwd: r.dir, stdin: '{}' });
+    const result = overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' });
 
     expect(result.status).toBe(2);
 
@@ -170,7 +170,7 @@ describe('patchfinder hook claude', () => {
 
   it('says nothing and exits 0 when the patch is clean', () => {
     const r = cleanRepo();
-    const result = patchfinder(['hook', 'claude'], { cwd: r.dir, stdin: '{}' });
+    const result = overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' });
 
     expect(result.status).toBe(0);
     expect(result.stdout).toBe('');
@@ -178,7 +178,7 @@ describe('patchfinder hook claude', () => {
 
   it('does not block twice — an unfixable finding must not loop the agent', () => {
     const r = weakenedRepo();
-    const result = patchfinder(['hook', 'claude'], {
+    const result = overlock(['hook', 'claude'], {
       cwd: r.dir,
       stdin: JSON.stringify({ stop_hook_active: true }),
     });
@@ -189,23 +189,23 @@ describe('patchfinder hook claude', () => {
 
   it('still works when the payload is absent or malformed', () => {
     const r = weakenedRepo();
-    expect(patchfinder(['hook', 'claude'], { cwd: r.dir, stdin: '' }).status).toBe(2);
-    expect(patchfinder(['hook', 'claude'], { cwd: r.dir, stdin: 'garbage' }).status).toBe(2);
+    expect(overlock(['hook', 'claude'], { cwd: r.dir, stdin: '' }).status).toBe(2);
+    expect(overlock(['hook', 'claude'], { cwd: r.dir, stdin: 'garbage' }).status).toBe(2);
   });
 
   it('records the run as a hook that blocked', () => {
     const r = weakenedRepo();
-    patchfinder(['hook', 'claude'], { cwd: r.dir, stdin: '{}' });
+    overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' });
 
-    const line = readFileSync(join(r.dir, '.patchfinder-ledger.jsonl'), 'utf8').trim();
+    const line = readFileSync(join(r.dir, '.overlock-ledger.jsonl'), 'utf8').trim();
     expect(JSON.parse(line)).toMatchObject({ mode: 'hook', blocked: true });
   });
 });
 
-describe('patchfinder init claude', () => {
+describe('overlock init claude', () => {
   it('writes a committable settings file that the hook then reads', () => {
     const r = cleanRepo();
-    const result = patchfinder(['init', 'claude'], { cwd: r.dir });
+    const result = overlock(['init', 'claude'], { cwd: r.dir });
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('.claude/settings.json');
@@ -214,12 +214,12 @@ describe('patchfinder init claude', () => {
     const settings = JSON.parse(readFileSync(join(r.dir, '.claude', 'settings.json'), 'utf8')) as {
       hooks: { Stop: { hooks: { command: string }[] }[] };
     };
-    expect(settings.hooks.Stop[0]?.hooks[0]?.command).toContain('patchfinder hook claude');
+    expect(settings.hooks.Stop[0]?.hooks[0]?.command).toContain('overlock hook claude');
   });
 
   it('rejects an unknown agent', () => {
     const r = cleanRepo();
-    const result = patchfinder(['init', 'emacs'], { cwd: r.dir });
+    const result = overlock(['init', 'emacs'], { cwd: r.dir });
     expect(result.status).toBe(2);
     expect(result.stderr).toContain('claude');
   });
@@ -228,11 +228,11 @@ describe('patchfinder init claude', () => {
 describe('the whole loop', () => {
   it('goes red on a weakened test and green once it is restored', () => {
     const r = weakenedRepo();
-    expect(patchfinder(['hook', 'claude'], { cwd: r.dir, stdin: '{}' }).status).toBe(2);
+    expect(overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' }).status).toBe(2);
 
     // The agent does the right thing: unskip rather than delete.
     r.write('src/auth.test.ts', PASSING_TEST);
-    expect(patchfinder(['hook', 'claude'], { cwd: r.dir, stdin: '{}' }).status).toBe(0);
+    expect(overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' }).status).toBe(0);
   });
 
   it('catches the second move too, when a lowered threshold replaces the skip', () => {
@@ -242,7 +242,7 @@ describe('the whole loop', () => {
     r.commit('chore: coverage gate');
     r.write('vitest.config.ts', 'export default { test: { coverage: { statements: 20 } } };\n');
 
-    const result = patchfinder(['check', '--base', 'auto', '--json'], { cwd: r.dir });
+    const result = overlock(['check', '--base', 'auto', '--json'], { cwd: r.dir });
     const report = JSON.parse(result.stdout) as { findings: { rule: string }[] };
     expect(report.findings.map((f) => f.rule)).toContain('COVERAGE_THRESHOLD_LOWERED');
   });

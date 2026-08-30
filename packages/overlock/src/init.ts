@@ -6,7 +6,7 @@ export type Agent = 'claude' | 'codex' | 'cursor' | 'copilot';
 export const AGENTS: Agent[] = ['claude', 'codex', 'cursor', 'copilot'];
 
 /** The command a hook or instruction file tells the agent to run. */
-export const HOOK_COMMAND = 'npx -y patchfinder hook claude';
+export const HOOK_COMMAND = 'npx -y overlock hook claude';
 
 export interface InitResult {
   agent: Agent;
@@ -61,7 +61,7 @@ export function initClaude(repoRoot: string): InitResult {
 
   const already = stop.some((group) =>
     (group.hooks ?? []).some(
-      (h) => typeof h.command === 'string' && h.command.includes('patchfinder'),
+      (h) => typeof h.command === 'string' && h.command.includes('overlock'),
     ),
   );
 
@@ -70,7 +70,7 @@ export function initClaude(repoRoot: string): InitResult {
       agent: 'claude',
       written: [],
       unchanged: true,
-      notes: ['.claude/settings.json already runs patchfinder on Stop.'],
+      notes: ['.claude/settings.json already runs overlock on Stop.'],
     };
   }
 
@@ -99,7 +99,7 @@ export function instructionSnippet(): string {
   return [
     '## Before you finish',
     '',
-    'Run `npx -y patchfinder check --compact` before reporting a task complete.',
+    'Run `npx -y overlock check --compact` before reporting a task complete.',
     'If it reports any HIGH finding, fix the cause rather than the check, then run it again.',
     'It reads only the diff you just made; it takes about a second and makes no network calls.',
     '',
@@ -108,7 +108,7 @@ export function instructionSnippet(): string {
 
 const INSTRUCTION_FILES: Record<Exclude<Agent, 'claude'>, string> = {
   codex: 'AGENTS.md',
-  cursor: '.cursor/rules/patchfinder.mdc',
+  cursor: '.cursor/rules/overlock.mdc',
   copilot: '.github/copilot-instructions.md',
 };
 
@@ -124,12 +124,12 @@ export function initInstructions(repoRoot: string, agent: Exclude<Agent, 'claude
     // First write for this agent.
   }
 
-  if (existing.includes('patchfinder check')) {
+  if (existing.includes('overlock check')) {
     return {
       agent,
       written: [],
       unchanged: true,
-      notes: [`${relative} already mentions patchfinder.`],
+      notes: [`${relative} already mentions overlock.`],
     };
   }
 

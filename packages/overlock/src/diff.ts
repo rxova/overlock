@@ -6,7 +6,7 @@ const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
  * Parses `git diff --no-color` output.
  *
  * Hand-written rather than a dependency, because the whole premise of the tool
- * is that `npx patchfinder` is one small download an agent can afford to run on
+ * is that `npx overlock` is one small download an agent can afford to run on
  * every turn. A diff parser is roughly a hundred lines; a dependency is a
  * round trip on every invocation plus a supply-chain surface on a tool whose
  * entire job is trust.

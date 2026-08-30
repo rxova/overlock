@@ -14,10 +14,10 @@ export class TempRepo {
   readonly dir: string;
 
   constructor() {
-    this.dir = mkdtempSync(join(tmpdir(), 'patchfinder-test-'));
+    this.dir = mkdtempSync(join(tmpdir(), 'overlock-test-'));
     this.git(['init', '--quiet', '--initial-branch=main']);
     this.git(['config', 'user.email', 'test@example.com']);
-    this.git(['config', 'user.name', 'Patchfinder Tests']);
+    this.git(['config', 'user.name', 'Overlock Tests']);
     this.git(['config', 'commit.gpgsign', 'false']);
   }
 

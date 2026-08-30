@@ -1,15 +1,15 @@
 {
-  "name": "patchfinder",
+  "name": "overlock",
   "version": "0.1.0",
   "description": "Find out what your coding agent did to your tests. A deterministic, zero-dependency gate on test integrity in a patch.",
   "license": "MIT",
   "author": "Jonatan Kruszewski <jonakrusze@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rxova/Patchfinder.git",
-    "directory": "packages/patchfinder"
+    "url": "git+https://github.com/rxova/overlock.git",
+    "directory": "packages/overlock"
   },
-  "bugs": "https://github.com/rxova/Patchfinder/issues",
+  "bugs": "https://github.com/rxova/overlock/issues",
   "keywords": [
     "ai",
     "agent",
@@ -32,7 +32,7 @@
   },
   "type": "module",
   "bin": {
-    "patchfinder": "./dist/cli.js"
+    "overlock": "./dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

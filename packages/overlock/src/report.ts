@@ -35,12 +35,12 @@ function severityColor(severity: Severity): string {
 /** The terminal view: everything, grouped, with the evidence inline. */
 export function human(report: Report, color: boolean): string {
   if (report.findings.length === 0) {
-    return paint('✓ patchfinder: nothing weakened in this patch.', ANSI.green, color);
+    return paint('✓ overlock: nothing weakened in this patch.', ANSI.green, color);
   }
 
   const lines: string[] = [];
   lines.push(
-    paint(`patchfinder — ${summarize(report)}`, ANSI.bold, color) +
+    paint(`overlock — ${summarize(report)}`, ANSI.bold, color) +
       paint(`  (${report.base})`, ANSI.dim, color),
   );
   lines.push('');
@@ -75,12 +75,12 @@ export function human(report: Report, color: boolean): string {
  * the untruncated text.
  */
 export function compact(report: Report, limit = 3): string {
-  if (report.findings.length === 0) return 'patchfinder: clean.';
+  if (report.findings.length === 0) return 'overlock: clean.';
 
   const shown = report.findings.slice(0, limit);
   const hidden = report.findings.length - shown.length;
 
-  const lines: string[] = [`patchfinder: ${summarize(report)}.`, ''];
+  const lines: string[] = [`overlock: ${summarize(report)}.`, ''];
 
   for (const f of shown) {
     lines.push(`${MARK[f.severity]} ${LABEL[f.severity].trim()} ${f.file}:${f.line} ${f.rule}`);
@@ -93,7 +93,7 @@ export function compact(report: Report, limit = 3): string {
   }
 
   if (hidden > 0) {
-    lines.push('', `...and ${hidden} more. Run \`npx patchfinder check\` for the full list.`);
+    lines.push('', `...and ${hidden} more. Run \`npx overlock check\` for the full list.`);
   }
 
   return lines.join('\n');

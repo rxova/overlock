@@ -7,7 +7,7 @@ import { HOOK_COMMAND, initClaude, initInstructions, instructionSnippet } from '
 let dir: string | null = null;
 
 function makeDir(): string {
-  dir = mkdtempSync(join(tmpdir(), 'patchfinder-init-'));
+  dir = mkdtempSync(join(tmpdir(), 'overlock-init-'));
   return dir;
 }
 
@@ -84,7 +84,7 @@ describe('initInstructions', () => {
     const result = initInstructions(root, 'codex');
 
     expect(result.written).toEqual(['AGENTS.md']);
-    expect(readFileSync(join(root, 'AGENTS.md'), 'utf8')).toContain('patchfinder check');
+    expect(readFileSync(join(root, 'AGENTS.md'), 'utf8')).toContain('overlock check');
     expect(result.notes.join(' ')).toContain('not a gate');
   });
 
@@ -95,7 +95,7 @@ describe('initInstructions', () => {
 
     const text = readFileSync(join(root, 'AGENTS.md'), 'utf8');
     expect(text).toContain('# House rules');
-    expect(text).toContain('patchfinder check');
+    expect(text).toContain('overlock check');
   });
 
   it('is idempotent', () => {
@@ -106,7 +106,7 @@ describe('initInstructions', () => {
 
   it('writes where each agent looks', () => {
     const root = makeDir();
-    expect(initInstructions(root, 'cursor').written).toEqual(['.cursor/rules/patchfinder.mdc']);
+    expect(initInstructions(root, 'cursor').written).toEqual(['.cursor/rules/overlock.mdc']);
     expect(initInstructions(root, 'copilot').written).toEqual(['.github/copilot-instructions.md']);
   });
 });

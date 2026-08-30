@@ -1,0 +1,224 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    # `edited` matters because the PR title becomes the squash-merge subject and
+    # nothing else validates it. `labeled`/`unlabeled` matter because the
+    # changeset gate's escape hatch is a label, and without them the label lands
+    # on a PR whose checks never re-run.
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+# Two lanes per ref. The three metadata-only actions move no file, so they must
+# not cancel a full run already in flight for the same commit and restart the
+# whole graph from zero.
+concurrency:
+  group: >-
+    ${{ github.workflow }}-${{ github.ref }}-${{
+    contains(fromJSON('["edited", "labeled", "unlabeled"]'), github.event.action)
+    && 'metadata' || 'code' }}
+  cancel-in-progress: true
+
+jobs:
+  # The root of the graph: everything else declares `needs: [commitlint]`. It
+  # runs on push as well as pull_request on purpose — a skipped job skips its
+  # dependents, so gating this on pull_request alone would silently skip the
+  # entire workflow on main.
+  commitlint:
+    name: commit messages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      # Every job that reads the tree is gated on this. A title edit or a label
+      # change leaves HEAD where it was, so re-running lint, types and tests
+      # would recompute a verdict this commit already carries. GitHub counts a
+      # job skipped by `if:` as satisfying a required check, which a trigger
+      # filter would not.
+      code-changed: ${{ steps.scope.outputs.code-changed }}
+    steps:
+      - name: Decide whether this event touched the tree
+        id: scope
+        env:
+          ACTION: ${{ github.event.action }}
+        run: |
+          case "$ACTION" in
+            edited | labeled | unlabeled) echo 'code-changed=false' >> "$GITHUB_OUTPUT" ;;
+            *) echo 'code-changed=true' >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint the branch commits
+        if: github.event_name == 'pull_request'
+        run: >-
+          pnpm exec commitlint --verbose
+          --from ${{ github.event.pull_request.base.sha }}
+          --to ${{ github.event.pull_request.head.sha }}
+
+      # Read the title live from the API rather than out of `github.event`: an
+      # edit no longer cancels the run in flight, so two runs can publish this
+      # check at once and the payload one could affirm a title the edit has since
+      # broken. Piped, never interpolated — a PR title is attacker-controlled text.
+      - name: Lint the PR title
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -o pipefail
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json title --jq .title \
+            | pnpm exec commitlint --verbose
+
+      - name: Lint the pushed commit
+        if: github.event_name == 'push'
+        run: pnpm exec commitlint --last --verbose
+
+  checks:
+    name: lint · format · types · build
+    needs: [commitlint]
+    if: needs.commitlint.outputs.code-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/turbo-cache
+      - run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Check formatting
+        run: pnpm format:check
+      - name: Build
+        run: pnpm exec turbo run build
+      - name: Typecheck
+        run: pnpm exec turbo run typecheck
+
+  test:
+    name: unit (node ${{ matrix.node-version }})
+    needs: [commitlint]
+    if: needs.commitlint.outputs.code-changed == 'true' && github.head_ref != 'changeset-release/main'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # The package supports Node >= 20.11; pnpm 11 needs >= 22.13 to install,
+        # so 20 is exercised by the compatibility job below instead.
+        node-version: [22, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-pnpm
+        with:
+          node-version: ${{ matrix.node-version }}
+      # Turbo hashes files and env, not the Node binary, and the cache action
+      # keys on `github.job` — one string for every leg of a matrix. Naming the
+      # partition after the leg keeps node 24 from replaying a node 22 result.
+      - uses: ./.github/actions/turbo-cache
+        with:
+          key: unit-node${{ matrix.node-version }}
+      - run: pnpm install --frozen-lockfile
+      - name: Test with coverage thresholds
+        run: pnpm test
+
+  e2e:
+    name: e2e (real git repositories)
+    needs: [commitlint]
+    if: needs.commitlint.outputs.code-changed == 'true' && github.head_ref != 'changeset-release/main'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The suite spawns git and reads its output. Path separators, line
+        # endings and the shell all differ on Windows, and this is the only
+        # suite that would notice.
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/turbo-cache
+        with:
+          key: e2e-${{ matrix.os }}
+      - run: pnpm install --frozen-lockfile
+      - name: Configure git for the fixtures
+        run: |
+          git config --global user.email "ci@example.com"
+          git config --global user.name "CI"
+          git config --global init.defaultBranch main
+      - name: End-to-end
+        run: pnpm run e2e
+
+  supply-chain:
+    name: audit · dedupe
+    needs: [commitlint]
+    if: needs.commitlint.outputs.code-changed == 'true' && github.head_ref != 'changeset-release/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/turbo-cache
+      - run: pnpm install --frozen-lockfile
+      # `audit:check` is deliberately not a Turbo task: its verdict depends on
+      # the upstream advisory database, which changes without any file here
+      # changing, so a cached pass could replay over a fresh CVE.
+      - name: Audit dependencies
+        run: pnpm run audit:check
+      - name: Check dependency dedupe
+        run: pnpm run dedupe:check
+
+  pack-smoke:
+    name: package contract
+    needs: [commitlint]
+    if: needs.commitlint.outputs.code-changed == 'true' && github.head_ref != 'changeset-release/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/turbo-cache
+      - run: pnpm install --frozen-lockfile
+      - name: Publint and Are The Types Wrong
+        run: pnpm run check:exports
+      # Packs the real tarball and runs the published bin out of it. The only
+      # check that catches a `files` entry that dropped dist.
+      - name: Pack smoke test
+        run: pnpm run pack:smoke
+
+  dogfood:
+    name: patchfinder on itself
+    needs: [commitlint]
+    if: github.event_name == 'pull_request' && needs.commitlint.outputs.code-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec turbo run build
+      # A tool that gates other people's test edits has no business exempting
+      # its own. Runs against the PR's base so it sees exactly this branch's work.
+      - name: Check this branch's own patch
+        run: node packages/patchfinder/dist/cli.js check --base ${{ github.event.pull_request.base.sha }} --no-ledger
+
+  changeset:
+    name: changeset present
+    needs: [commitlint]
+    if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Require a changeset when the published package changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node --import tsx ./packages/tooling/check-changeset.ts

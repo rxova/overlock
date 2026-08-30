@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+set -e
+
+# One ordered gate, the same list CI runs, so a green push means a green
+# pipeline. Turbo caches unchanged tasks, so a re-push after a docs-only edit
+# replays in seconds. (E2E is not in verify — it runs as its own CI job.)
+pnpm run verify

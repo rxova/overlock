@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+set -e
+
+# eslint --fix + prettier --write over exactly the staged files.
+pnpm exec lint-staged
+
+# The whole-program checks lint-staged cannot do per-file: types are a property
+# of the program, not of a file, and a unit test can only fail against the whole
+# module graph. Turbo replays both from cache for every package whose inputs are
+# byte-identical, so this re-checks only what the commit actually touched —
+# without asking git what "changed", which is what keeps it correct mid-rebase,
+# after a cherry-pick and on a merge.
+#
+# The heavier work (build, audit, dedupe, packaging) stays in pre-push; e2e
+# stays in CI.
+pnpm exec turbo run typecheck test

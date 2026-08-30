@@ -1,0 +1,70 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "globalDependencies": ["tsconfig.base.json", ".nvmrc"],
+  "globalPassThroughEnv": ["CI"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      // A build only reads src + build config. Excluding the suites keeps
+      // editing a test from busting the build cache — they cannot affect dist.
+      "inputs": ["$TURBO_DEFAULT$", "!e2e/**", "!**/*.test.ts", "!README.md", "!CHANGELOG.md"],
+      "outputLogs": "new-only"
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "outputLogs": "new-only"
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"],
+      "outputLogs": "new-only"
+    },
+    // publint and attw read the manifest and the emitted types.
+    "check:exports": {
+      "dependsOn": ["build"],
+      "outputs": [],
+      "outputLogs": "new-only"
+    },
+    // Packs the real tarball, installs it into a scratch project and runs the
+    // published bin — the only check that catches a `files` entry that dropped
+    // dist, or a bin that is not executable once npm has unpacked it.
+    //
+    // Keyed on the shared script as well as the package, so editing the checker
+    // invalidates the cache instead of replaying an old pass.
+    "pack:smoke": {
+      "dependsOn": ["build"],
+      "outputs": [],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/tooling/pack-smoke.ts"],
+      "outputLogs": "new-only"
+    },
+    // Not a Turbo task by omission elsewhere, but listed here so the root
+    // script can fan it out: e2e spawns the built binary against real temporary
+    // git repositories, so it depends on this package's own build, not its
+    // dependencies'.
+    "e2e": {
+      "dependsOn": ["build"],
+      "outputs": [],
+      "cache": false
+    },
+    // A root task (`//#`): `pnpm dedupe --check` reads the whole workspace in
+    // one pass, so there is nothing to fan out. Keyed on exactly the files that
+    // feed it, so source edits replay it while any manifest change re-runs it.
+    //
+    // Deliberately NOT applied to audit:check: its verdict depends on the
+    // upstream advisory database, which changes without any file here changing,
+    // so a cached pass could replay over a newly-disclosed CVE.
+    "//#dedupe:check": {
+      "outputs": [],
+      "inputs": [
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "package.json",
+        "packages/*/package.json"
+      ],
+      "outputLogs": "new-only"
+    }
+  }
+}

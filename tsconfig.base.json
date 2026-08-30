@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    // tsup's dts build hardcodes `baseUrl` (rollup.js: `compilerOptions.baseUrl || "."`),
+    // which TS 6 deprecates and TS 7 removes. None of our own configs set it, so this
+    // only silences tsup's injection — drop it when tsup stops forcing baseUrl.
+    "ignoreDeprecations": "6.0",
+    "target": "ES2023",
+    // ES2022.Error for `new Error(msg, { cause })`: every git and filesystem
+    // failure in this tool is re-thrown with the underlying error attached, and
+    // without this the `cause` option does not typecheck.
+    "lib": ["ES2023", "ES2022.Error"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true
+  }
+}

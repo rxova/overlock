@@ -1,0 +1,69 @@
+{
+  "name": "patchfinder",
+  "version": "0.1.0",
+  "description": "Find out what your coding agent did to your tests. A deterministic, zero-dependency gate on test integrity in a patch.",
+  "license": "MIT",
+  "author": "Jonatan Kruszewski <jonakrusze@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rxova/Patchfinder.git",
+    "directory": "packages/patchfinder"
+  },
+  "bugs": "https://github.com/rxova/Patchfinder/issues",
+  "keywords": [
+    "ai",
+    "agent",
+    "coding-agent",
+    "claude-code",
+    "codex",
+    "cursor",
+    "copilot",
+    "hooks",
+    "code-review",
+    "diff",
+    "git",
+    "test-integrity",
+    "reward-hacking",
+    "guardrails",
+    "lint"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "bin": {
+    "patchfinder": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run --coverage",
+    "e2e": "vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --noEmit",
+    "check:exports": "publint --strict && attw --pack . --profile esm-only",
+    "pack:smoke": "node --import tsx ../tooling/pack-smoke.ts"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@types/node": "^24.13.3",
+    "@vitest/coverage-v8": "^4.1.10",
+    "publint": "^0.3.21",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Explicit rather than relying on automatic @types discovery: this package
+    // is a Node CLI, and `node` is the only ambient type set it should see.
+    "types": ["node"]
+  },
+  "include": ["src", "e2e"]
+}

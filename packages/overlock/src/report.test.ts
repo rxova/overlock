@@ -35,7 +35,7 @@ describe('human', () => {
 
 describe('compact', () => {
   it('is one line when clean', () => {
-    expect(compact(clean)).toBe('patchfinder: clean.');
+    expect(compact(clean)).toBe('overlock: clean.');
   });
 
   it('shows at most the limit and says how many it held back', () => {

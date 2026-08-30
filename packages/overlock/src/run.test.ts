@@ -10,7 +10,7 @@ let repo: TempRepo | null = null;
 afterEach(() => {
   repo?.cleanup();
   repo = null;
-  delete process.env.PATCHFINDER_LEDGER;
+  delete process.env.OVERLOCK_LEDGER;
 });
 
 function repoWithWeakenedTest(): TempRepo {
@@ -35,7 +35,7 @@ describe('run', () => {
   it('records the run in the ledger without recording source', () => {
     const r = repoWithWeakenedTest();
     const path = join(r.dir, 'ledger.jsonl');
-    process.env.PATCHFINDER_LEDGER = path;
+    process.env.OVERLOCK_LEDGER = path;
 
     run({ cwd: r.dir, base: 'auto', mode: 'hook' });
 
@@ -49,15 +49,15 @@ describe('run', () => {
   it('writes nothing when the ledger is off', () => {
     const r = repoWithWeakenedTest();
     const path = join(r.dir, 'ledger.jsonl');
-    process.env.PATCHFINDER_LEDGER = path;
+    process.env.OVERLOCK_LEDGER = path;
 
     run({ cwd: r.dir, base: 'auto', ledger: false });
 
     expect(() => readFileSync(path, 'utf8')).toThrow();
   });
 
-  it('honours PATCHFINDER_LEDGER for the default path', () => {
-    process.env.PATCHFINDER_LEDGER = '/tmp/explicit.jsonl';
+  it('honours OVERLOCK_LEDGER for the default path', () => {
+    process.env.OVERLOCK_LEDGER = '/tmp/explicit.jsonl';
     expect(ledgerPath(process.env)).toBe('/tmp/explicit.jsonl');
   });
 });

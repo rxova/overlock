@@ -17,9 +17,9 @@ export interface LedgerEntry {
 }
 
 export function ledgerPath(env: NodeJS.ProcessEnv = process.env): string {
-  const override = env.PATCHFINDER_LEDGER;
+  const override = env.OVERLOCK_LEDGER;
   if (override) return override;
-  return join(env.PATCHFINDER_HOME ?? join(homedir(), '.patchfinder'), 'ledger.jsonl');
+  return join(env.OVERLOCK_HOME ?? join(homedir(), '.overlock'), 'ledger.jsonl');
 }
 
 export function toEntry(input: {

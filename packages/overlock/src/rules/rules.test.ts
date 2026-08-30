@@ -91,7 +91,7 @@ describe('TEST_SKIPPED_ADDED', () => {
     expect(rulesFor(diffOf('src/lib.rs', hunk('+#[ignore]')))).toContain('TEST_SKIPPED_ADDED');
   });
 
-  // Both of these came from running patchfinder against its own repository,
+  // Both of these came from running overlock against its own repository,
   // where they fired 28 times on documentation and test fixtures.
   it('does not read a language marker outside that language', () => {
     expect(rulesFor(diffOf('README.md', hunk('+| `t.Skip()` | skips a Go test |')))).not.toContain(

@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const pkgDir = process.cwd();
-const scratch = mkdtempSync(join(tmpdir(), 'patchfinder-pack-'));
+const scratch = mkdtempSync(join(tmpdir(), 'overlock-pack-'));
 
 function sh(command: string, args: string[], cwd: string): string {
   return execFileSync(command, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -28,7 +28,7 @@ try {
   sh('npm', ['install', '--no-audit', '--no-fund', join(scratch, tarball)], scratch);
 
   // The bin, as a consumer gets it.
-  const version = sh('npx', ['--no-install', 'patchfinder', '--version'], scratch).trim();
+  const version = sh('npx', ['--no-install', 'overlock', '--version'], scratch).trim();
   if (!/^\d+\.\d+\.\d+/.test(version)) {
     throw new Error(`published bin reported an unusable version: ${version}`);
   }
@@ -38,7 +38,7 @@ try {
   writeFileSync(
     probe,
     [
-      "import { analyze, RULE_IDS } from 'patchfinder';",
+      "import { analyze, RULE_IDS } from 'overlock';",
       "const report = analyze({ diff: '' });",
       'if (report.findings.length !== 0) throw new Error("empty diff produced findings");',
       'if (RULE_IDS.length !== 9) throw new Error("rule registry changed shape");',
@@ -48,7 +48,7 @@ try {
   const probeOut = sh('node', [probe], scratch).trim();
   if (probeOut !== 'ok') throw new Error(`probe failed: ${probeOut}`);
 
-  console.log(`pack:smoke ok — patchfinder@${version} installs and runs from a tarball`);
+  console.log(`pack:smoke ok — overlock@${version} installs and runs from a tarball`);
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

@@ -1,13 +1,13 @@
 # Working in this repository
 
-`patchfinder` reads a git diff and reports test-integrity findings. It is a
+`overlock` reads a git diff and reports test-integrity findings. It is a
 deterministic CLI with **zero runtime dependencies** — that is a product
 constraint, not an accident. Something runs this on every agent turn, so a
 runtime dependency costs a network round trip each time. Do not add one.
 
 ## Layout
 
-- `packages/patchfinder` — the published package.
+- `packages/overlock` — the published package.
   - `src/diff.ts` — unified diff parser, hand-written for the same reason.
   - `src/rules/` — the nine rules. Each is pure: `DiffFile[]` in, `Finding[]` out.
   - `src/report.ts` — three views. `compact` is the one that reaches a phone.
@@ -38,7 +38,7 @@ train people to use `--no-verify`.
 ## The hook on this repository
 
 `.claude/settings.json` runs the **locally built** binary rather than
-`npx -y patchfinder`, which is what `patchfinder init claude` writes everywhere
+`npx -y overlock`, which is what `overlock init claude` writes everywhere
 else. This repository is the package, so it gates itself on the code in the
 working tree, not on the last published release. Run `pnpm exec turbo run build`
 once and the hook is live; before that it exits non-zero without blocking, which

@@ -1,23 +1,26 @@
-# patchfinder
+# overlock
 
 **Find out what your coding agent did to your tests.**
+
+> An overlock stitch binds a raw seam edge so it cannot fray.
+> This does the same to a test suite.
 
 An agent that cannot make a test pass has a second option: make the test stop
 asking. It adds `it.skip`, it swaps `toBe(3)` for `toBeDefined()`, it edits the
 expected value to whatever the code now returns, it lowers a coverage threshold.
 Then it reports success, truthfully as far as its summary goes.
 
-`patchfinder` reads the diff the agent just made and answers one question:
+`overlock` reads the diff the agent just made and answers one question:
 
 > Did this change make the tests pass by weakening the tests?
 
 Deterministic. No LLM calls, no network, no telemetry. Zero runtime
-dependencies, so `npx patchfinder` on a cold cache is one small download — which
+dependencies, so `npx overlock` on a cold cache is one small download — which
 matters when something runs it on every turn.
 
 ```console
-$ npx patchfinder
-patchfinder — 2 findings (2 high)  (HEAD)
+$ npx overlock
+overlock — 2 findings (2 high)  (HEAD)
 
 ✗ HIGH  src/auth.test.ts:42  TEST_SKIPPED_ADDED
      .skip added — this test no longer runs.
@@ -39,7 +42,7 @@ merge on trust or park everything until you are back at a laptop. The agent's
 summary is the one artifact you can actually read on a phone, and it is exactly
 the artifact that will not mention a weakened assertion.
 
-Installed as a Claude Code Stop hook, `patchfinder` makes that self-report
+Installed as a Claude Code Stop hook, `overlock` makes that self-report
 falsifiable. The agent cannot end its turn claiming success while a HIGH finding
 stands, and the reason it gets back is written to be read one-handed.
 
@@ -47,10 +50,10 @@ stands, and the reason it gets back is written to be read one-handed.
 
 ```bash
 # Run it once, right now, against your working tree
-npx patchfinder
+npx overlock
 
 # Or wire it into your agent
-npx patchfinder init claude
+npx overlock init claude
 ```
 
 `init claude` writes a **committed** `.claude/settings.json`. That is
@@ -91,16 +94,16 @@ conventions are recognised out of the box. `--test-glob` adds your own.
 ## Usage
 
 ```bash
-patchfinder [check]                 # the current patch
-patchfinder --staged                # only what is staged
-patchfinder --base main             # against a ref
-patchfinder --json                  # the full report, for a script or an agent
-patchfinder --compact               # the short form a phone can read
-patchfinder --fail-on medium        # high | medium | low | none
-patchfinder --test-glob '\.check\.ts$'
+overlock [check]                 # the current patch
+overlock --staged                # only what is staged
+overlock --base main             # against a ref
+overlock --json                  # the full report, for a script or an agent
+overlock --compact               # the short form a phone can read
+overlock --fail-on medium        # high | medium | low | none
+overlock --test-glob '\.check\.ts$'
 ```
 
-Exit codes: `0` clean, `1` findings at or above `--fail-on`, `2` patchfinder
+Exit codes: `0` clean, `1` findings at or above `--fail-on`, `2` overlock
 could not run.
 
 `--base auto` (the default for the hook) works out what "this patch" means: your
@@ -136,14 +139,14 @@ changing what an existing ID means is a breaking one.
 ## Programmatic use
 
 ```ts
-import { analyze } from 'patchfinder';
+import { analyze } from 'overlock';
 
 const report = analyze({ diff: myUnifiedDiff, failOn: 'medium' });
 ```
 
 ## The ledger
 
-Every run appends one line to `~/.patchfinder/ledger.jsonl`: timestamp, repo,
+Every run appends one line to `~/.overlock/ledger.jsonl`: timestamp, repo,
 branch, which rules fired, and whether the run actually blocked. It exists to
 answer one question after a month of use — _how many times did my agent weaken a
 test that I would have merged without noticing?_
@@ -152,7 +155,7 @@ It records rule, severity and location. It never records file contents: the
 evidence lines in a finding are your source code, and a ledger that accumulated
 them would be a copy of your repository sitting in your home directory.
 
-`--no-ledger` turns it off; `PATCHFINDER_LEDGER` moves it.
+`--no-ledger` turns it off; `OVERLOCK_LEDGER` moves it.
 
 ## What it is not
 
@@ -163,7 +166,7 @@ the human review moment on the PR page. Not a scope gate —
 [`agent-guardrails`](https://www.npmjs.com/package/agent-guardrails) checks a
 change against a declared plan.
 
-`patchfinder` does one thing those do not: it reads the patch for the specific
+`overlock` does one thing those do not: it reads the patch for the specific
 edits that buy a green check, and it is deterministic enough to sit in a hook
 and block on the result.
 

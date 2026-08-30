@@ -190,7 +190,7 @@ jobs:
         run: pnpm run pack:smoke
 
   dogfood:
-    name: patchfinder on itself
+    name: overlock on itself
     needs: [commitlint]
     if: github.event_name == 'pull_request' && needs.commitlint.outputs.code-changed == 'true'
     runs-on: ubuntu-latest
@@ -204,7 +204,7 @@ jobs:
       # A tool that gates other people's test edits has no business exempting
       # its own. Runs against the PR's base so it sees exactly this branch's work.
       - name: Check this branch's own patch
-        run: node packages/patchfinder/dist/cli.js check --base ${{ github.event.pull_request.base.sha }} --no-ledger
+        run: node packages/overlock/dist/cli.js check --base ${{ github.event.pull_request.base.sha }} --no-ledger
 
   changeset:
     name: changeset present

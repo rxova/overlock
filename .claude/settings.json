@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./packages/patchfinder/dist/cli.js hook claude"
+            "command": "node ./packages/overlock/dist/cli.js hook claude"
           }
         ]
       }

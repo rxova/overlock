@@ -309,6 +309,27 @@ measurable from a log. The second half is reported as a question rather than a
 score, because a tool that graded itself on both halves would be marking its own
 homework.
 
+## Notes on trust
+
+overlock reads a patch and hands what it finds to a terminal, an agent and a
+pull request comment. Everything it quotes is written by whoever wrote the
+patch, so:
+
+- **Refs are refs.** A `--base` that starts with a dash is refused. `git diff
+--output=FILE` writes wherever it is pointed, and `base` is reachable from the
+  MCP tool argument — so without that check, anything able to call the tool
+  could overwrite a file as you.
+- **An unknown `--fail-on` fails closed**, at `high`, rather than making every
+  comparison false and passing everything.
+- **Evidence, messages and paths are stripped of control characters and capped.**
+  A test name carrying an erase-line sequence would otherwise rewrite the verdict
+  printed above it; a backtick or newline in a path would break out of the code
+  span in a pull request comment.
+- **Evidence is labelled as quoted content** where it reaches an agent, because
+  a test name is attacker-controlled text arriving in a context window.
+- **Symlinks are never followed** out of the repository, and nothing is ever
+  written to the git index.
+
 ## What it is not
 
 Not a linter — ESLint already reviews your code, and

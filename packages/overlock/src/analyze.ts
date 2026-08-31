@@ -18,8 +18,18 @@ export interface AnalyzeOptions {
   failOn?: Severity | 'none';
 }
 
+/**
+ * An unrecognised level used to make every severity comparison false, so a
+ * patch carrying a HIGH finding reported `ok`. A gate given a value it does not
+ * understand has to fail closed.
+ */
+function normalizeFailOn(value: Severity | 'none'): Severity | 'none' {
+  return value === 'none' || value in SEVERITY_RANK ? value : 'high';
+}
+
 export function analyze(options: AnalyzeOptions): Report {
-  const { diff, base = 'HEAD', testGlobs = [], failOn = 'high' } = options;
+  const { diff, base = 'HEAD', testGlobs = [] } = options;
+  const failOn = normalizeFailOn(options.failOn ?? 'high');
 
   const files = parseDiff(diff);
   const ctx = {

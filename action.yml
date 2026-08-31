@@ -108,8 +108,11 @@ runs:
           exit "$status"
         fi
 
-        findings=$(node -e "process.stdout.write(String(require('$report').findings.length))")
-        ok=$(node -e "process.stdout.write(String(require('$report').ok))")
+        # Through the environment rather than interpolated into the script: the
+        # path is ours today, but building shell out of values is how the next
+        # person's change becomes an injection.
+        findings=$(REPORT="$report" node -e 'const r=require(process.env.REPORT);process.stdout.write(String(r.findings.length))')
+        ok=$(REPORT="$report" node -e 'const r=require(process.env.REPORT);process.stdout.write(String(r.ok))')
 
         {
           echo "ok=$ok"
@@ -145,9 +148,17 @@ runs:
             printf '| Severity | Rule | Where |\n| --- | --- | --- |\n'
             node -e '
               const report = require(process.env.REPORT);
+              // Rule and path come from the diff, so on any pull request they are
+              // chosen by whoever opened it. A backtick closes the code span and a
+              // newline ends the row and starts one the attacker writes. Both are
+              // stripped rather than escaped: neither belongs in either field.
+              const cell = (value) =>
+                String(value)
+                  .replace(/[\u0000-\u001F\u007F\u0060]/g, "")
+                  .replace(/\|/g, "\\|")
+                  .slice(0, 200);
               for (const f of report.findings) {
-                const cell = (s) => String(s).replace(/\|/g, "\\|");
-                process.stdout.write(`| ${f.severity} | \`${cell(f.rule)}\` | \`${cell(f.file)}:${f.line}\` |\n`);
+                process.stdout.write(`| ${cell(f.severity)} | \`${cell(f.rule)}\` | \`${cell(f.file)}:${Number(f.line) || 0}\` |\n`);
               }
             '
             printf '\nSilence one deliberately with `// overlock-ignore RULE_ID -- reason`.\n'
@@ -168,6 +179,11 @@ runs:
     - name: Fail if the gate did not pass
       if: ${{ steps.check.outputs.status != '0' }}
       shell: bash
+      # `${{ }}` expressions are pasted into the script before bash sees it, so
+      # they belong in env even when the values are ones this action computed.
+      env:
+        FINDINGS: ${{ steps.check.outputs.findings }}
+        FAIL_ON: ${{ inputs.fail-on }}
       run: |
-        echo "::error::overlock found ${{ steps.check.outputs.findings }} finding(s) at or above ${{ inputs.fail-on }}"
+        echo "::error::overlock found $FINDINGS finding(s) at or above $FAIL_ON"
         exit 1

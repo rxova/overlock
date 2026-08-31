@@ -250,7 +250,7 @@ export function main(argv: string[], io: Io): number {
     return report.ok ? 0 : 1;
   } catch (error) {
     if (error instanceof GitError) {
-      io.stderr(`overlock: ${error.message}. Is this a git repository?\n`);
+      io.stderr(`overlock: ${error.message}${error.hint ? `. ${error.hint}` : ''}\n`);
       return 2;
     }
     io.stderr(`overlock: ${error instanceof Error ? error.message : String(error)}\n`);

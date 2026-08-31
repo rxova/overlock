@@ -40,6 +40,17 @@ export function withoutStringContents(text: string): string {
   return text.replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, '$1$1');
 }
 
+/**
+ * Paths are rendered into markdown code spans in pull request comments, so a
+ * backtick closes the span and a newline ends the row and begins one the
+ * attacker writes. Neither belongs in a path this tool reports.
+ */
+export function sanitizePath(path: string): string {
+  // eslint-disable-next-line no-control-regex -- stripping control characters is the point
+  const stripped = path.replace(/[\u0000-\u001F\u007F`]/g, '');
+  return stripped.length <= MAX_TEXT ? stripped : `...${stripped.slice(-MAX_TEXT)}`;
+}
+
 export function finding(input: {
   rule: RuleId;
   severity: Severity;
@@ -55,10 +66,10 @@ export function finding(input: {
   if (input.after !== undefined) evidence.after = sanitize(input.after.trim());
 
   return {
-    id: `${input.rule}:${input.file}:${input.line}`,
+    id: `${input.rule}:${sanitizePath(input.file)}:${input.line}`,
     rule: input.rule,
     severity: input.severity,
-    file: input.file,
+    file: sanitizePath(input.file),
     line: input.line,
     message: sanitize(input.message),
     evidence,

@@ -2,11 +2,19 @@
 import { readFileSync } from 'node:fs';
 import { GitError, repoRoot } from './git.js';
 import { parseStopPayload, stopHookOutcome } from './hook.js';
-import { AGENTS, type Agent, initClaude, initInstructions, instructionSnippet } from './init.js';
+import {
+  AGENTS,
+  type Agent,
+  initClaude,
+  initInstructions,
+  instructionSnippet,
+  mcpSnippet,
+} from './init.js';
 import { compact, human, json, summaryText, useColor } from './report.js';
 import { run } from './run.js';
 import { ledgerPath } from './ledger.js';
 import { readLedger, summarize } from './summary.js';
+import { MessageBuffer, handleMessage } from './mcp.js';
 import type { Severity } from './types.js';
 
 const VERSION = typeof __OVERLOCK_VERSION__ === 'string' ? __OVERLOCK_VERSION__ : '0.0.0';
@@ -18,6 +26,7 @@ USAGE
   overlock hook claude           Run as a Claude Code Stop hook (reads stdin)
   overlock init <agent>          Wire it into an agent: ${AGENTS.join(', ')}
   overlock report [--days N]     What the ledger has been recording
+  overlock mcp                   Serve as an MCP tool over stdio
 
 CHECK OPTIONS
   --base <ref>       Diff against this ref. Default: auto
@@ -53,7 +62,7 @@ Findings are advisory. The tool reads a diff; it never edits your code, and it
 makes no network calls.`;
 
 export interface ParsedArgs {
-  command: 'check' | 'hook' | 'init' | 'report' | 'help' | 'version';
+  command: 'check' | 'hook' | 'init' | 'report' | 'mcp' | 'help' | 'version';
   target?: string;
   base?: string;
   staged: boolean;
@@ -87,10 +96,11 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
   const first = rest[0];
 
   if (first !== undefined && !first.startsWith('-')) {
-    if (first !== 'check' && first !== 'hook' && first !== 'init' && first !== 'report') {
+    const commands = ['check', 'hook', 'init', 'report', 'mcp'] as const;
+    if (!(commands as readonly string[]).includes(first)) {
       throw new UsageError(`Unknown command: ${first}`);
     }
-    parsed.command = first;
+    parsed.command = first as ParsedArgs['command'];
     rest.shift();
     const target = rest[0];
     if (target !== undefined && !target.startsWith('-')) {
@@ -183,6 +193,8 @@ export interface Io {
   stdout: (text: string) => void;
   stderr: (text: string) => void;
   readStdin: () => string;
+  /** Streaming stdin, for the long-lived MCP transport. */
+  onStdin: (handler: (chunk: string) => void) => void;
   isTTY: boolean;
   env: NodeJS.ProcessEnv;
 }
@@ -208,6 +220,7 @@ export function main(argv: string[], io: Io): number {
   try {
     if (args.command === 'init') return runInit(args, io);
     if (args.command === 'report') return runReport(args, io);
+    if (args.command === 'mcp') return runMcp(args, io);
 
     const { report } = run({
       cwd: args.cwd,
@@ -260,6 +273,41 @@ function runReport(args: ParsedArgs, io: Io): number {
   return 0;
 }
 
+/**
+ * The MCP transport is stdout, so nothing else may be written to it — a stray
+ * log line is a parse error at the other end. Everything human goes to stderr.
+ */
+function runMcp(args: ParsedArgs, io: Io): number {
+  const deps = {
+    version: VERSION,
+    check: (call: { base?: string; staged?: boolean; failOn?: string }) =>
+      run({
+        cwd: args.cwd,
+        base: call.base ?? 'auto',
+        ...(call.staged === undefined ? {} : { staged: call.staged }),
+        failOn: (call.failOn ?? 'high') as Severity | 'none',
+        testGlobs: args.testGlobs,
+        mode: 'check' as const,
+        ledger: args.ledger,
+        untracked: args.untracked,
+      }).report,
+    report: (call: { days?: number }) =>
+      summarize(readLedger(ledgerPath(io.env)), { days: call.days ?? args.days }),
+  };
+
+  const buffer = new MessageBuffer();
+  io.stderr(`overlock ${VERSION} mcp server ready\n`);
+
+  io.onStdin((chunk) => {
+    for (const message of buffer.push(chunk)) {
+      const response = handleMessage(message, deps);
+      if (response) io.stdout(`${JSON.stringify(response)}\n`);
+    }
+  });
+
+  return 0;
+}
+
 function runInit(args: ParsedArgs, io: Io): number {
   const agent = args.target as Agent | undefined;
   if (agent === undefined || !AGENTS.includes(agent)) {
@@ -279,6 +327,8 @@ function runInit(args: ParsedArgs, io: Io): number {
   }
   if (agent !== 'claude') io.stdout(`\n${instructionSnippet()}`);
 
+  io.stdout(`\nTo let agents discover it as a tool, add to .mcp.json:\n\n${mcpSnippet()}`);
+
   return 0;
 }
 
@@ -296,6 +346,14 @@ if (process.env.OVERLOCK_NO_AUTORUN !== '1') {
       } catch {
         return '';
       }
+    },
+    onStdin: (handler) => {
+      process.stdin.setEncoding('utf8');
+      process.stdin.on('data', handler);
+      // The server lives as long as its transport. When the client closes the
+      // pipe there is nothing left to answer, so exiting is the correct end.
+      process.stdin.on('end', () => process.exit(0));
+      process.stdin.resume();
     },
     isTTY: process.stdout.isTTY === true,
     env: process.env,

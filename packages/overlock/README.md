@@ -91,6 +91,33 @@ place by telling you which implementation change the other findings are about.
 Languages: TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, Ruby and C#
 conventions are recognised out of the box. `--test-glob` adds your own.
 
+## As an MCP tool
+
+```console
+$ overlock init claude     # also prints the MCP snippet
+```
+
+Or add it to `.mcp.json` yourself:
+
+```json
+{
+  "mcpServers": {
+    "overlock": { "command": "npx", "args": ["-y", "overlock", "mcp"] }
+  }
+}
+```
+
+Two tools: `overlock_check` and `overlock_report`. The check tool returns the
+compact report, plus the full JSON only when there is something to act on — a
+clean run costs one line rather than a serialised empty report.
+
+The server is spoken by hand rather than through
+`@modelcontextprotocol/sdk`. MCP over stdio is newline-delimited JSON-RPC 2.0
+with five methods, which is less code than the argument for adding a runtime
+dependency to a package an agent runs on every turn. Protocol versions are taken
+from the official SDK's own constants, and negotiation echoes the client's
+version when it is one overlock knows.
+
 ## Silencing a finding
 
 Sometimes a skip is deliberate — a test quarantined behind a real bug, waiting

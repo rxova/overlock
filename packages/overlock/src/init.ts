@@ -95,6 +95,18 @@ export function initClaude(repoRoot: string): InitResult {
  * instruction rather than a gate: the agent is told to run the check before it
  * reports done. Weaker, and honest about being weaker.
  */
+/** What to paste into `.mcp.json` for any MCP-capable agent. */
+export function mcpSnippet(): string {
+  return [
+    '{',
+    '  "mcpServers": {',
+    '    "overlock": { "command": "npx", "args": ["-y", "overlock", "mcp"] }',
+    '  }',
+    '}',
+    '',
+  ].join('\n');
+}
+
 export function instructionSnippet(): string {
   return [
     '## Before you finish',

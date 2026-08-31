@@ -1,6 +1,6 @@
 export { analyze, type AnalyzeOptions } from './analyze.js';
 export { parseDiff, addedLines, removedLines } from './diff.js';
-export { untrackedDiff, untrackedFiles } from './git.js';
+export { hasCommits, untrackedDiff, untrackedFiles } from './git.js';
 export { stopHookOutcome, parseStopPayload, type HookOutcome } from './hook.js';
 export {
   AGENTS,

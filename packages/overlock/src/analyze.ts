@@ -1,6 +1,7 @@
 import { parseDiff } from './diff.js';
 import { isTestFile } from './paths.js';
 import { RULES } from './rules/index.js';
+import { sanitize } from './rules/shared.js';
 import { applySuppressions, collectSuppressions } from './suppress.js';
 import type { Finding, Report, RuleId, Severity } from './types.js';
 
@@ -27,11 +28,12 @@ export function analyze(options: AnalyzeOptions): Report {
   };
 
   const raw = RULES.flatMap((rule) => rule.run(ctx));
-  const { kept, suppressed } = applySuppressions(
+  const { kept, suppressed, used } = applySuppressions(
     sortFindings(dedupe(raw)),
     collectSuppressions(files),
   );
   const findings = kept;
+  const freshlyAdded = used.filter((s) => s.added);
 
   const counts: Record<Severity, number> = { high: 0, medium: 0, low: 0 };
   for (const f of findings) counts[f.severity] += 1;
@@ -41,7 +43,21 @@ export function analyze(options: AnalyzeOptions): Report {
       ? true
       : !findings.some((f) => SEVERITY_RANK[f.severity] <= SEVERITY_RANK[failOn]);
 
-  return { schema: 1, ok, base, findings, counts, suppressed: suppressed.length };
+  return {
+    schema: 1,
+    ok,
+    base,
+    findings,
+    counts,
+    suppressed: suppressed.length,
+    suppressed_new: freshlyAdded.length,
+    suppressions_new: freshlyAdded.map((s) => ({
+      rule: s.rule,
+      file: s.file,
+      line: s.line,
+      reason: sanitize(s.reason),
+    })),
+  };
 }
 
 /**

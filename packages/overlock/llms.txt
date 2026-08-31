@@ -4,7 +4,8 @@
 > did this change make the tests pass by weakening the tests?
 
 Zero runtime dependencies. No network calls, no LLM calls, no telemetry. Reads
-the diff; never edits code and never writes to the git index.
+the diff; never edits code, never writes to the git index, and never follows a
+symlink out of the repository.
 
 ## When to call it
 
@@ -94,10 +95,13 @@ Only when a person has decided the finding is wrong or the skip is deliberate:
 // overlock-ignore TEST_SKIPPED_ADDED -- quarantined pending #412
 ```
 
-The rule ID and the reason are both required; there is no wildcard, and it covers
-one rule on one line. Suppressions are counted in every report and in the ledger,
-so they are never invisible. Do not add one to make a check pass without being
-asked to.
+The rule ID and the reason are both required; there is no wildcard, one quoted
+inside a string is not a directive, and it covers one rule on one line.
+
+**Do not add one to make a check pass.** A directive added by the same patch it
+silences stops the hook once and quotes your reason back to the person, so it
+buys nothing except their attention. If you believe a finding is wrong, say so
+in your reply and let them decide.
 
 ## What it is not
 

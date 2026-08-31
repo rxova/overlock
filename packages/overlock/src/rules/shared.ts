@@ -11,6 +11,35 @@ export interface Rule {
   run: (ctx: RuleContext) => Finding[];
 }
 
+/**
+ * Evidence and messages are built from diff content, and diff content is
+ * written by whatever produced the patch. They are printed to a terminal,
+ * handed to an agent, and pasted into pull request comments — so a test name
+ * carrying an erase-line sequence can rewrite the verdict printed above it, and
+ * a minified line can carry 400KB into an agent's context window.
+ *
+ * Both are cut off here, at the one place every finding is built.
+ */
+const MAX_TEXT = 1000;
+
+export function sanitize(text: string): string {
+  // eslint-disable-next-line no-control-regex -- stripping control characters is the point
+  const stripped = text.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '');
+  return stripped.length <= MAX_TEXT ? stripped : `${stripped.slice(0, MAX_TEXT)}...`;
+}
+
+/**
+ * Blanks the contents of string literals, keeping the quotes.
+ *
+ * A marker inside quotes is data, not a directive: a fixture asserting on
+ * `"it.skip(...)"`, a lint rule naming the pattern it bans, a doc line showing
+ * how to write a suppression. Every one of those is a false positive, and on a
+ * blocking rule a false positive is how the tool gets uninstalled.
+ */
+export function withoutStringContents(text: string): string {
+  return text.replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, '$1$1');
+}
+
 export function finding(input: {
   rule: RuleId;
   severity: Severity;
@@ -22,8 +51,8 @@ export function finding(input: {
   after?: string;
 }): Finding {
   const evidence: Finding['evidence'] = {};
-  if (input.before !== undefined) evidence.before = input.before.trim();
-  if (input.after !== undefined) evidence.after = input.after.trim();
+  if (input.before !== undefined) evidence.before = sanitize(input.before.trim());
+  if (input.after !== undefined) evidence.after = sanitize(input.after.trim());
 
   return {
     id: `${input.rule}:${input.file}:${input.line}`,
@@ -31,7 +60,7 @@ export function finding(input: {
     severity: input.severity,
     file: input.file,
     line: input.line,
-    message: input.message,
+    message: sanitize(input.message),
     evidence,
     fix_hint: input.fix_hint,
   };

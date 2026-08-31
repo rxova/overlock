@@ -4,6 +4,7 @@ import {
   GitError,
   currentBranch,
   defaultBranch,
+  hasCommits,
   readDiff,
   repoRoot,
   resolveRange,
@@ -56,14 +57,29 @@ describe('resolveRange', () => {
     expect(resolveRange({ cwd: r.dir, staged: true })).toBe('--cached');
   });
 
-  it('passes an explicit ref through untouched', () => {
+  it('passes an explicit ref through untouched, even before the first commit', () => {
     const r = makeRepo();
+    expect(resolveRange({ cwd: r.dir, base: 'origin/main' })).toBe('origin/main');
+
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
     expect(resolveRange({ cwd: r.dir, base: 'origin/main' })).toBe('origin/main');
   });
 
   it('defaults to the working tree when no base is given', () => {
     const r = makeRepo();
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
     expect(resolveRange({ cwd: r.dir })).toBe('HEAD');
+  });
+
+  // Before this, a freshly initialised repository reported itself as not being
+  // a git repository at all.
+  it('falls back to the empty tree before the first commit', () => {
+    const r = makeRepo();
+    expect(hasCommits(r.dir)).toBe(false);
+    expect(resolveRange({ cwd: r.dir })).toBe(EMPTY_TREE);
+    expect(resolveRange({ cwd: r.dir, base: 'auto' })).toBe(EMPTY_TREE);
   });
 
   describe('auto', () => {

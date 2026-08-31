@@ -1,3 +1,4 @@
+import { withoutStringContents } from './rules/shared.js';
 import type { DiffFile, Finding, RuleId } from './types.js';
 import { RULE_IDS } from './types.js';
 
@@ -21,6 +22,16 @@ export interface Suppression {
   file: string;
   /** Post-image line the comment sits on. */
   line: number;
+  /**
+   * True when this patch introduced the directive.
+   *
+   * The difference matters more than anything else in this file: a suppression
+   * that was already in the tree records a decision somebody made and reviewed,
+   * while one added by the same patch it silences is the agent writing its own
+   * permission slip. Both still apply — but only the second is worth stopping
+   * for, and the Stop hook does.
+   */
+  added: boolean;
 }
 
 function isRuleId(value: string): value is RuleId {
@@ -43,7 +54,9 @@ export function collectSuppressions(files: DiffFile[]): Suppression[] {
       for (const line of hunk.lines) {
         if (line.kind === 'del' || line.newLine === null) continue;
 
-        const match = SUPPRESSION.exec(line.text);
+        // Blanked the same way skip markers are: a directive quoted inside a
+        // string is documentation or a fixture, not permission.
+        const match = SUPPRESSION.exec(withoutStringContents(line.text));
         const rule = match?.[1];
         const reason = match?.[2];
         // A malformed directive — no rule, an unknown rule, or no reason —
@@ -51,7 +64,13 @@ export function collectSuppressions(files: DiffFile[]): Suppression[] {
         // failed to suppress is the feedback.
         if (!rule || !reason || !isRuleId(rule)) continue;
 
-        found.push({ rule, reason, file: file.path, line: line.newLine });
+        found.push({
+          rule,
+          reason,
+          file: file.path,
+          line: line.newLine,
+          added: line.kind === 'add',
+        });
       }
     }
   }
@@ -62,6 +81,8 @@ export function collectSuppressions(files: DiffFile[]): Suppression[] {
 export interface SuppressionResult {
   kept: Finding[];
   suppressed: Finding[];
+  /** The directives that did the silencing, for reporting what was silenced. */
+  used: Suppression[];
 }
 
 /**
@@ -74,21 +95,27 @@ export function applySuppressions(
   findings: Finding[],
   suppressions: Suppression[],
 ): SuppressionResult {
-  if (suppressions.length === 0) return { kept: findings, suppressed: [] };
+  if (suppressions.length === 0) return { kept: findings, suppressed: [], used: [] };
 
-  const covered = new Set<string>();
+  const covered = new Map<string, Suppression>();
   for (const s of suppressions) {
-    covered.add(`${s.rule}:${s.file}:${s.line}`);
-    covered.add(`${s.rule}:${s.file}:${s.line + 1}`);
+    covered.set(`${s.rule}:${s.file}:${s.line}`, s);
+    covered.set(`${s.rule}:${s.file}:${s.line + 1}`, s);
   }
 
   const kept: Finding[] = [];
   const suppressed: Finding[] = [];
+  const used: Suppression[] = [];
 
   for (const finding of findings) {
-    if (covered.has(`${finding.rule}:${finding.file}:${finding.line}`)) suppressed.push(finding);
-    else kept.push(finding);
+    const directive = covered.get(`${finding.rule}:${finding.file}:${finding.line}`);
+    if (directive) {
+      suppressed.push(finding);
+      if (!used.includes(directive)) used.push(directive);
+    } else {
+      kept.push(finding);
+    }
   }
 
-  return { kept, suppressed };
+  return { kept, suppressed, used };
 }

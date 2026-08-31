@@ -70,6 +70,16 @@ export interface Report {
    * gate, and this number is what makes a rising suppression rate visible.
    */
   suppressed: number;
+  /**
+   * Of those, the ones this patch introduced.
+   *
+   * A directive already in the tree records a decision somebody made. One added
+   * by the same patch it silences is the agent writing its own permission slip,
+   * and the Stop hook stops once for it.
+   */
+  suppressed_new: number;
+  /** What the new directives claimed, so a human can judge the claim. */
+  suppressions_new: { rule: RuleId; file: string; line: number; reason: string }[];
 }
 
 export type DiffLineKind = 'add' | 'del' | 'ctx';

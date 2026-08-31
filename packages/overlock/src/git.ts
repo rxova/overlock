@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export class GitError extends Error {}
@@ -27,8 +27,24 @@ export function repoRoot(cwd: string): string {
   return git(['rev-parse', '--show-toplevel'], cwd).trim();
 }
 
+/**
+ * `--show-current` rather than `rev-parse --abbrev-ref HEAD`, which fails
+ * outright before the first commit — so a freshly initialised repository used
+ * to be reported as "not a git repository". It returns empty on a detached
+ * HEAD, which is what the old form spelled `HEAD`.
+ */
 export function currentBranch(cwd: string): string {
-  return git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd).trim();
+  return git(['branch', '--show-current'], cwd).trim() || 'HEAD';
+}
+
+/** False in a repository that has been initialised but never committed to. */
+export function hasCommits(cwd: string): boolean {
+  try {
+    git(['rev-parse', '--verify', '--quiet', 'HEAD'], cwd);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -79,6 +95,13 @@ export function resolveRange(options: RangeOptions): string {
 
   if (staged) return '--cached';
   if (base && base !== 'auto') return base;
+
+  // Nothing to diff against before the first commit, so everything in the tree
+  // is an addition. An agent scaffolding a new project is exactly that case,
+  // and it used to be reported as "not a git repository". Checked after an
+  // explicit ref, which the caller means literally either way.
+  if (!hasCommits(cwd)) return EMPTY_TREE;
+
   if (base === undefined) return 'HEAD';
 
   const dirty = git(['status', '--porcelain'], cwd).trim();
@@ -160,7 +183,13 @@ export function untrackedDiff(cwd: string, paths: string[]): string {
 
     let contents: string;
     try {
-      if (statSync(absolute).size > MAX_UNTRACKED_BYTES) continue;
+      // lstat, not stat: a symlink is followed by readFileSync, so an untracked
+      // link is a way to make this tool read a file outside the repository and
+      // print its contents as evidence. Nothing in a repository needs its
+      // symlinks read to answer the question this tool asks.
+      const stats = lstatSync(absolute);
+      if (!stats.isFile()) continue;
+      if (stats.size > MAX_UNTRACKED_BYTES) continue;
       contents = readFileSync(absolute, 'utf8');
     } catch {
       // Vanished between listing and reading, or is not readable. Either way

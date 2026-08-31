@@ -1,4 +1,5 @@
 import { BAR_DAYS, CATCH_BAR, meetsBar, type Summary } from './summary.js';
+import { EMPTY_TREE } from './git.js';
 import type { Finding, Report, Severity } from './types.js';
 
 const MARK: Record<Severity, string> = { high: '✗', medium: '!', low: '·' };
@@ -46,7 +47,7 @@ export function human(report: Report, color: boolean): string {
   const lines: string[] = [];
   lines.push(
     paint(`overlock — ${summarize(report)}`, ANSI.bold, color) +
-      paint(`  (${report.base})${suppressedNote(report)}`, ANSI.dim, color),
+      paint(`  (${describeBase(report.base)})${suppressedNote(report)}`, ANSI.dim, color),
   );
   lines.push('');
 
@@ -121,6 +122,13 @@ function summarize(report: Report): string {
  * Suppressions are always shown, even on a clean run. A silenced finding that
  * leaves no trace in the output is how a gate ends up passing everything.
  */
+/** The empty-tree hash is git's answer, not an answer a person can read. */
+function describeBase(base: string): string {
+  if (base === EMPTY_TREE) return 'no commits yet';
+  if (base === '--cached') return 'staged';
+  return base;
+}
+
 function suppressedNote(report: Report): string {
   if (report.suppressed === 0) return '';
   return ` (${report.suppressed} suppressed)`;

@@ -157,8 +157,26 @@ it.skip('rejects expired tokens', () => {
 ```
 
 The rule ID and the reason are **both required**. A directive with no written
-reason silences nothing, an unknown rule ID silences nothing, and there is no
-wildcard. A suppression covers one rule on one line in one file.
+reason silences nothing, an unknown rule ID silences nothing, there is no
+wildcard, and one quoted inside a string literal is documentation rather than
+permission. A suppression covers one rule on one line in one file.
+
+**A directive the patch itself added stops the Stop hook once.** It still
+silences the finding, but the agent cannot reach a silent exit 0 by writing its
+own permission slip — the hook stops and quotes the claim back to you:
+
+```
+overlock: this patch silenced 1 of its own findings.
+
+! src/auth.test.ts:42 TEST_SKIPPED_ADDED
+   overlock-ignore ... -- flaky
+
+If that is right, say so and finish. If not, fix the cause.
+```
+
+Accept it and the next turn continues; the hook never stops twice. A directive
+that was already in the tree records a decision somebody made and reviewed, so
+it passes in silence.
 
 That friction is the design. A gate with no escape hatch gets uninstalled the
 first time it is wrong; a gate with a frictionless one gets suppressed everywhere

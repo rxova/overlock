@@ -18,6 +18,22 @@ interface StopPayload {
   [key: string]: unknown;
 }
 
+/**
+ * What to say when the only thing standing between this patch and a pass is a
+ * directive the patch itself wrote. The reasons are quoted verbatim, because
+ * the claim is the thing being put to the person.
+ */
+function suppressionNotice(report: Report): string {
+  const lines = [`overlock: this patch silenced ${report.suppressed_new} of its own findings.`, ''];
+
+  for (const s of report.suppressions_new) {
+    lines.push(`! ${s.file}:${s.line} ${s.rule}`);
+    lines.push(`   overlock-ignore ... -- ${s.reason}`);
+  }
+
+  return lines.join('\n');
+}
+
 export function parseStopPayload(raw: string): StopPayload {
   if (!raw.trim()) return {};
   try {
@@ -40,9 +56,14 @@ export function parseStopPayload(raw: string): StopPayload {
  * worth sending twice rather than discovering one channel was the wrong one.
  */
 export function stopHookOutcome(report: Report, payload: StopPayload): HookOutcome {
-  const reason = compact(report);
+  // A patch that silences its own findings passes every check and prints
+  // nothing, which on a phone is indistinguishable from a clean run. Stopping
+  // once is what puts the claim in front of the person: they can accept it and
+  // carry on, but they cannot miss it.
+  const laundered = report.ok && report.suppressed_new > 0;
+  const reason = laundered ? suppressionNotice(report) : compact(report);
 
-  if (report.ok) {
+  if (report.ok && !laundered) {
     return { exitCode: 0, stdout: '', stderr: '' };
   }
 
@@ -57,7 +78,9 @@ export function stopHookOutcome(report: Report, payload: StopPayload): HookOutco
   const body = {
     hookSpecificOutput: {
       hookEventName: 'Stop',
-      blockStopReason: `${reason}\n\nFix the cause, not the check, then finish.`,
+      blockStopReason: laundered
+        ? `${reason}\n\nIf that is right, say so and finish. If not, fix the cause.`
+        : `${reason}\n\nFix the cause, not the check, then finish.`,
     },
   };
 

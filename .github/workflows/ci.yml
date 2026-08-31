@@ -239,6 +239,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Publint and Are The Types Wrong
         run: pnpm run check:exports
+      # Before the tarball, so a drifted llms.txt is reported as itself rather
+      # than as a missing file inside pack-smoke's output.
+      - name: Check llms.txt
+        run: pnpm run check:llms
       # Packs the real tarball and runs the published bin out of it. The only
       # check that catches a `files` entry that dropped dist.
       - name: Pack smoke test

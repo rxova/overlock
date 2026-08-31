@@ -2,9 +2,19 @@
 import { readFileSync } from 'node:fs';
 import { GitError, repoRoot } from './git.js';
 import { parseStopPayload, stopHookOutcome } from './hook.js';
-import { AGENTS, type Agent, initClaude, initInstructions, instructionSnippet } from './init.js';
-import { compact, human, json, useColor } from './report.js';
+import {
+  AGENTS,
+  type Agent,
+  initClaude,
+  initInstructions,
+  instructionSnippet,
+  mcpSnippet,
+} from './init.js';
+import { compact, human, json, summaryText, useColor } from './report.js';
 import { run } from './run.js';
+import { ledgerPath } from './ledger.js';
+import { readLedger, summarize } from './summary.js';
+import { MessageBuffer, handleMessage } from './mcp.js';
 import type { Severity } from './types.js';
 
 const VERSION = typeof __OVERLOCK_VERSION__ === 'string' ? __OVERLOCK_VERSION__ : '0.0.0';
@@ -15,6 +25,8 @@ USAGE
   overlock [check] [options]     Check the current patch (default command)
   overlock hook claude           Run as a Claude Code Stop hook (reads stdin)
   overlock init <agent>          Wire it into an agent: ${AGENTS.join(', ')}
+  overlock report [--days N]     What the ledger has been recording
+  overlock mcp                   Serve as an MCP tool over stdio
 
 CHECK OPTIONS
   --base <ref>       Diff against this ref. Default: auto
@@ -37,6 +49,10 @@ SILENCING A FINDING
   The rule ID and the reason are both required. A directive without a written
   reason silences nothing.
 
+REPORT OPTIONS
+  --days <n>         Only count runs from the last n days. Default: 30
+  --json             The aggregate as data
+
 EXIT CODES
   0  nothing at or above --fail-on
   1  findings at or above --fail-on
@@ -46,13 +62,14 @@ Findings are advisory. The tool reads a diff; it never edits your code, and it
 makes no network calls.`;
 
 export interface ParsedArgs {
-  command: 'check' | 'hook' | 'init' | 'help' | 'version';
+  command: 'check' | 'hook' | 'init' | 'report' | 'mcp' | 'help' | 'version';
   target?: string;
   base?: string;
   staged: boolean;
   format: 'human' | 'json' | 'compact';
   failOn: Severity | 'none';
   limit: number;
+  days: number;
   testGlobs: RegExp[];
   cwd: string;
   ledger: boolean;
@@ -68,6 +85,7 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
     format: 'human',
     failOn: 'high',
     limit: 3,
+    days: 30,
     testGlobs: [],
     cwd,
     ledger: true,
@@ -78,10 +96,11 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
   const first = rest[0];
 
   if (first !== undefined && !first.startsWith('-')) {
-    if (first !== 'check' && first !== 'hook' && first !== 'init') {
+    const commands = ['check', 'hook', 'init', 'report', 'mcp'] as const;
+    if (!(commands as readonly string[]).includes(first)) {
       throw new UsageError(`Unknown command: ${first}`);
     }
-    parsed.command = first;
+    parsed.command = first as ParsedArgs['command'];
     rest.shift();
     const target = rest[0];
     if (target !== undefined && !target.startsWith('-')) {
@@ -129,6 +148,14 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
       case '--cwd':
         parsed.cwd = value('--cwd');
         break;
+      case '--days': {
+        const days = Number(value('--days'));
+        if (!Number.isInteger(days) || days < 1) {
+          throw new UsageError('--days needs a positive integer');
+        }
+        parsed.days = days;
+        break;
+      }
       case '--limit': {
         const limit = Number(value('--limit'));
         if (!Number.isInteger(limit) || limit < 1) {
@@ -166,6 +193,8 @@ export interface Io {
   stdout: (text: string) => void;
   stderr: (text: string) => void;
   readStdin: () => string;
+  /** Streaming stdin, for the long-lived MCP transport. */
+  onStdin: (handler: (chunk: string) => void) => void;
   isTTY: boolean;
   env: NodeJS.ProcessEnv;
 }
@@ -190,6 +219,8 @@ export function main(argv: string[], io: Io): number {
 
   try {
     if (args.command === 'init') return runInit(args, io);
+    if (args.command === 'report') return runReport(args, io);
+    if (args.command === 'mcp') return runMcp(args, io);
 
     const { report } = run({
       cwd: args.cwd,
@@ -219,12 +250,62 @@ export function main(argv: string[], io: Io): number {
     return report.ok ? 0 : 1;
   } catch (error) {
     if (error instanceof GitError) {
-      io.stderr(`overlock: ${error.message}. Is this a git repository?\n`);
+      io.stderr(`overlock: ${error.message}${error.hint ? `. ${error.hint}` : ''}\n`);
       return 2;
     }
     io.stderr(`overlock: ${error instanceof Error ? error.message : String(error)}\n`);
     return 2;
   }
+}
+
+/**
+ * Reading the ledger back. Always exits 0: this reports history, it does not
+ * gate anything, and a shell that treated a month with findings as a failure
+ * would be answering a different question.
+ */
+function runReport(args: ParsedArgs, io: Io): number {
+  const entries = readLedger(ledgerPath(io.env));
+  const summary = summarize(entries, { days: args.days });
+
+  if (args.format === 'json') io.stdout(`${JSON.stringify(summary, null, 2)}\n`);
+  else io.stdout(`${summaryText(summary, useColor({ isTTY: io.isTTY }, io.env))}\n`);
+
+  return 0;
+}
+
+/**
+ * The MCP transport is stdout, so nothing else may be written to it — a stray
+ * log line is a parse error at the other end. Everything human goes to stderr.
+ */
+function runMcp(args: ParsedArgs, io: Io): number {
+  const deps = {
+    version: VERSION,
+    check: (call: { base?: string; staged?: boolean; failOn?: string }) =>
+      run({
+        cwd: args.cwd,
+        base: call.base ?? 'auto',
+        ...(call.staged === undefined ? {} : { staged: call.staged }),
+        failOn: (call.failOn ?? 'high') as Severity | 'none',
+        testGlobs: args.testGlobs,
+        mode: 'check' as const,
+        ledger: args.ledger,
+        untracked: args.untracked,
+      }).report,
+    report: (call: { days?: number }) =>
+      summarize(readLedger(ledgerPath(io.env)), { days: call.days ?? args.days }),
+  };
+
+  const buffer = new MessageBuffer();
+  io.stderr(`overlock ${VERSION} mcp server ready\n`);
+
+  io.onStdin((chunk) => {
+    for (const message of buffer.push(chunk)) {
+      const response = handleMessage(message, deps);
+      if (response) io.stdout(`${JSON.stringify(response)}\n`);
+    }
+  });
+
+  return 0;
 }
 
 function runInit(args: ParsedArgs, io: Io): number {
@@ -246,6 +327,8 @@ function runInit(args: ParsedArgs, io: Io): number {
   }
   if (agent !== 'claude') io.stdout(`\n${instructionSnippet()}`);
 
+  io.stdout(`\nTo let agents discover it as a tool, add to .mcp.json:\n\n${mcpSnippet()}`);
+
   return 0;
 }
 
@@ -263,6 +346,14 @@ if (process.env.OVERLOCK_NO_AUTORUN !== '1') {
       } catch {
         return '';
       }
+    },
+    onStdin: (handler) => {
+      process.stdin.setEncoding('utf8');
+      process.stdin.on('data', handler);
+      // The server lives as long as its transport. When the client closes the
+      // pipe there is nothing left to answer, so exiting is the correct end.
+      process.stdin.on('end', () => process.exit(0));
+      process.stdin.resume();
     },
     isTTY: process.stdout.isTTY === true,
     env: process.env,

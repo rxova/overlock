@@ -299,14 +299,155 @@ describe('suppressions', () => {
     expect(overlock(['check', '--base', 'auto'], { cwd: r.dir }).status).toBe(1);
   });
 
-  it('lets a suppressed patch through the Stop hook, and records it', () => {
+  // This case previously asserted an exit 0, which is exactly the hole: a patch
+  // that writes its own directive passed the hook in silence.
+  it('stops the hook once for a directive the patch itself added', () => {
     const r = repoWithSuppressedSkip(
       '// overlock-ignore TEST_SKIPPED_ADDED -- quarantined, see #412',
     );
-    expect(overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' }).status).toBe(0);
+    expect(overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' }).status).toBe(2);
 
     const line = readFileSync(join(r.dir, '.overlock-ledger.jsonl'), 'utf8').trim();
     expect(JSON.parse(line)).toMatchObject({ ok: true, suppressed: 1 });
+  });
+
+  it('says nothing about a directive that was already in the tree', () => {
+    const r = new TempRepo();
+    repo = r;
+    // The directive is committed first, so the patch under review only adds the
+    // skip it covers — a decision somebody already made and reviewed.
+    r.write(
+      'src/auth.test.ts',
+      PASSING_TEST.replace(
+        "it('rejects",
+        "// overlock-ignore TEST_SKIPPED_ADDED -- quarantined, see #412\nit('rejects",
+      ),
+    );
+    r.commit('test: quarantine the expiry case');
+    r.write(
+      'src/auth.test.ts',
+      readFileSync(join(r.dir, 'src/auth.test.ts'), 'utf8').replace(
+        "it('rejects",
+        "it.skip('rejects",
+      ),
+    );
+
+    const result = overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe('');
+  });
+});
+
+describe('overlock report', () => {
+  it('reads back what the ledger recorded, and always exits 0', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.commit('feat: add auth tests');
+    r.write('src/auth.test.ts', SKIPPED_TEST);
+
+    overlock(['check', '--base', 'auto'], { cwd: r.dir });
+    overlock(['check', '--base', 'auto'], { cwd: r.dir });
+
+    const result = overlock(['report'], { cwd: r.dir });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('2 runs');
+    expect(result.stdout).toContain('TEST_SKIPPED_ADDED');
+  });
+
+  it('says what to do when there is nothing recorded yet', () => {
+    const r = cleanRepo();
+    const result = overlock(['report', '--days', '1'], { cwd: r.dir });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('nothing recorded');
+  });
+
+  it('emits the aggregate as data', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.commit('feat: add auth tests');
+    r.write('src/auth.test.ts', SKIPPED_TEST);
+    overlock(['check', '--base', 'auto'], { cwd: r.dir });
+
+    const summary = JSON.parse(overlock(['report', '--json'], { cwd: r.dir }).stdout) as {
+      runs: number;
+      caught: number;
+      byRule: { rule: string }[];
+    };
+    expect(summary.runs).toBe(1);
+    expect(summary.caught).toBe(1);
+    expect(summary.byRule[0]?.rule).toBe('TEST_SKIPPED_ADDED');
+  });
+
+  it('rejects a nonsense window', () => {
+    const r = cleanRepo();
+    const result = overlock(['report', '--days', '0'], { cwd: r.dir });
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('positive integer');
+  });
+});
+
+describe('an agent trying to get to green', () => {
+  function repoWithSkip(extraLine = ''): TempRepo {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.commit('feat: add auth tests');
+    r.write(
+      'src/auth.test.ts',
+      SKIPPED_TEST.replace('it.skip', `${extraLine}\nit.skip`.trimStart()),
+    );
+    return r;
+  }
+
+  // The gate's whole claim is that an agent cannot reach "done" by editing the
+  // check. Writing its own suppression and exiting 0 in silence was exactly
+  // that, and from a phone it looked identical to a clean run.
+  it('cannot silence its own finding and slip past the hook', () => {
+    const r = repoWithSkip('// overlock-ignore TEST_SKIPPED_ADDED -- flaky');
+    const result = overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('silenced 1 of its own findings');
+    expect(result.stderr).toContain('flaky');
+  });
+
+  it('is let through once the person has seen the claim', () => {
+    const r = repoWithSkip('// overlock-ignore TEST_SKIPPED_ADDED -- flaky');
+    const result = overlock(['hook', 'claude'], {
+      cwd: r.dir,
+      stdin: JSON.stringify({ stop_hook_active: true }),
+    });
+
+    expect(result.status).toBe(0);
+  });
+
+  it('cannot smuggle a directive inside a string literal', () => {
+    const r = repoWithSkip('const doc = "write // overlock-ignore TEST_SKIPPED_ADDED -- like so";');
+    expect(overlock(['check', '--base', 'auto'], { cwd: r.dir }).status).toBe(1);
+  });
+
+  it('cannot hide a marker by splitting it over two lines', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.commit('feat: add auth tests');
+    r.write('src/auth.test.ts', PASSING_TEST.replace("it('rejects", "it\n  .skip('rejects"));
+
+    expect(overlock(['check', '--base', 'auto'], { cwd: r.dir }).status).toBe(1);
+  });
+
+  it('works in a repository that has never been committed to', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', SKIPPED_TEST);
+
+    const result = overlock(['check', '--base', 'auto'], { cwd: r.dir });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('no commits yet');
+    expect(result.stdout).not.toContain('git repository');
   });
 });
 

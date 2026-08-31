@@ -15,6 +15,7 @@ const steps: [name: string, command: string][] = [
   ['typecheck', 'pnpm exec turbo run typecheck'],
   ['unit tests', 'pnpm exec turbo run test'],
   ['package exports', 'pnpm run check:exports'],
+  ['llms.txt', 'pnpm run check:llms'],
   ['dependency dedupe', 'pnpm run dedupe:check'],
   ['audit', 'pnpm run audit:check'],
 ];

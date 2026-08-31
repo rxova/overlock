@@ -1,8 +1,19 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-export class GitError extends Error {}
+export class GitError extends Error {
+  /**
+   * Advice that only makes sense for a git invocation that failed, so a
+   * refused ref is not told to check whether it is in a repository.
+   */
+  readonly hint: string | undefined;
+
+  constructor(message: string, options?: ErrorOptions & { hint?: string }) {
+    super(message, options);
+    this.hint = options?.hint;
+  }
+}
 
 /**
  * All git access goes through execFileSync with an argument array — never a
@@ -19,7 +30,30 @@ function git(args: string[], cwd: string): string {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (error) {
-    throw new GitError(`git ${args.join(' ')} failed`, { cause: error });
+    throw new GitError(`git ${args.join(' ')} failed`, {
+      cause: error,
+      hint: 'Is this a git repository?',
+    });
+  }
+}
+
+/**
+ * Refuses a "ref" that git would read as an option.
+ *
+ * `git diff --output=FILE` writes wherever it is pointed, and the ref reaches
+ * this code from `--base` and from the MCP `base` argument — so without this,
+ * any MCP client, or an agent that read a hostile instruction somewhere, could
+ * overwrite a shell profile or an authorized_keys as the user. `--ext-diff`
+ * would likewise undo the `--no-ext-diff` that keeps external diff drivers from
+ * running.
+ *
+ * No legitimate ref starts with a dash: git itself rejects such branch names.
+ */
+export function assertSafeRef(ref: string): void {
+  if (ref.startsWith('-')) {
+    throw new GitError(
+      `refusing to treat ${JSON.stringify(ref)} as a ref: it looks like an option`,
+    );
   }
 }
 
@@ -27,8 +61,24 @@ export function repoRoot(cwd: string): string {
   return git(['rev-parse', '--show-toplevel'], cwd).trim();
 }
 
+/**
+ * `--show-current` rather than `rev-parse --abbrev-ref HEAD`, which fails
+ * outright before the first commit — so a freshly initialised repository used
+ * to be reported as "not a git repository". It returns empty on a detached
+ * HEAD, which is what the old form spelled `HEAD`.
+ */
 export function currentBranch(cwd: string): string {
-  return git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd).trim();
+  return git(['branch', '--show-current'], cwd).trim() || 'HEAD';
+}
+
+/** False in a repository that has been initialised but never committed to. */
+export function hasCommits(cwd: string): boolean {
+  try {
+    git(['rev-parse', '--verify', '--quiet', 'HEAD'], cwd);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -78,7 +128,17 @@ export function resolveRange(options: RangeOptions): string {
   const { cwd, base, staged } = options;
 
   if (staged) return '--cached';
-  if (base && base !== 'auto') return base;
+  if (base && base !== 'auto') {
+    assertSafeRef(base);
+    return base;
+  }
+
+  // Nothing to diff against before the first commit, so everything in the tree
+  // is an addition. An agent scaffolding a new project is exactly that case,
+  // and it used to be reported as "not a git repository". Checked after an
+  // explicit ref, which the caller means literally either way.
+  if (!hasCommits(cwd)) return EMPTY_TREE;
+
   if (base === undefined) return 'HEAD';
 
   const dirty = git(['status', '--porcelain'], cwd).trim();
@@ -120,8 +180,18 @@ export function readDiff(range: string, cwd: string): string {
     '--unified=3',
   ];
 
-  if (range === '--cached') args.push('--cached');
-  else args.push(range);
+  if (range === '--cached') {
+    args.push('--cached');
+  } else {
+    // Checked here as well as where the range is resolved: this is the boundary
+    // that actually hands the value to git, and it is exported.
+    assertSafeRef(range);
+    args.push(range);
+  }
+
+  // Everything after this is a pathspec, so nothing downstream can be read as
+  // an option even if a future caller forgets the check above.
+  args.push('--');
 
   return git(args, cwd);
 }
@@ -160,7 +230,13 @@ export function untrackedDiff(cwd: string, paths: string[]): string {
 
     let contents: string;
     try {
-      if (statSync(absolute).size > MAX_UNTRACKED_BYTES) continue;
+      // lstat, not stat: a symlink is followed by readFileSync, so an untracked
+      // link is a way to make this tool read a file outside the repository and
+      // print its contents as evidence. Nothing in a repository needs its
+      // symlinks read to answer the question this tool asks.
+      const stats = lstatSync(absolute);
+      if (!stats.isFile()) continue;
+      if (stats.size > MAX_UNTRACKED_BYTES) continue;
       contents = readFileSync(absolute, 'utf8');
     } catch {
       // Vanished between listing and reading, or is not readable. Either way

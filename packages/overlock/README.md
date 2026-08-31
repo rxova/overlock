@@ -91,6 +91,56 @@ place by telling you which implementation change the other findings are about.
 Languages: TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, Ruby and C#
 conventions are recognised out of the box. `--test-glob` adds your own.
 
+## As an MCP tool
+
+```console
+$ overlock init claude     # also prints the MCP snippet
+```
+
+Or add it to `.mcp.json` yourself:
+
+```json
+{
+  "mcpServers": {
+    "overlock": { "command": "npx", "args": ["-y", "overlock", "mcp"] }
+  }
+}
+```
+
+Two tools: `overlock_check` and `overlock_report`. The check tool returns the
+compact report, plus the full JSON only when there is something to act on — a
+clean run costs one line rather than a serialised empty report.
+
+The server is spoken by hand rather than through
+`@modelcontextprotocol/sdk`. MCP over stdio is newline-delimited JSON-RPC 2.0
+with five methods, which is less code than the argument for adding a runtime
+dependency to a package an agent runs on every turn. Protocol versions are taken
+from the official SDK's own constants, and negotiation echoes the client's
+version when it is one overlock knows.
+
+## In CI
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+
+steps:
+  - uses: actions/checkout@v5
+    with: { fetch-depth: 0 }
+  - uses: rxova/overlock@v0
+```
+
+On a pull request it diffs against the base commit — not `github.sha`, which on
+a PR is the merge commit and would report nothing — and posts a single findings
+comment, edited in place on later pushes rather than appended to. A bot that
+comments again on every push buries the review it is meant to support.
+
+`fail-on`, `base`, `working-directory`, `version` and `comment` are all inputs;
+`ok`, `findings` and `report` are outputs. The action never writes a ledger: that
+file is a record of what your agents did on your machine, and a CI runner is
+neither.
+
 ## Silencing a finding
 
 Sometimes a skip is deliberate — a test quarantined behind a real bug, waiting
@@ -103,8 +153,26 @@ it.skip('rejects expired tokens', () => {
 ```
 
 The rule ID and the reason are **both required**. A directive with no written
-reason silences nothing, an unknown rule ID silences nothing, and there is no
-wildcard. A suppression covers one rule on one line in one file.
+reason silences nothing, an unknown rule ID silences nothing, there is no
+wildcard, and one quoted inside a string literal is documentation rather than
+permission. A suppression covers one rule on one line in one file.
+
+**A directive the patch itself added stops the Stop hook once.** It still
+silences the finding, but the agent cannot reach a silent exit 0 by writing its
+own permission slip — the hook stops and quotes the claim back to you:
+
+```
+overlock: this patch silenced 1 of its own findings.
+
+! src/auth.test.ts:42 TEST_SKIPPED_ADDED
+   overlock-ignore ... -- flaky
+
+If that is right, say so and finish. If not, fix the cause.
+```
+
+Accept it and the next turn continues; the hook never stops twice. A directive
+that was already in the tree records a decision somebody made and reviewed, so
+it passes in silence.
 
 That friction is the design. A gate with no escape hatch gets uninstalled the
 first time it is wrong; a gate with a frictionless one gets suppressed everywhere
@@ -203,6 +271,64 @@ evidence lines in a finding are your source code, and a ledger that accumulated
 them would be a copy of your repository sitting in your home directory.
 
 `--no-ledger` turns it off; `OVERLOCK_LEDGER` moves it.
+
+## Reading the ledger back
+
+```console
+$ overlock report
+overlock — 30 days, 3 repos, 60 runs
+
+  Caught           10   runs with a high or medium finding
+  Blocked           5   times an agent was stopped
+  Suppressed        5   findings silenced with a reason
+  Noted             3   runs with low findings only
+
+By rule
+  ASSERTION_WEAKENED             5  ████████████████████████
+  COVERAGE_THRESHOLD_LOWERED     2  ██████████
+  TEST_SKIPPED_ADDED             2  ██████████
+
+Context only
+  TEST_AND_IMPL_TOGETHER         6
+
+Bar: 4+ catches in 30 days. 10 caught — met.
+```
+
+`--days <n>` moves the window, `--json` gives you the aggregate as data, and it
+always exits 0 — this reports history, it does not gate anything.
+
+**Low findings are not catches.** `TEST_AND_IMPL_TOGETHER` fires on ordinary
+test-driven work and would otherwise be the most common finding every month,
+which would let the tool clear its own bar on noise. Catches count high and
+medium only; low findings are listed separately as context.
+
+The bar itself was written down before any of this was built, so the result
+could not be read the way it was wanted: **four real catches in thirty days, and
+zero false blocks annoying enough to switch it off.** Only the first half is
+measurable from a log. The second half is reported as a question rather than a
+score, because a tool that graded itself on both halves would be marking its own
+homework.
+
+## Notes on trust
+
+overlock reads a patch and hands what it finds to a terminal, an agent and a
+pull request comment. Everything it quotes is written by whoever wrote the
+patch, so:
+
+- **Refs are refs.** A `--base` that starts with a dash is refused. `git diff
+--output=FILE` writes wherever it is pointed, and `base` is reachable from the
+  MCP tool argument — so without that check, anything able to call the tool
+  could overwrite a file as you.
+- **An unknown `--fail-on` fails closed**, at `high`, rather than making every
+  comparison false and passing everything.
+- **Evidence, messages and paths are stripped of control characters and capped.**
+  A test name carrying an erase-line sequence would otherwise rewrite the verdict
+  printed above it; a backtick or newline in a path would break out of the code
+  span in a pull request comment.
+- **Evidence is labelled as quoted content** where it reaches an agent, because
+  a test name is attacker-controlled text arriving in a context window.
+- **Symlinks are never followed** out of the repository, and nothing is ever
+  written to the git index.
 
 ## What it is not
 

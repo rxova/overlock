@@ -1,6 +1,5 @@
-import { addedLines } from '../diff.js';
 import type { Finding } from '../types.js';
-import { finding, type Rule, type RuleContext } from './shared.js';
+import { finding, withoutStringContents, type Rule, type RuleContext } from './shared.js';
 
 interface SkipPattern {
   re: RegExp;
@@ -50,21 +49,6 @@ function isCommented(text: string): boolean {
   return /^\s*(?:\/\/|#(?!!?\[)|\*|\/\*)/.test(text);
 }
 
-/**
- * Blanks the contents of string literals before matching.
- *
- * A marker inside quotes is data, not a directive: a test fixture asserting on
- * `"it.skip(...)"`, a lint rule naming the pattern it bans, a message that
- * mentions it. Every one of those is a false positive, and a false positive on
- * a `high` rule is how a blocking hook gets uninstalled.
- *
- * The quotes themselves are kept so a real marker survives the blanking —
- * `it.skip('rejects', fn)` becomes `it.skip('', fn)` and still matches.
- */
-function withoutStringContents(text: string): string {
-  return text.replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, '$1$1');
-}
-
 function extensionOf(path: string): string {
   const base = path.slice(path.lastIndexOf('/') + 1);
   const dot = base.lastIndexOf('.');
@@ -81,9 +65,23 @@ export const testSkippedAdded: Rule = {
       const inTestFile = ctx.isTest(file.path);
       const extension = extensionOf(file.path);
 
-      for (const line of addedLines(file)) {
+      // Every line of the post-image, so a marker split over two lines can be
+      // rejoined. `it\n  .skip(...)` is a formatter's ordinary output and it
+      // evaded this rule entirely while only the added half was examined.
+      const post = file.hunks.flatMap((h) => h.lines.filter((l) => l.kind !== 'del'));
+
+      for (const [index, line] of post.entries()) {
+        if (line.kind !== 'add') continue;
         if (isCommented(line.text)) continue;
-        const code = withoutStringContents(line.text);
+
+        const previous = post[index - 1];
+        const code = withoutStringContents(
+          // Joined only when this line opens with the property access, so an
+          // ordinary `.skipBrokenSetup()` on its own line stays ordinary.
+          /^\s*\./.test(line.text) && previous
+            ? `${previous.text.trimEnd()}${line.text.trimStart()}`
+            : line.text,
+        );
 
         for (const pattern of SKIP_PATTERNS) {
           if (pattern.extensions) {

@@ -2,7 +2,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { HOOK_COMMAND, initClaude, initInstructions, instructionSnippet } from './init.js';
+import {
+  HOOK_COMMAND,
+  initClaude,
+  initInstructions,
+  instructionSnippet,
+  mcpSnippet,
+} from './init.js';
 
 let dir: string | null = null;
 
@@ -108,6 +114,16 @@ describe('initInstructions', () => {
     const root = makeDir();
     expect(initInstructions(root, 'cursor').written).toEqual(['.cursor/rules/overlock.mdc']);
     expect(initInstructions(root, 'copilot').written).toEqual(['.github/copilot-instructions.md']);
+  });
+});
+
+describe('mcpSnippet', () => {
+  it('is valid JSON an agent config can take verbatim', () => {
+    const parsed = JSON.parse(mcpSnippet()) as {
+      mcpServers: { overlock: { command: string; args: string[] } };
+    };
+    expect(parsed.mcpServers.overlock.command).toBe('npx');
+    expect(parsed.mcpServers.overlock.args).toEqual(['-y', 'overlock', 'mcp']);
   });
 });
 

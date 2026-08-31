@@ -64,6 +64,19 @@ describe('compact', () => {
   });
 });
 
+describe('the suppressed note', () => {
+  it('is absent when nothing was suppressed', () => {
+    expect(human(dirty, false)).not.toContain('suppressed');
+    expect(compact(dirty)).not.toContain('suppressed');
+  });
+
+  it('appears alongside findings, not only on a clean run', () => {
+    const withBoth = { ...dirty, suppressed: 2 };
+    expect(human(withBoth, false)).toContain('(2 suppressed)');
+    expect(compact(withBoth)).toContain('(2 suppressed)');
+  });
+});
+
 describe('json', () => {
   it('round-trips the report', () => {
     const parsed = JSON.parse(json(dirty)) as typeof dirty;

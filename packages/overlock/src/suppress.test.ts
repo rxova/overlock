@@ -76,7 +76,7 @@ describe('collectSuppressions', () => {
 describe('applySuppressions', () => {
   it('returns everything untouched when there is nothing to apply', () => {
     const findings = analyze({ diff: diffOf('src/a.test.ts', hunk(skipLine)) }).findings;
-    expect(applySuppressions(findings, [])).toEqual({ kept: findings, suppressed: [] });
+    expect(applySuppressions(findings, [])).toEqual({ kept: findings, suppressed: [], used: [] });
   });
 });
 

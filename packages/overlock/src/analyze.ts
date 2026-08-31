@@ -1,6 +1,7 @@
 import { parseDiff } from './diff.js';
 import { isTestFile } from './paths.js';
 import { RULES } from './rules/index.js';
+import { sanitize } from './rules/shared.js';
 import { applySuppressions, collectSuppressions } from './suppress.js';
 import type { Finding, Report, RuleId, Severity } from './types.js';
 
@@ -17,8 +18,18 @@ export interface AnalyzeOptions {
   failOn?: Severity | 'none';
 }
 
+/**
+ * An unrecognised level used to make every severity comparison false, so a
+ * patch carrying a HIGH finding reported `ok`. A gate given a value it does not
+ * understand has to fail closed.
+ */
+function normalizeFailOn(value: Severity | 'none'): Severity | 'none' {
+  return value === 'none' || value in SEVERITY_RANK ? value : 'high';
+}
+
 export function analyze(options: AnalyzeOptions): Report {
-  const { diff, base = 'HEAD', testGlobs = [], failOn = 'high' } = options;
+  const { diff, base = 'HEAD', testGlobs = [] } = options;
+  const failOn = normalizeFailOn(options.failOn ?? 'high');
 
   const files = parseDiff(diff);
   const ctx = {
@@ -27,11 +38,12 @@ export function analyze(options: AnalyzeOptions): Report {
   };
 
   const raw = RULES.flatMap((rule) => rule.run(ctx));
-  const { kept, suppressed } = applySuppressions(
+  const { kept, suppressed, used } = applySuppressions(
     sortFindings(dedupe(raw)),
     collectSuppressions(files),
   );
   const findings = kept;
+  const freshlyAdded = used.filter((s) => s.added);
 
   const counts: Record<Severity, number> = { high: 0, medium: 0, low: 0 };
   for (const f of findings) counts[f.severity] += 1;
@@ -41,7 +53,21 @@ export function analyze(options: AnalyzeOptions): Report {
       ? true
       : !findings.some((f) => SEVERITY_RANK[f.severity] <= SEVERITY_RANK[failOn]);
 
-  return { schema: 1, ok, base, findings, counts, suppressed: suppressed.length };
+  return {
+    schema: 1,
+    ok,
+    base,
+    findings,
+    counts,
+    suppressed: suppressed.length,
+    suppressed_new: freshlyAdded.length,
+    suppressions_new: freshlyAdded.map((s) => ({
+      rule: s.rule,
+      file: s.file,
+      line: s.line,
+      reason: sanitize(s.reason),
+    })),
+  };
 }
 
 /**

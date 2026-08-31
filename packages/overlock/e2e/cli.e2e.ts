@@ -310,6 +310,57 @@ describe('suppressions', () => {
   });
 });
 
+describe('overlock report', () => {
+  it('reads back what the ledger recorded, and always exits 0', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.commit('feat: add auth tests');
+    r.write('src/auth.test.ts', SKIPPED_TEST);
+
+    overlock(['check', '--base', 'auto'], { cwd: r.dir });
+    overlock(['check', '--base', 'auto'], { cwd: r.dir });
+
+    const result = overlock(['report'], { cwd: r.dir });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('2 runs');
+    expect(result.stdout).toContain('TEST_SKIPPED_ADDED');
+  });
+
+  it('says what to do when there is nothing recorded yet', () => {
+    const r = cleanRepo();
+    const result = overlock(['report', '--days', '1'], { cwd: r.dir });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('nothing recorded');
+  });
+
+  it('emits the aggregate as data', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.commit('feat: add auth tests');
+    r.write('src/auth.test.ts', SKIPPED_TEST);
+    overlock(['check', '--base', 'auto'], { cwd: r.dir });
+
+    const summary = JSON.parse(overlock(['report', '--json'], { cwd: r.dir }).stdout) as {
+      runs: number;
+      caught: number;
+      byRule: { rule: string }[];
+    };
+    expect(summary.runs).toBe(1);
+    expect(summary.caught).toBe(1);
+    expect(summary.byRule[0]?.rule).toBe('TEST_SKIPPED_ADDED');
+  });
+
+  it('rejects a nonsense window', () => {
+    const r = cleanRepo();
+    const result = overlock(['report', '--days', '0'], { cwd: r.dir });
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('positive integer');
+  });
+});
+
 describe('the whole loop', () => {
   it('goes red on a weakened test and green once it is restored', () => {
     const r = weakenedRepo();

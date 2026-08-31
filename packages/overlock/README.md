@@ -204,6 +204,43 @@ them would be a copy of your repository sitting in your home directory.
 
 `--no-ledger` turns it off; `OVERLOCK_LEDGER` moves it.
 
+## Reading the ledger back
+
+```console
+$ overlock report
+overlock — 30 days, 3 repos, 60 runs
+
+  Caught           10   runs with a high or medium finding
+  Blocked           5   times an agent was stopped
+  Suppressed        5   findings silenced with a reason
+  Noted             3   runs with low findings only
+
+By rule
+  ASSERTION_WEAKENED             5  ████████████████████████
+  COVERAGE_THRESHOLD_LOWERED     2  ██████████
+  TEST_SKIPPED_ADDED             2  ██████████
+
+Context only
+  TEST_AND_IMPL_TOGETHER         6
+
+Bar: 4+ catches in 30 days. 10 caught — met.
+```
+
+`--days <n>` moves the window, `--json` gives you the aggregate as data, and it
+always exits 0 — this reports history, it does not gate anything.
+
+**Low findings are not catches.** `TEST_AND_IMPL_TOGETHER` fires on ordinary
+test-driven work and would otherwise be the most common finding every month,
+which would let the tool clear its own bar on noise. Catches count high and
+medium only; low findings are listed separately as context.
+
+The bar itself was written down before any of this was built, so the result
+could not be read the way it was wanted: **four real catches in thirty days, and
+zero false blocks annoying enough to switch it off.** Only the first half is
+measurable from a log. The second half is reported as a question rather than a
+score, because a tool that graded itself on both halves would be marking its own
+homework.
+
 ## What it is not
 
 Not a linter — ESLint already reviews your code, and

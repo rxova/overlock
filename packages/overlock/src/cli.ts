@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs';
 import { GitError, repoRoot } from './git.js';
 import { parseStopPayload, stopHookOutcome } from './hook.js';
 import { AGENTS, type Agent, initClaude, initInstructions, instructionSnippet } from './init.js';
-import { compact, human, json, useColor } from './report.js';
+import { compact, human, json, summaryText, useColor } from './report.js';
 import { run } from './run.js';
+import { ledgerPath } from './ledger.js';
+import { readLedger, summarize } from './summary.js';
 import type { Severity } from './types.js';
 
 const VERSION = typeof __OVERLOCK_VERSION__ === 'string' ? __OVERLOCK_VERSION__ : '0.0.0';
@@ -15,6 +17,7 @@ USAGE
   overlock [check] [options]     Check the current patch (default command)
   overlock hook claude           Run as a Claude Code Stop hook (reads stdin)
   overlock init <agent>          Wire it into an agent: ${AGENTS.join(', ')}
+  overlock report [--days N]     What the ledger has been recording
 
 CHECK OPTIONS
   --base <ref>       Diff against this ref. Default: auto
@@ -37,6 +40,10 @@ SILENCING A FINDING
   The rule ID and the reason are both required. A directive without a written
   reason silences nothing.
 
+REPORT OPTIONS
+  --days <n>         Only count runs from the last n days. Default: 30
+  --json             The aggregate as data
+
 EXIT CODES
   0  nothing at or above --fail-on
   1  findings at or above --fail-on
@@ -46,13 +53,14 @@ Findings are advisory. The tool reads a diff; it never edits your code, and it
 makes no network calls.`;
 
 export interface ParsedArgs {
-  command: 'check' | 'hook' | 'init' | 'help' | 'version';
+  command: 'check' | 'hook' | 'init' | 'report' | 'help' | 'version';
   target?: string;
   base?: string;
   staged: boolean;
   format: 'human' | 'json' | 'compact';
   failOn: Severity | 'none';
   limit: number;
+  days: number;
   testGlobs: RegExp[];
   cwd: string;
   ledger: boolean;
@@ -68,6 +76,7 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
     format: 'human',
     failOn: 'high',
     limit: 3,
+    days: 30,
     testGlobs: [],
     cwd,
     ledger: true,
@@ -78,7 +87,7 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
   const first = rest[0];
 
   if (first !== undefined && !first.startsWith('-')) {
-    if (first !== 'check' && first !== 'hook' && first !== 'init') {
+    if (first !== 'check' && first !== 'hook' && first !== 'init' && first !== 'report') {
       throw new UsageError(`Unknown command: ${first}`);
     }
     parsed.command = first;
@@ -129,6 +138,14 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
       case '--cwd':
         parsed.cwd = value('--cwd');
         break;
+      case '--days': {
+        const days = Number(value('--days'));
+        if (!Number.isInteger(days) || days < 1) {
+          throw new UsageError('--days needs a positive integer');
+        }
+        parsed.days = days;
+        break;
+      }
       case '--limit': {
         const limit = Number(value('--limit'));
         if (!Number.isInteger(limit) || limit < 1) {
@@ -190,6 +207,7 @@ export function main(argv: string[], io: Io): number {
 
   try {
     if (args.command === 'init') return runInit(args, io);
+    if (args.command === 'report') return runReport(args, io);
 
     const { report } = run({
       cwd: args.cwd,
@@ -225,6 +243,21 @@ export function main(argv: string[], io: Io): number {
     io.stderr(`overlock: ${error instanceof Error ? error.message : String(error)}\n`);
     return 2;
   }
+}
+
+/**
+ * Reading the ledger back. Always exits 0: this reports history, it does not
+ * gate anything, and a shell that treated a month with findings as a failure
+ * would be answering a different question.
+ */
+function runReport(args: ParsedArgs, io: Io): number {
+  const entries = readLedger(ledgerPath(io.env));
+  const summary = summarize(entries, { days: args.days });
+
+  if (args.format === 'json') io.stdout(`${JSON.stringify(summary, null, 2)}\n`);
+  else io.stdout(`${summaryText(summary, useColor({ isTTY: io.isTTY }, io.env))}\n`);
+
+  return 0;
 }
 
 function runInit(args: ParsedArgs, io: Io): number {

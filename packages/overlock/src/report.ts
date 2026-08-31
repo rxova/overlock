@@ -1,3 +1,4 @@
+import { BAR_DAYS, CATCH_BAR, meetsBar, type Summary } from './summary.js';
 import type { Finding, Report, Severity } from './types.js';
 
 const MARK: Record<Severity, string> = { high: '✗', medium: '!', low: '·' };
@@ -130,3 +131,94 @@ function clip(text: string, max: number): string {
 }
 
 export type { Finding };
+
+/**
+ * The ledger, read back.
+ *
+ * Deliberately a handful of numbers rather than a dashboard: this is read once
+ * a month to answer one question, and every extra row is a place for the answer
+ * to hide.
+ */
+/** Rules that never block, kept out of the headline chart. */
+const LOW_RULES = new Set<string>(['TEST_AND_IMPL_TOGETHER', 'TEST_TIMEOUT_RAISED']);
+
+export function summaryText(summary: Summary, color: boolean): string {
+  const window = summary.days === undefined ? 'all time' : `${summary.days} days`;
+
+  if (summary.runs === 0) {
+    return [
+      paint(`overlock — nothing recorded in ${window}.`, ANSI.bold, color),
+      '',
+      paint('  Install the hook and leave it on:  overlock init claude', ANSI.dim, color),
+      paint('  The ledger only fills while something is running it.', ANSI.dim, color),
+    ].join('\n');
+  }
+
+  const lines: string[] = [];
+  const repos = `${summary.repos} repo${summary.repos === 1 ? '' : 's'}`;
+  lines.push(
+    paint(`overlock — ${window}, ${repos}, ${summary.runs} runs`, ANSI.bold, color),
+    '',
+    row('Caught', summary.caught, 'runs with a high or medium finding', color),
+    row('Blocked', summary.blocked, 'times an agent was stopped', color),
+    row('Suppressed', summary.suppressed, 'findings silenced with a reason', color),
+    row('Noted', summary.noted, 'runs with low findings only', color),
+  );
+
+  // Low-severity rules are listed under their own heading rather than mixed in.
+  // TEST_AND_IMPL_TOGETHER fires on ordinary test-driven work and would
+  // otherwise top the chart every month and bury everything that matters.
+  const real = summary.byRule.filter((r) => !LOW_RULES.has(r.rule));
+  const context = summary.byRule.filter((r) => LOW_RULES.has(r.rule));
+
+  if (real.length > 0) {
+    const widest = real[0]?.count ?? 1;
+    lines.push('', paint('By rule', ANSI.dim, color));
+    for (const { rule, count } of real) {
+      const bar = '█'.repeat(Math.max(1, Math.round((count / widest) * 24)));
+      lines.push(
+        `  ${rule.padEnd(28)}${String(count).padStart(4)}  ${paint(bar, ANSI.dim, color)}`,
+      );
+    }
+  }
+
+  if (context.length > 0) {
+    lines.push('', paint('Context only', ANSI.dim, color));
+    for (const { rule, count } of context) {
+      lines.push(paint(`  ${rule.padEnd(28)}${String(count).padStart(4)}`, ANSI.dim, color));
+    }
+  }
+
+  if (summary.byRepo.length > 1) {
+    lines.push('', paint('By repository', ANSI.dim, color));
+    for (const { repo, caught } of summary.byRepo) {
+      lines.push(`  ${shorten(repo, 40).padEnd(42)}${String(caught).padStart(4)}`);
+    }
+  }
+
+  const met = meetsBar(summary);
+  lines.push(
+    '',
+    paint(`Bar: ${CATCH_BAR}+ catches in ${BAR_DAYS} days.`, ANSI.dim, color) +
+      ' ' +
+      paint(
+        met ? `${summary.caught} caught — met.` : `${summary.caught} caught — not met yet.`,
+        met ? ANSI.green : ANSI.yellow,
+        color,
+      ),
+    paint('The other half of the bar — whether it ever blocked you wrongly', ANSI.dim, color),
+    paint('enough to switch it off — only you can answer.', ANSI.dim, color),
+  );
+
+  return lines.join('\n');
+}
+
+function row(label: string, value: number, note: string, color: boolean): string {
+  return `  ${label.padEnd(14)}${String(value).padStart(5)}   ${paint(note, ANSI.dim, color)}`;
+}
+
+/** Keeps the tail of a path, which is the part that identifies the repository. */
+function shorten(path: string, max: number): string {
+  if (path.length <= max) return path;
+  return `...${path.slice(-(max - 3))}`;
+}

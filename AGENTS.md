@@ -43,3 +43,16 @@ else. This repository is the package, so it gates itself on the code in the
 working tree, not on the last published release. Run `pnpm exec turbo run build`
 once and the hook is live; before that it exits non-zero without blocking, which
 is the correct behaviour for a hook that cannot run.
+
+## Two things not to undo
+
+**Untracked files are part of the patch.** `git diff HEAD` says nothing about a
+file git has never seen, so an agent creating an already-skipped test file used
+to pass clean. `src/git.ts` synthesises additions for them. Do not "simplify"
+this to `git add -N`: that writes to the index of a repository this tool
+promises only to read, and the e2e suite asserts the index is untouched.
+
+**Suppressions require a reason.** `overlock-ignore RULE_ID -- reason` silences
+one rule on one line. No reason, no unknown rule, no wildcard — and the count of
+suppressed findings is reported and logged. Making the hatch easier is not an
+improvement; it is how the gate ends up passing everything.

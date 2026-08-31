@@ -1,4 +1,6 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 
 export class GitError extends Error {}
 
@@ -122,4 +124,71 @@ export function readDiff(range: string, cwd: string): string {
   else args.push(range);
 
   return git(args, cwd);
+}
+
+/**
+ * Paths git knows nothing about yet, honouring .gitignore.
+ *
+ * `-z` rather than newline-delimited: a path with a space, a newline or a
+ * non-ASCII byte comes back quoted and escaped otherwise, and this list is fed
+ * straight into path matching.
+ */
+export function untrackedFiles(cwd: string): string[] {
+  return git(['ls-files', '--others', '--exclude-standard', '-z'], cwd).split('\0').filter(Boolean);
+}
+
+/** Files above this are not what anyone hand-wrote as a test. */
+const MAX_UNTRACKED_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Renders untracked files as added-file hunks, so the rules see them.
+ *
+ * This exists because `git diff HEAD` does not report untracked files at all —
+ * which meant a brand-new test file arriving already skipped passed completely
+ * clean. Creating a test file is the most ordinary thing an agent does, so that
+ * was a hole straight through the middle of what this tool claims to check.
+ *
+ * The obvious fix is `git add -N`, and it is wrong: it writes to the index of a
+ * repository the tool promised only to read. So the diff is synthesised here
+ * instead, in exactly the shape the parser already accepts.
+ */
+export function untrackedDiff(cwd: string, paths: string[]): string {
+  const chunks: string[] = [];
+
+  for (const path of paths) {
+    const absolute = join(cwd, path);
+
+    let contents: string;
+    try {
+      if (statSync(absolute).size > MAX_UNTRACKED_BYTES) continue;
+      contents = readFileSync(absolute, 'utf8');
+    } catch {
+      // Vanished between listing and reading, or is not readable. Either way
+      // there is nothing to report and this must not fail the run.
+      continue;
+    }
+
+    // A NUL byte in text decoded as UTF-8 means it was never text. git makes
+    // the same call, and reports `Binary files differ` rather than a hunk.
+    if (contents.includes('\u0000')) continue;
+
+    const lines = contents.split('\n');
+    // A trailing newline splits into a final empty element that is not a line.
+    if (lines.at(-1) === '') lines.pop();
+    if (lines.length === 0) continue;
+
+    chunks.push(
+      [
+        `diff --git a/${path} b/${path}`,
+        'new file mode 100644',
+        '--- /dev/null',
+        `+++ b/${path}`,
+        `@@ -0,0 +1,${lines.length} @@`,
+        ...lines.map((line) => `+${line}`),
+        '',
+      ].join('\n'),
+    );
+  }
+
+  return chunks.join('');
 }

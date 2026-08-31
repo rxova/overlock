@@ -1,6 +1,7 @@
 import { parseDiff } from './diff.js';
 import { isTestFile } from './paths.js';
 import { RULES } from './rules/index.js';
+import { applySuppressions, collectSuppressions } from './suppress.js';
 import type { Finding, Report, RuleId, Severity } from './types.js';
 
 const SEVERITY_RANK: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
@@ -26,7 +27,11 @@ export function analyze(options: AnalyzeOptions): Report {
   };
 
   const raw = RULES.flatMap((rule) => rule.run(ctx));
-  const findings = sortFindings(dedupe(raw));
+  const { kept, suppressed } = applySuppressions(
+    sortFindings(dedupe(raw)),
+    collectSuppressions(files),
+  );
+  const findings = kept;
 
   const counts: Record<Severity, number> = { high: 0, medium: 0, low: 0 };
   for (const f of findings) counts[f.severity] += 1;
@@ -36,7 +41,7 @@ export function analyze(options: AnalyzeOptions): Report {
       ? true
       : !findings.some((f) => SEVERITY_RANK[f.severity] <= SEVERITY_RANK[failOn]);
 
-  return { schema: 1, ok, base, findings, counts };
+  return { schema: 1, ok, base, findings, counts, suppressed: suppressed.length };
 }
 
 /**

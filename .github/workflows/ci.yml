@@ -127,6 +127,61 @@ jobs:
       - name: Test with coverage thresholds
         run: pnpm test
 
+  # `engines.node` claims >=20.11 for the published package, and until this job
+  # existed nothing checked it: the dev toolchain needs pnpm 11, which itself
+  # needs >=22.13, so every other job runs on 22 or 24 and the claim went
+  # untested. This packs on 24 and then runs the tarball under 20, which is the
+  # only thing the claim is actually about.
+  compat:
+    name: published package on node 20
+    needs: [commitlint]
+    if: needs.commitlint.outputs.code-changed == 'true' && github.head_ref != 'changeset-release/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/turbo-cache
+        with:
+          key: compat
+      - run: pnpm install --frozen-lockfile
+      - name: Build and pack
+        run: |
+          pnpm exec turbo run build
+          npm pack --pack-destination /tmp/pkg --workspace packages/overlock
+
+      - name: Switch to Node 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20.11'
+
+      - name: Install the tarball and run it as a consumer would
+        run: |
+          node --version
+          mkdir -p /tmp/consumer && cd /tmp/consumer
+          echo '{"name":"consumer","private":true,"type":"module"}' > package.json
+          npm install --no-audit --no-fund /tmp/pkg/*.tgz
+          npx --no-install overlock --version
+          node -e "import('overlock').then(m => {
+            const r = m.analyze({ diff: '' });
+            if (r.findings.length !== 0) throw new Error('empty diff produced findings');
+            if (m.RULE_IDS.length !== 9) throw new Error('rule registry changed shape');
+            console.log('library entry loads on node 20');
+          })"
+
+      - name: Check it against a real repository on node 20
+        run: |
+          mkdir -p /tmp/probe && cd /tmp/probe
+          git init -q --initial-branch=main .
+          git config user.email ci@example.com && git config user.name CI
+          mkdir -p src && printf 'export const check = () => true;\n' > src/a.ts
+          git add -A && git commit -q -m "init"
+          printf "it.skip('x', () => {});\n" > src/a.test.ts
+          set +e
+          /tmp/consumer/node_modules/.bin/overlock check --base auto --no-ledger
+          status=$?
+          set -e
+          test "$status" -eq 1 || { echo "expected exit 1, got $status"; exit 1; }
+
   e2e:
     name: e2e (real git repositories)
     needs: [commitlint]

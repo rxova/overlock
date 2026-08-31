@@ -91,6 +91,52 @@ place by telling you which implementation change the other findings are about.
 Languages: TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, Ruby and C#
 conventions are recognised out of the box. `--test-glob` adds your own.
 
+## Silencing a finding
+
+Sometimes a skip is deliberate — a test quarantined behind a real bug, waiting
+on a fix you have already written down somewhere. Put a comment on the offending
+line, or the line directly above it:
+
+```ts
+// overlock-ignore TEST_SKIPPED_ADDED -- quarantined pending #412
+it.skip('rejects expired tokens', () => {
+```
+
+The rule ID and the reason are **both required**. A directive with no written
+reason silences nothing, an unknown rule ID silences nothing, and there is no
+wildcard. A suppression covers one rule on one line in one file.
+
+That friction is the design. A gate with no escape hatch gets uninstalled the
+first time it is wrong; a gate with a frictionless one gets suppressed everywhere
+and stops meaning anything — which is why `eslint-disable` eventually needed a
+lint rule of its own to police it. Requiring a named rule and a sentence of
+justification keeps the hatch usable by a person explaining themselves and
+useless to an agent looking for the shortest path to green.
+
+Every run reports how many findings were suppressed, including clean ones:
+
+```console
+$ overlock
+✓ overlock: nothing weakened in this patch. (1 suppressed)
+```
+
+The count goes into the ledger too. An escape hatch nobody can count is one that
+quietly empties the gate.
+
+## Untracked files
+
+Files git has not seen yet are included by default, rendered as additions.
+
+This matters more than it sounds: `git diff HEAD` reports nothing whatsoever
+about an untracked file, so before this existed a brand-new test file arriving
+already skipped passed completely clean — and creating a test file is the most
+ordinary thing an agent does. `--no-untracked` opts out; `--staged` never
+includes them, because the question it asks is specifically what the index holds.
+
+overlock reads those files, it never stages them. `git add -N` would have been
+the shorter fix and it writes to the index of a repository this tool promised
+only to read.
+
 ## Usage
 
 ```bash
@@ -101,6 +147,7 @@ overlock --json                  # the full report, for a script or an agent
 overlock --compact               # the short form a phone can read
 overlock --fail-on medium        # high | medium | low | none
 overlock --test-glob '\.check\.ts$'
+overlock --no-untracked             # ignore files git does not track yet
 ```
 
 Exit codes: `0` clean, `1` findings at or above `--fail-on`, `2` overlock

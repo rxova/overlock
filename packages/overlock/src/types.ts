@@ -64,6 +64,12 @@ export interface Report {
   base: string;
   findings: Finding[];
   counts: Record<Severity, number>;
+  /**
+   * Findings an `overlock-ignore` comment silenced. Reported rather than simply
+   * dropped: an escape hatch nobody can count is one that quietly empties the
+   * gate, and this number is what makes a rising suppression rate visible.
+   */
+  suppressed: number;
 }
 
 export type DiffLineKind = 'add' | 'del' | 'ctx';

@@ -249,6 +249,10 @@ jobs:
     needs: [commitlint]
     if: github.event_name == 'pull_request' && needs.commitlint.outputs.code-changed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # The action posts a single findings comment, edited in place.
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -257,9 +261,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec turbo run build
       # A tool that gates other people's test edits has no business exempting
-      # its own. Runs against the PR's base so it sees exactly this branch's work.
+      # its own — and running it through the action rather than the binary means
+      # the action is exercised on every pull request too. `cli-path` points at
+      # this branch's build, so the gate is the code under review rather than
+      # the last release.
       - name: Check this branch's own patch
-        run: node packages/overlock/dist/cli.js check --base ${{ github.event.pull_request.base.sha }} --no-ledger
+        uses: ./
+        with:
+          cli-path: ${{ github.workspace }}/packages/overlock/dist/cli.js
 
   changeset:
     name: changeset present

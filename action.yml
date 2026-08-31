@@ -1,0 +1,173 @@
+name: overlock
+description: Find out what a coding agent did to your tests — a deterministic gate on test integrity in a patch.
+author: Jonatan Kruszewski
+
+branding:
+  icon: scissors
+  color: green
+
+inputs:
+  base:
+    description: >-
+      Git ref to diff against. Defaults to the pull request's base commit, or
+      "auto" on a push (uncommitted work if any, otherwise this branch's commits).
+    required: false
+    default: ''
+  fail-on:
+    description: 'Severity at or above which the job fails: high, medium, low or none.'
+    required: false
+    default: 'high'
+  comment:
+    description: >-
+      Post the findings as a single pull request comment, updated in place on
+      later runs rather than added to. Needs `pull-requests: write`.
+    required: false
+    default: 'true'
+  working-directory:
+    description: Directory to run in.
+    required: false
+    default: '.'
+  version:
+    description: Version of overlock to run.
+    required: false
+    default: 'latest'
+  cli-path:
+    description: >-
+      Path to an already-built CLI, used instead of fetching from npm. This
+      repository's own dogfood job sets it so overlock gates its pull requests
+      with the code in the branch rather than the last release.
+    required: false
+    default: ''
+  github-token:
+    description: Token used to post the comment.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  ok:
+    description: '"true" when nothing at or above fail-on was found.'
+    value: ${{ steps.check.outputs.ok }}
+  findings:
+    description: Number of findings reported.
+    value: ${{ steps.check.outputs.findings }}
+  report:
+    description: Path to the JSON report.
+    value: ${{ steps.check.outputs.report }}
+
+runs:
+  using: composite
+  steps:
+    # A pull request is the case worth getting right: `github.sha` on a PR is the
+    # merge commit, so diffing against it reports nothing. The base commit is
+    # what makes the diff mean "this branch's work".
+    - name: Work out what to diff against
+      id: range
+      shell: bash
+      env:
+        INPUT_BASE: ${{ inputs.base }}
+        PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      run: |
+        if [ -n "$INPUT_BASE" ]; then
+          echo "base=$INPUT_BASE" >> "$GITHUB_OUTPUT"
+        elif [ -n "$PR_BASE_SHA" ]; then
+          echo "base=$PR_BASE_SHA" >> "$GITHUB_OUTPUT"
+        else
+          echo "base=auto" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Run overlock
+      id: check
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        BASE: ${{ steps.range.outputs.base }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        VERSION: ${{ inputs.version }}
+        CLI_PATH: ${{ inputs.cli-path }}
+      run: |
+        set -o pipefail
+
+        if [ -n "$CLI_PATH" ]; then
+          run_overlock() { node "$CLI_PATH" "$@"; }
+        else
+          run_overlock() { npx -y "overlock@$VERSION" "$@"; }
+        fi
+
+        report="$RUNNER_TEMP/overlock-report.json"
+
+        # The ledger is a record of what a person's agents did on their machine.
+        # A CI runner is neither, and it is thrown away, so nothing is written.
+        set +e
+        run_overlock check --base "$BASE" --fail-on "$FAIL_ON" --no-ledger --json > "$report"
+        status=$?
+        set -e
+
+        if [ "$status" -gt 1 ]; then
+          echo "::error::overlock could not run"
+          cat "$report" || true
+          exit "$status"
+        fi
+
+        findings=$(node -e "process.stdout.write(String(require('$report').findings.length))")
+        ok=$(node -e "process.stdout.write(String(require('$report').ok))")
+
+        {
+          echo "ok=$ok"
+          echo "findings=$findings"
+          echo "report=$report"
+          echo "status=$status"
+        } >> "$GITHUB_OUTPUT"
+
+        # The human-readable form in the log, regardless of pass or fail.
+        set +e
+        run_overlock check --base "$BASE" --fail-on none --no-ledger
+        set -e
+
+    - name: Comment on the pull request
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPORT: ${{ steps.check.outputs.report }}
+        FINDINGS: ${{ steps.check.outputs.findings }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
+      run: |
+        set -o pipefail
+        marker="<!-- overlock-report -->"
+        body="$RUNNER_TEMP/overlock-comment.md"
+
+        if [ "$FINDINGS" = "0" ]; then
+          printf '%s\n\n**overlock**: nothing weakened in this patch.\n' "$marker" > "$body"
+        else
+          {
+            printf '%s\n\n**overlock** found %s thing(s) this patch does to its tests:\n\n' "$marker" "$FINDINGS"
+            printf '| Severity | Rule | Where |\n| --- | --- | --- |\n'
+            node -e '
+              const report = require(process.env.REPORT);
+              for (const f of report.findings) {
+                const cell = (s) => String(s).replace(/\|/g, "\\|");
+                process.stdout.write(`| ${f.severity} | \`${cell(f.rule)}\` | \`${cell(f.file)}:${f.line}\` |\n`);
+              }
+            '
+            printf '\nSilence one deliberately with `// overlock-ignore RULE_ID -- reason`.\n'
+          } > "$body"
+        fi
+
+        # One comment, edited in place. A bot that appends on every push buries
+        # the review it is supposed to support.
+        existing=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+          --jq "map(select(.body | startswith(\"$marker\"))) | first | .id // empty")
+
+        if [ -n "$existing" ]; then
+          gh api --method PATCH "repos/$REPO/issues/comments/$existing" -F "body=@$body" > /dev/null
+        else
+          gh api --method POST "repos/$REPO/issues/$PR_NUMBER/comments" -F "body=@$body" > /dev/null
+        fi
+
+    - name: Fail if the gate did not pass
+      if: ${{ steps.check.outputs.status != '0' }}
+      shell: bash
+      run: |
+        echo "::error::overlock found ${{ steps.check.outputs.findings }} finding(s) at or above ${{ inputs.fail-on }}"
+        exit 1

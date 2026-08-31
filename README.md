@@ -122,6 +122,29 @@ dependency to a package an agent runs on every turn. Protocol versions are taken
 from the official SDK's own constants, and negotiation echoes the client's
 version when it is one overlock knows.
 
+## In CI
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+
+steps:
+  - uses: actions/checkout@v5
+    with: { fetch-depth: 0 }
+  - uses: rxova/overlock@v0
+```
+
+On a pull request it diffs against the base commit — not `github.sha`, which on
+a PR is the merge commit and would report nothing — and posts a single findings
+comment, edited in place on later pushes rather than appended to. A bot that
+comments again on every push buries the review it is meant to support.
+
+`fail-on`, `base`, `working-directory`, `version` and `comment` are all inputs;
+`ok`, `findings` and `report` are outputs. The action never writes a ledger: that
+file is a record of what your agents did on your machine, and a CI runner is
+neither.
+
 ## Silencing a finding
 
 Sometimes a skip is deliberate — a test quarantined behind a real bug, waiting

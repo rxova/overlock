@@ -1,5 +1,12 @@
 import { analyze } from './analyze.js';
-import { currentBranch, readDiff, repoRoot, resolveRange } from './git.js';
+import {
+  currentBranch,
+  readDiff,
+  repoRoot,
+  resolveRange,
+  untrackedDiff,
+  untrackedFiles,
+} from './git.js';
 import { appendLedger, toEntry } from './ledger.js';
 import type { Report, Severity } from './types.js';
 
@@ -11,6 +18,8 @@ export interface RunOptions {
   testGlobs?: RegExp[];
   mode?: 'check' | 'hook';
   ledger?: boolean;
+  /** Include files git does not track yet. Default true, except for --staged. */
+  untracked?: boolean;
 }
 
 export interface RunResult {
@@ -29,12 +38,19 @@ export function run(options: RunOptions): RunResult {
     testGlobs = [],
     mode = 'check',
     ledger = true,
+    untracked,
   } = options;
 
   const repo = repoRoot(cwd);
   const branch = currentBranch(cwd);
   const range = resolveRange({ cwd, base, staged });
-  const diff = readDiff(range, cwd);
+
+  // Untracked files are part of the working tree but not of any diff against
+  // it, so they are appended explicitly. Not for `--staged`, where the question
+  // asked is specifically what the index holds.
+  const includeUntracked = untracked ?? range !== '--cached';
+  const diff =
+    readDiff(range, cwd) + (includeUntracked ? untrackedDiff(cwd, untrackedFiles(cwd)) : '');
 
   const report = analyze({ diff, base: range, testGlobs, failOn });
 

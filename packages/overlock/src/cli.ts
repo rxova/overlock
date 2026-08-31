@@ -26,7 +26,16 @@ CHECK OPTIONS
   --limit <n>        Findings shown in --compact. Default: 3
   --test-glob <re>   Extra regex marking a path as a test file (repeatable)
   --cwd <dir>        Run against this directory
+  --no-untracked     Skip files git does not track yet (they are included by default)
   --no-ledger        Do not record this run in ~/.overlock/ledger.jsonl
+
+SILENCING A FINDING
+  Put a comment on the offending line, or the line above it:
+
+    // overlock-ignore TEST_SKIPPED_ADDED -- quarantined pending #412
+
+  The rule ID and the reason are both required. A directive without a written
+  reason silences nothing.
 
 EXIT CODES
   0  nothing at or above --fail-on
@@ -47,6 +56,7 @@ export interface ParsedArgs {
   testGlobs: RegExp[];
   cwd: string;
   ledger: boolean;
+  untracked: boolean;
 }
 
 export class UsageError extends Error {}
@@ -61,6 +71,7 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
     testGlobs: [],
     cwd,
     ledger: true,
+    untracked: true,
   };
 
   const rest = [...argv];
@@ -108,6 +119,9 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
         break;
       case '--no-ledger':
         parsed.ledger = false;
+        break;
+      case '--no-untracked':
+        parsed.untracked = false;
         break;
       case '--base':
         parsed.base = value('--base');
@@ -188,6 +202,7 @@ export function main(argv: string[], io: Io): number {
       testGlobs: args.testGlobs,
       mode: args.command === 'hook' ? 'hook' : 'check',
       ledger: args.ledger,
+      untracked: args.untracked,
     });
 
     if (args.command === 'hook') {

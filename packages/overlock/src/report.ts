@@ -35,13 +35,17 @@ function severityColor(severity: Severity): string {
 /** The terminal view: everything, grouped, with the evidence inline. */
 export function human(report: Report, color: boolean): string {
   if (report.findings.length === 0) {
-    return paint('✓ overlock: nothing weakened in this patch.', ANSI.green, color);
+    return paint(
+      `✓ overlock: nothing weakened in this patch.${suppressedNote(report)}`,
+      ANSI.green,
+      color,
+    );
   }
 
   const lines: string[] = [];
   lines.push(
     paint(`overlock — ${summarize(report)}`, ANSI.bold, color) +
-      paint(`  (${report.base})`, ANSI.dim, color),
+      paint(`  (${report.base})${suppressedNote(report)}`, ANSI.dim, color),
   );
   lines.push('');
 
@@ -75,12 +79,12 @@ export function human(report: Report, color: boolean): string {
  * the untruncated text.
  */
 export function compact(report: Report, limit = 3): string {
-  if (report.findings.length === 0) return 'overlock: clean.';
+  if (report.findings.length === 0) return `overlock: clean.${suppressedNote(report)}`;
 
   const shown = report.findings.slice(0, limit);
   const hidden = report.findings.length - shown.length;
 
-  const lines: string[] = [`overlock: ${summarize(report)}.`, ''];
+  const lines: string[] = [`overlock: ${summarize(report)}.${suppressedNote(report)}`, ''];
 
   for (const f of shown) {
     lines.push(`${MARK[f.severity]} ${LABEL[f.severity].trim()} ${f.file}:${f.line} ${f.rule}`);
@@ -110,6 +114,15 @@ function summarize(report: Report): string {
   if (report.counts.low > 0) parts.push(`${report.counts.low} low`);
   const total = report.findings.length;
   return `${total} finding${total === 1 ? '' : 's'} (${parts.join(', ')})`;
+}
+
+/**
+ * Suppressions are always shown, even on a clean run. A silenced finding that
+ * leaves no trace in the output is how a gate ends up passing everything.
+ */
+function suppressedNote(report: Report): string {
+  if (report.suppressed === 0) return '';
+  return ` (${report.suppressed} suppressed)`;
 }
 
 function clip(text: string, max: number): string {

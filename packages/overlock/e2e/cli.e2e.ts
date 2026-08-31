@@ -225,6 +225,91 @@ describe('overlock init claude', () => {
   });
 });
 
+describe('untracked files', () => {
+  it('catches a skipped test in a file git has never seen', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.ts', 'export const check = () => true;\n');
+    r.commit('feat: add auth');
+    r.write('src/auth.test.ts', SKIPPED_TEST);
+
+    const result = overlock(['check', '--base', 'auto', '--json'], { cwd: r.dir });
+    expect(result.status).toBe(1);
+
+    const report = JSON.parse(result.stdout) as { findings: { rule: string; file: string }[] };
+    expect(report.findings[0]).toMatchObject({
+      rule: 'TEST_SKIPPED_ADDED',
+      file: 'src/auth.test.ts',
+    });
+  });
+
+  it('leaves the index exactly as it found it', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.ts', 'export const check = () => true;\n');
+    r.commit('feat: add auth');
+    r.write('src/auth.test.ts', SKIPPED_TEST);
+
+    // --no-ledger so the harness does not drop its own JSONL into the repo and
+    // make an untracked test artefact look like a write.
+    const before = r.git(['status', '--porcelain']);
+    overlock(['check', '--base', 'auto', '--no-ledger'], { cwd: r.dir });
+    expect(r.git(['status', '--porcelain'])).toBe(before);
+    expect(r.git(['diff', '--cached', '--name-only'])).toBe('');
+  });
+
+  it('can be opted out of', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.ts', 'export const check = () => true;\n');
+    r.commit('feat: add auth');
+    r.write('src/auth.test.ts', SKIPPED_TEST);
+
+    expect(overlock(['check', '--base', 'auto', '--no-untracked'], { cwd: r.dir }).status).toBe(0);
+  });
+});
+
+describe('suppressions', () => {
+  function repoWithSuppressedSkip(directive: string): TempRepo {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.commit('feat: add auth tests');
+    r.write('src/auth.test.ts', SKIPPED_TEST.replace('it.skip', `${directive}\nit.skip`));
+    return r;
+  }
+
+  it('silences a finding when a reason is given, and says it did', () => {
+    const r = repoWithSuppressedSkip(
+      '// overlock-ignore TEST_SKIPPED_ADDED -- quarantined, see #412',
+    );
+    const result = overlock(['check', '--base', 'auto'], { cwd: r.dir });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('1 suppressed');
+  });
+
+  it('silences nothing when the reason is missing', () => {
+    const r = repoWithSuppressedSkip('// overlock-ignore TEST_SKIPPED_ADDED');
+    expect(overlock(['check', '--base', 'auto'], { cwd: r.dir }).status).toBe(1);
+  });
+
+  it('silences nothing when the rule does not match', () => {
+    const r = repoWithSuppressedSkip('// overlock-ignore ASSERTION_REMOVED -- wrong rule');
+    expect(overlock(['check', '--base', 'auto'], { cwd: r.dir }).status).toBe(1);
+  });
+
+  it('lets a suppressed patch through the Stop hook, and records it', () => {
+    const r = repoWithSuppressedSkip(
+      '// overlock-ignore TEST_SKIPPED_ADDED -- quarantined, see #412',
+    );
+    expect(overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' }).status).toBe(0);
+
+    const line = readFileSync(join(r.dir, '.overlock-ledger.jsonl'), 'utf8').trim();
+    expect(JSON.parse(line)).toMatchObject({ ok: true, suppressed: 1 });
+  });
+});
+
 describe('the whole loop', () => {
   it('goes red on a weakened test and green once it is restored', () => {
     const r = weakenedRepo();

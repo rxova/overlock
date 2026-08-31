@@ -13,6 +13,7 @@ export interface LedgerEntry {
   /** True when this run actually stopped the agent, not merely reported. */
   blocked: boolean;
   counts: Record<Severity, number>;
+  suppressed: number;
   rules: { rule: string; severity: Severity; file: string; line: number }[];
 }
 
@@ -40,6 +41,7 @@ export function toEntry(input: {
     ok: report.ok,
     blocked,
     counts: report.counts,
+    suppressed: report.suppressed,
     rules: report.findings.map((f) => ({
       rule: f.rule,
       severity: f.severity,

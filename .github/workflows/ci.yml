@@ -144,10 +144,16 @@ jobs:
         with:
           key: compat
       - run: pnpm install --frozen-lockfile
+      # `npm pack --workspace` reads npm's own `workspaces` field from the root
+      # manifest. This is a pnpm workspace, so npm sees none and the job failed
+      # before it checked anything — which is how the engines claim stayed
+      # unverified while a green-looking job sat next to it. Packing from inside
+      # the package needs no workspace support at all.
       - name: Build and pack
-        run: |
-          pnpm exec turbo run build
-          npm pack --pack-destination /tmp/pkg --workspace packages/overlock
+        run: pnpm exec turbo run build
+      - name: Pack the tarball
+        working-directory: packages/overlock
+        run: npm pack --pack-destination /tmp/pkg
 
       - name: Switch to Node 20
         uses: actions/setup-node@v6

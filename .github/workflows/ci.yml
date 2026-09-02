@@ -40,16 +40,20 @@ jobs:
       # would recompute a verdict this commit already carries. GitHub counts a
       # job skipped by `if:` as satisfying a required check, which a trigger
       # filter would not.
-      code-changed: ${{ steps.scope.outputs.code-changed }}
+      code-changed: >-
+        ${{ steps.event-scope.outputs.metadata-only == 'true'
+        && 'false' || steps.scope.outputs.code-changed }}
     steps:
-      - name: Decide whether this event touched the tree
-        id: scope
+      # Recognised without a checkout, so a title edit or a label costs one
+      # short job rather than a clone and an install.
+      - name: Decide whether this event could have touched the tree
+        id: event-scope
         env:
           ACTION: ${{ github.event.action }}
         run: |
           case "$ACTION" in
-            edited | labeled | unlabeled) echo 'code-changed=false' >> "$GITHUB_OUTPUT" ;;
-            *) echo 'code-changed=true' >> "$GITHUB_OUTPUT" ;;
+            edited | labeled | unlabeled) echo 'metadata-only=true' >> "$GITHUB_OUTPUT" ;;
+            *) echo 'metadata-only=false' >> "$GITHUB_OUTPUT" ;;
           esac
 
       - uses: actions/checkout@v7
@@ -57,6 +61,23 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile
+
+      # The release commit bumps a version, writes a changelog and consumes the
+      # changesets, leaving the source tree identical to a parent CI already
+      # proved green. Re-running the matrix on it re-derives a verdict that
+      # commit already carries. Recognised by its file set, never by its branch
+      # name or its subject line.
+      - name: Decide whether this commit touched the tree
+        id: scope
+        if: steps.event-scope.outputs.metadata-only != 'true'
+        env:
+          BASE_SHA: >-
+            ${{ github.event_name == 'pull_request'
+            && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: >-
+            ${{ github.event_name == 'pull_request'
+            && github.event.pull_request.head.sha || github.sha }}
+        run: node --import tsx ./packages/tooling/check-scope.ts
 
       - name: Lint the branch commits
         if: github.event_name == 'pull_request'
@@ -105,7 +126,7 @@ jobs:
   test:
     name: unit (node ${{ matrix.node-version }})
     needs: [commitlint]
-    if: needs.commitlint.outputs.code-changed == 'true' && github.head_ref != 'changeset-release/main'
+    if: needs.commitlint.outputs.code-changed == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -135,7 +156,7 @@ jobs:
   compat:
     name: published package on node 20
     needs: [commitlint]
-    if: needs.commitlint.outputs.code-changed == 'true' && github.head_ref != 'changeset-release/main'
+    if: needs.commitlint.outputs.code-changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -195,7 +216,7 @@ jobs:
   e2e:
     name: e2e (real git repositories)
     needs: [commitlint]
-    if: needs.commitlint.outputs.code-changed == 'true' && github.head_ref != 'changeset-release/main'
+    if: needs.commitlint.outputs.code-changed == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -222,7 +243,7 @@ jobs:
   supply-chain:
     name: audit · dedupe
     needs: [commitlint]
-    if: needs.commitlint.outputs.code-changed == 'true' && github.head_ref != 'changeset-release/main'
+    if: needs.commitlint.outputs.code-changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -240,7 +261,7 @@ jobs:
   pack-smoke:
     name: package contract
     needs: [commitlint]
-    if: needs.commitlint.outputs.code-changed == 'true' && github.head_ref != 'changeset-release/main'
+    if: needs.commitlint.outputs.code-changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

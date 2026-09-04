@@ -175,6 +175,67 @@ describe('a patch that is mostly a rename', () => {
   });
 
   /**
+   * The residual only works on findings that exist. A rule that pairs a
+   * removal with an addition by their text sees two unrelated lines once a
+   * rename has moved through the subject, fires nothing, and leaves nothing
+   * for the residual to mark — which is a weakened assertion that reaches a
+   * reviewer as silence. The pairing runs against the substituted pre-image
+   * for exactly that reason.
+   */
+  it('sees a weakened assertion whose subject the rename moved', () => {
+    const hidden =
+      rename +
+      diffOf(
+        'src/mod9.test.ts',
+        hunk(
+          [
+            '-    expect(trainmotherfoca.total()).toBe(42);',
+            '+    expect(trainmf.total()).toBeDefined();',
+          ].join('\n'),
+        ),
+      );
+
+    const report = analyze({ diff: hidden });
+    const unexplained = report.findings.filter((f) => f.explained_by === undefined);
+
+    expect(unexplained).toHaveLength(1);
+    expect(unexplained[0]?.rule).toBe('ASSERTION_WEAKENED');
+    // Evidence is the patch as written, not the pre-image the pairing used.
+    expect(unexplained[0]?.evidence.before).toContain('trainmotherfoca.total()');
+    expect(unexplained[0]?.evidence.after).toContain('trainmf.total()');
+    expect(report.ok).toBe(false);
+  });
+
+  it('sees an expected value edited under the same rename', () => {
+    const hidden =
+      rename +
+      diffOf(
+        'src/mod9.test.ts',
+        hunk(
+          [
+            '-    expect(trainmotherfoca.total()).toBe(42);',
+            '+    expect(trainmf.total()).toBe(7);',
+          ].join('\n'),
+        ),
+      );
+
+    const report = analyze({ diff: hidden });
+    const unexplained = report.findings.filter((f) => f.explained_by === undefined);
+
+    expect(unexplained.map((f) => f.rule)).toContain('EXPECTED_VALUE_CHANGED');
+    expect(unexplained[0]?.message).toContain('42 → 7');
+  });
+
+  /**
+   * The other half of the same coin: a line the rename fully explains must not
+   * become a finding because the substitution made its shape match.
+   */
+  it('does not read the rename itself as a value change', () => {
+    const report = analyze({ diff: rename });
+    expect(report.findings.map((f) => f.rule)).not.toContain('EXPECTED_VALUE_CHANGED');
+  });
+
+  /**
    * An inferred substitution is a heuristic, and a heuristic that silenced
    * findings on its own would be a way to launder a real edit through a big
    * enough rename. Marking is not suppressing.

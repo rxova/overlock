@@ -56,6 +56,7 @@ export function analyze(options: AnalyzeOptions): Report {
   const ctx = {
     files,
     isTest: (path: string) => isTestFile(path, testGlobs),
+    renamed: explanation.applyRenames,
   };
 
   const raw = RULES.flatMap((rule) => rule.run(ctx)).map((f) => regrade(f, severities));

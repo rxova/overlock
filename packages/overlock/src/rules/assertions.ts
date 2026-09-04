@@ -72,7 +72,12 @@ export const assertionWeakened: Rule = {
           // unrelated strict assertion removed in the same hunk as an unrelated
           // loose one added is not a weakening, and without the subject check
           // it would read as one.
-          const subject = expectSubject(del.text);
+          //
+          // The subject is taken from the renamed pre-image, because the
+          // subject is where a rename lands: `expect(trainmotherfoca.total())`
+          // becoming `expect(trainmf.total()).toBeDefined()` is a weakening
+          // whose two halves would otherwise never be seen as a pair.
+          const subject = expectSubject(ctx.renamed(del.text));
           const match = adds.find((a) =>
             subject === null ? false : expectSubject(a.text) === subject,
           );
@@ -113,7 +118,10 @@ export const expectedValueChanged: Rule = {
         const claimed = new Set<number>();
 
         for (const del of dels) {
-          const shape = normalizeLiterals(del.text);
+          // Renamed first, for the same reason: a value edited in the same
+          // commit that renamed the thing it is read from is still a value
+          // edit, and the shapes only match once the rename is applied.
+          const shape = normalizeLiterals(ctx.renamed(del.text));
 
           for (const [i, add] of adds.entries()) {
             if (claimed.has(i)) continue;

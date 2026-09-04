@@ -47,6 +47,11 @@ export interface PatchExplanation {
   files: Map<string, Explanation>;
   /** Whether one before/after pair is accounted for. */
   explainsEdit: (before: string, after: string) => Explanation | null;
+  /**
+   * A pre-image line with the inferred substitution applied, so a rule can
+   * compare it against the post-image on equal terms.
+   */
+  applyRenames: (text: string) => string;
   /** `trainmotherfoca -> trainmf`, or null when no rename was inferred. */
   label: string | null;
 }
@@ -157,6 +162,21 @@ function explainRun(run: Run, map: Map<string, string>): Explanation | null {
   return substituted ? 'rename' : 'reformatting';
 }
 
+/**
+ * Rewrites the accepted substitutions wherever they appear as whole words.
+ *
+ * Every key is an identifier — `IDENTIFIER` saw to that before it became a
+ * candidate — so it needs no regex escaping and `\b` means what it says. Where
+ * no rename was inferred this is the identity, which is the common case and
+ * costs nothing.
+ */
+function substituter(map: Map<string, string>): (text: string) => string {
+  if (map.size === 0) return (text) => text;
+
+  const pattern = new RegExp(`\\b(?:${[...map.keys()].join('|')})\\b`, 'g');
+  return (text) => text.replace(pattern, (name) => map.get(name) ?? name);
+}
+
 interface Candidate {
   from: string;
   to: string;
@@ -246,6 +266,7 @@ export function explainPatch(files: DiffFile[]): PatchExplanation {
     renames,
     files: explained,
     explainsEdit: (before, after) => explainRun({ before, after }, map),
+    applyRenames: substituter(map),
     label: headline === undefined ? null : `${headline.from} -> ${headline.to}`,
   };
 }

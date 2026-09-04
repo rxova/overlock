@@ -4,6 +4,16 @@ export interface RuleContext {
   files: DiffFile[];
   /** Path-based test detection, with any `--test-glob` patterns folded in. */
   isTest: (path: string) => boolean;
+  /**
+   * A removed line with the patch's inferred rename applied.
+   *
+   * A rule that pairs a removal with an addition by comparing their text is
+   * blind to any edit done in the same commit as a rename: the two lines no
+   * longer look alike, so the pair never forms and nothing fires. Pairing
+   * against the substituted pre-image is what closes that, and it is only the
+   * *pairing* that uses it — evidence is always the line as the patch wrote it.
+   */
+  renamed: (text: string) => string;
 }
 
 export interface Rule {

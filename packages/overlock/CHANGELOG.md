@@ -1,5 +1,81 @@
 # overlock
 
+## 0.3.0
+
+### Minor Changes
+
+- [#22](https://github.com/rxova/overlock/pull/22) [`d23bac9`](https://github.com/rxova/overlock/commit/d23bac9e7a150edf440c1df0b80d9274e0f5b72b) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Read `--base <ref>` as a fork point, and say what each run examined
+
+  `--base main` ran `git diff main`, which compares main's tip to this working
+  tree. The moment main moved ahead, every file main gained read as a deletion
+  here — and a test file among them was reported as `TEST_REMOVED`, at HIGH, on a
+  branch that never touched it. It now resolves to the fork point, `main...HEAD`:
+  what this branch did since it left main. `--base-mode direct` asks for the old,
+  literal comparison.
+
+  `check` now defaults to `auto` like the hook and the MCP tool, instead of
+  looking only at the working tree. A pre-push gate runs when the commits exist
+  and nothing is uncommitted, which was precisely when the old default had least
+  to look at, and it reported that as clean.
+
+  Every verdict now names its scope — `83 files, 3 commits, against 492b7ad` — on
+  clean runs as well as findings, and a range that resolved to nothing is reported
+  as `nothing to examine` rather than as a pass. `--fail-on-empty` makes that
+  exit 1. `--explain-base` prints how the base was chosen, in order.
+
+  `Report` gains an optional `scope` field, `{ files, commits }`, set on any run
+  against a repository.
+
+- [#23](https://github.com/rxova/overlock/pull/23) [`310ec0f`](https://github.com/rxova/overlock/commit/310ec0fb1e0825609a8416cfd8b5bde003353ae2) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Read settings from the repository, so the CLI, the hook and the action agree
+
+  The CLI, the GitHub action and the Stop hook each arrived at their own base,
+  their own fail-on and their own severity grades. The same patch could pass
+  locally and block in CI with nothing to point at, and anyone wanting the three
+  to agree had to carry the policy between them in a wrapper script — which is
+  where the drift lives, not where it is fixed.
+
+  `overlock.config.json` beside your `package.json`, or an `overlock` key inside
+  it, is now read by all of them: `base`, `baseMode`, `failOn`, `failOnEmpty`,
+  `severity`, `testGlob`, `untracked`. The nearest declaration at or above the
+  working directory applies, so a package in a monorepo can have its own answer.
+  A flag always wins over the file. `--config <file>` points at one directly and
+  `--no-config` ignores the search.
+
+  An unknown setting or a bad value stops the run with exit 2 rather than being
+  skipped, because a `failon` typo that silently did nothing is the same failure
+  in miniature.
+
+  `overlock config` prints the settings in force and whether each came from a
+  flag, the file or the built-in default. `Report` gains `fail_on`, the threshold
+  the run actually applied, so a renderer names the same one the run used — the
+  action's pull request comment now reads it from there.
+
+  The action no longer passes `--base auto` or `--fail-on high` when its inputs
+  are unset, so the repository's own configuration is what answers. It gains a
+  `fail-on` output carrying the threshold that was applied, logs the settings in
+  force in a collapsed group, and prints `--explain-base` alongside the readable
+  report.
+
+- [#24](https://github.com/rxova/overlock/pull/24) [`35e0496`](https://github.com/rxova/overlock/commit/35e0496d6d0bdb014006deb8fd479db0f5e87478) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Let the Stop hook see what the agent committed
+
+  The hook read uncommitted work. Agents commit and then stop, so in the ordinary
+  workflow it saw nothing at all — a strange blind spot for a tool whose subject
+  is what your coding agent did to your tests.
+
+  At Stop time the patch is now the session: the last commit made before the
+  session began, through to the working tree. That covers both halves at once,
+  everything committed during the session and everything still uncommitted.
+
+  The session is dated from the birth time of the transcript the Stop payload
+  names, since that file is created when the session is. Without one — no
+  transcript, no birth time recorded by the filesystem, no commit before it, no
+  repository — the hook falls back to `auto`, which is what it did before.
+
+  `Overlock-Allow:` trailers consequently work at Stop time now, for commits the
+  agent made during the session. Work still sitting in the tree still has no
+  commit message to read, so the inline directive remains the only way to
+  acknowledge that.
+
 ## 0.2.0
 
 ### Minor Changes

@@ -2,5 +2,8 @@
   "name": "@overlock/tooling",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --coverage"
+  }
 }

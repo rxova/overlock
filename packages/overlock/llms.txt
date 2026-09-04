@@ -26,8 +26,10 @@ the test are not.
 
 ## Commands
 
-- `overlock check` — the current patch. `--base <ref>`, `--staged`, `--json`,
-  `--compact`, `--fail-on high|medium|low|none`, `--severity <rule>=<level>`,
+- `overlock check` — the current patch. `--base <ref>` (the fork point with that
+  ref, not the ref itself; `--base-mode direct` compares against the ref),
+  `--explain-base`, `--fail-on-empty`, `--staged`, `--json`, `--compact`,
+  `--fail-on high|medium|low|none`, `--severity <rule>=<level>`,
   `--test-glob <re>`, `--allow-file <path>`, `--no-untracked`, `--no-ledger`.
 - `overlock hook claude` — Claude Code Stop hook. Blocks on HIGH via exit 2 and
   `blockStopReason`; never blocks twice, so an unfixable finding cannot loop.

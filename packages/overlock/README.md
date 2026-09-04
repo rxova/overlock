@@ -210,7 +210,10 @@ only to read.
 ```bash
 overlock [check]                 # the current patch
 overlock --staged                # only what is staged
-overlock --base main             # against a ref
+overlock --base main             # against where this branch left main
+overlock --base main --base-mode direct   # against main's tip itself
+overlock --explain-base          # say how the base was chosen, then run
+overlock --fail-on-empty         # exit 1 if the resolved patch holds nothing
 overlock --json                  # the full report, for a script or an agent
 overlock --compact               # the short form a phone can read
 overlock --fail-on medium        # high | medium | low | none
@@ -221,9 +224,25 @@ overlock --no-untracked             # ignore files git does not track yet
 Exit codes: `0` clean, `1` findings at or above `--fail-on`, `2` overlock
 could not run.
 
-`--base auto` (the default for the hook) works out what "this patch" means: your
+`--base auto` — the default — works out what "this patch" means: your
 uncommitted work if there is any, otherwise this branch's commits since it left
-the default branch, otherwise the last commit.
+the default branch, otherwise the last commit. It is the default for the check,
+the hook and the MCP tool alike, because a gate that runs right after the agent
+committed is exactly the moment the working tree is empty and the commits are
+the whole patch.
+
+`--base <ref>` means the fork point — `<ref>...HEAD`, what this branch did since
+it left `<ref>`. It is not `git diff <ref>`, which compares that ref's tip to
+your working tree: the moment the ref moves ahead, every file it gained reads as
+a deletion here, and a test file among them is reported as `TEST_REMOVED` at
+HIGH on a branch that never touched it. `--base-mode direct` asks for the
+literal comparison, for the callers that want it.
+
+Every verdict says what it examined — `83 files, 3 commits, against 492b7ad` —
+and a range that turned out to hold nothing is reported as such rather than as a
+pass. `--fail-on-empty` turns that into exit 1; `--explain-base` prints how the
+base was chosen, which is the quickest way to find out why a run saw less than
+you expected.
 
 ## The JSON contract
 

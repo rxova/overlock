@@ -1,6 +1,17 @@
 export { analyze, type AnalyzeOptions } from './analyze.js';
 export { parseDiff, addedLines, removedLines } from './diff.js';
-export { assertSafeRef, hasCommits, untrackedDiff, untrackedFiles } from './git.js';
+export {
+  assertSafeRef,
+  explainRange,
+  hasCommits,
+  rangeScope,
+  resolveRange,
+  untrackedDiff,
+  untrackedFiles,
+  type BaseMode,
+  type RangeOptions,
+  type ResolvedRange,
+} from './git.js';
 export { stopHookOutcome, parseStopPayload, type HookOutcome } from './hook.js';
 export {
   AGENTS,
@@ -22,7 +33,16 @@ export {
 export { appendLedger, ledgerPath, toEntry, type LedgerEntry } from './ledger.js';
 export { BAR_DAYS, CATCH_BAR, meetsBar, readLedger, summarize, type Summary } from './summary.js';
 export { isTestFile, isSnapshotFile, isThresholdConfig } from './paths.js';
-export { compact, human, json, summaryText, useColor } from './report.js';
+export {
+  compact,
+  describeScope,
+  EMPTY_PATCH_NOTE,
+  human,
+  isEmptyPatch,
+  json,
+  summaryText,
+  useColor,
+} from './report.js';
 export { applySuppressions, collectSuppressions, type Suppression } from './suppress.js';
 export { RULES } from './rules/index.js';
 export { run, type RunOptions, type RunResult } from './run.js';

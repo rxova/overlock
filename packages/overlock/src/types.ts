@@ -98,6 +98,16 @@ export interface Report {
   ok: boolean;
   /** The git range actually analysed, as resolved — never the literal `auto`. */
   base: string;
+  /**
+   * How much that range covered. Present whenever the report came from a run
+   * against a repository; absent when `analyze` was handed a diff directly,
+   * which has no repository to count against.
+   *
+   * A clean verdict is the same sentence whether 83 files were examined or
+   * none, so without this there is no way to tell a passing patch from a patch
+   * that was never read.
+   */
+  scope?: { files: number; commits: number };
   findings: Finding[];
   counts: Record<Severity, number>;
   /**

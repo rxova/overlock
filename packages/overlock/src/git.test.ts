@@ -4,7 +4,9 @@ import {
   GitError,
   currentBranch,
   defaultBranch,
+  explainRange,
   hasCommits,
+  rangeScope,
   readDiff,
   readMessages,
   repoRoot,
@@ -58,13 +60,59 @@ describe('resolveRange', () => {
     expect(resolveRange({ cwd: r.dir, staged: true })).toBe('--cached');
   });
 
-  it('passes an explicit ref through untouched, even before the first commit', () => {
-    const r = makeRepo();
-    expect(resolveRange({ cwd: r.dir, base: 'origin/main' })).toBe('origin/main');
+  describe('an explicit ref', () => {
+    /** A branch that forked before the trunk moved on — the shape that broke. */
+    function forkedRepo(): { repo: TempRepo; fork: string } {
+      const r = makeRepo();
+      r.write('a.test.ts', PASSING_TEST);
+      r.commit('feat: first');
+      const fork = r.git(['rev-parse', 'HEAD']).trim();
 
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
-    expect(resolveRange({ cwd: r.dir, base: 'origin/main' })).toBe('origin/main');
+      r.git(['checkout', '--quiet', '-b', 'feature']);
+      r.write('feature.ts', 'export const x = 1;\n');
+      r.commit('feat: on the branch');
+
+      r.git(['checkout', '--quiet', 'main']);
+      r.write('b.test.ts', PASSING_TEST);
+      r.commit('feat: on main, after the fork');
+      r.git(['checkout', '--quiet', 'feature']);
+
+      return { repo: r, fork };
+    }
+
+    it('resolves to the fork point, not to the ref itself', () => {
+      const { repo: r, fork } = forkedRepo();
+      // `git diff main` would report b.test.ts — a file this branch never
+      // touched — as a deletion, and a deleted test file is a HIGH finding.
+      expect(resolveRange({ cwd: r.dir, base: 'main' })).toBe(fork);
+      expect(readDiff(resolveRange({ cwd: r.dir, base: 'main' }), r.dir)).not.toContain(
+        'b.test.ts',
+      );
+    });
+
+    it('compares against the ref itself when asked directly', () => {
+      const { repo: r } = forkedRepo();
+      expect(resolveRange({ cwd: r.dir, base: 'main', baseMode: 'direct' })).toBe('main');
+      expect(readDiff('main', r.dir)).toContain('b.test.ts');
+    });
+
+    it('falls back to the ref when there is no common history', () => {
+      const r = makeRepo();
+      r.write('a.txt', 'one\n');
+      r.commit('feat: first');
+      // A ref this clone has never heard of cannot be merge-based.
+      expect(resolveRange({ cwd: r.dir, base: 'origin/main' })).toBe('origin/main');
+    });
+
+    it('passes the ref through before the first commit', () => {
+      const r = makeRepo();
+      expect(resolveRange({ cwd: r.dir, base: 'origin/main' })).toBe('origin/main');
+    });
+
+    it('still refuses a ref that looks like an option', () => {
+      const r = makeRepo();
+      expect(() => resolveRange({ cwd: r.dir, base: '--output=/tmp/pwned' })).toThrow(GitError);
+    });
   });
 
   it('defaults to the working tree when no base is given', () => {
@@ -123,6 +171,166 @@ describe('resolveRange', () => {
 
       expect(resolveRange({ cwd: r.dir, base: 'auto' })).toBe(EMPTY_TREE);
     });
+  });
+});
+
+describe('explainRange', () => {
+  it('says it read the index', () => {
+    const r = makeRepo();
+    expect(explainRange({ cwd: r.dir, staged: true }).steps).toEqual(['--staged: the index']);
+  });
+
+  it('names the fork point it found', () => {
+    const r = makeRepo();
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
+    r.git(['checkout', '--quiet', '-b', 'feature']);
+    r.write('b.txt', 'two\n');
+    r.commit('feat: second');
+
+    const { steps } = explainRange({ cwd: r.dir, base: 'main' });
+    expect(steps[0]).toBe('explicit --base main');
+    expect(steps[1]).toMatch(/^fork point with main is [0-9a-f]{7}$/);
+  });
+
+  it('says when it was told to compare directly', () => {
+    const r = makeRepo();
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
+    expect(explainRange({ cwd: r.dir, base: 'main', baseMode: 'direct' }).steps).toContain(
+      '--base-mode direct: comparing against the ref itself',
+    );
+  });
+
+  it('traces auto all the way to the answer', () => {
+    const r = makeRepo();
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
+    r.git(['checkout', '--quiet', '-b', 'feature']);
+    r.write('b.txt', 'two\n');
+    r.commit('feat: second');
+
+    const { steps } = explainRange({ cwd: r.dir, base: 'auto' });
+    expect(steps[0]).toBe('auto');
+    expect(steps).toContain('nothing uncommitted');
+    expect(steps.at(-1)).toMatch(/^feature is 1 commit\(s\) ahead of main since [0-9a-f]{7}$/);
+  });
+
+  it('says it stopped at the working tree', () => {
+    const r = makeRepo();
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
+    r.write('a.txt', 'two\n');
+
+    expect(explainRange({ cwd: r.dir, base: 'auto' }).steps).toContain(
+      'uncommitted changes present: the working tree',
+    );
+    expect(explainRange({ cwd: r.dir }).steps).toEqual(['no --base: the working tree']);
+  });
+
+  it('says why it had nothing to measure against', () => {
+    const r = makeRepo();
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
+    r.write('a.txt', 'two\n');
+    r.commit('feat: second');
+
+    const { steps } = explainRange({ cwd: r.dir, base: 'auto' });
+    expect(steps).toContain('on main itself, so there are no branch commits to read');
+    expect(steps).toContain('falling back to the last commit');
+  });
+
+  it('says when the branch is level with the trunk', () => {
+    const r = makeRepo();
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
+    r.write('a.txt', 'two\n');
+    r.commit('feat: second');
+    r.git(['checkout', '--quiet', '-b', 'feature']);
+
+    const { range, steps } = explainRange({ cwd: r.dir, base: 'auto' });
+    expect(steps).toContain('feature is level with main');
+    expect(range).toBe('HEAD~1');
+  });
+
+  it('says when there is no common history with the trunk', () => {
+    const r = makeRepo();
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
+    r.git(['checkout', '--quiet', '--orphan', 'unrelated']);
+    r.write('b.txt', 'two\n');
+    r.commit('feat: an unrelated root');
+
+    expect(explainRange({ cwd: r.dir, base: 'auto' }).steps).toContain(
+      'no common history with main',
+    );
+  });
+
+  it('says when there is no default branch to measure against', () => {
+    const r = makeRepo();
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
+    r.write('a.txt', 'two\n');
+    r.commit('feat: second');
+    // No origin/HEAD, and nothing called main, master or develop.
+    r.git(['branch', '--move', 'topic']);
+
+    expect(defaultBranch(r.dir)).toBeNull();
+    expect(explainRange({ cwd: r.dir, base: 'auto' }).steps).toContain(
+      'no default branch to measure against',
+    );
+  });
+
+  it('says there are no commits at all', () => {
+    const r = makeRepo();
+    expect(explainRange({ cwd: r.dir }).steps).toEqual([
+      'no commits yet: everything in the tree is an addition',
+    ]);
+  });
+});
+
+describe('rangeScope', () => {
+  it('counts the files and commits a range covers', () => {
+    const r = makeRepo();
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
+    const base = r.git(['rev-parse', 'HEAD']).trim();
+
+    r.write('b.txt', 'two\n');
+    r.commit('feat: second');
+    r.write('c.txt', 'three\n');
+    r.commit('feat: third');
+
+    expect(rangeScope(base, r.dir)).toEqual({ files: 2, commits: 2 });
+  });
+
+  it('counts no commits for the working tree or the index', () => {
+    const r = makeRepo();
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
+    r.write('a.txt', 'two\n');
+
+    expect(rangeScope('HEAD', r.dir)).toEqual({ files: 1, commits: 0 });
+    r.git(['add', '-A']);
+    expect(rangeScope('--cached', r.dir)).toEqual({ files: 1, commits: 0 });
+  });
+
+  it('reports an empty range as empty', () => {
+    const r = makeRepo();
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
+
+    expect(rangeScope('HEAD', r.dir)).toEqual({ files: 0, commits: 0 });
+  });
+
+  it('counts the whole history against the empty tree', () => {
+    const r = makeRepo();
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
+
+    // The first commit in a repository is the whole patch, and git is willing
+    // to walk from the empty tree to it.
+    expect(rangeScope(EMPTY_TREE, r.dir)).toEqual({ files: 1, commits: 1 });
   });
 });
 

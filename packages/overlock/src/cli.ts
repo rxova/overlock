@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
-import { GitError, repoRoot } from './git.js';
+import { type BaseMode, GitError, repoRoot } from './git.js';
 import { parseStopPayload, stopHookOutcome } from './hook.js';
 import {
   AGENTS,
@@ -10,7 +10,7 @@ import {
   instructionSnippet,
   mcpSnippet,
 } from './init.js';
-import { compact, human, json, summaryText, useColor } from './report.js';
+import { compact, human, isEmptyPatch, json, summaryText, useColor } from './report.js';
 import { run } from './run.js';
 import { ledgerPath } from './ledger.js';
 import { readLedger, summarize } from './summary.js';
@@ -29,8 +29,13 @@ USAGE
   overlock mcp                   Serve as an MCP tool over stdio
 
 CHECK OPTIONS
-  --base <ref>       Diff against this ref. Default: auto
+  --base <ref>       Diff against where this branch left <ref>. Default: auto
                      (auto = uncommitted work if any, else this branch's commits)
+  --base-mode <how>  fork-point | direct. Default: fork-point
+                     (direct compares against the ref itself, so anything the
+                      ref gained since this branch left it reads as a deletion)
+  --explain-base     Say how the base was chosen, then run
+  --fail-on-empty    Exit 1 when the resolved patch turns out to be empty
   --staged           Check only what is staged
   --json             Machine-readable report on stdout
   --compact          The short form a phone can read
@@ -83,6 +88,9 @@ export interface ParsedArgs {
   command: 'check' | 'hook' | 'init' | 'report' | 'mcp' | 'help' | 'version';
   target?: string;
   base?: string;
+  baseMode: BaseMode;
+  explainBase: boolean;
+  failOnEmpty: boolean;
   staged: boolean;
   format: 'human' | 'json' | 'compact';
   failOn: Severity | 'none';
@@ -101,6 +109,9 @@ export class UsageError extends Error {}
 export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
   const parsed: ParsedArgs = {
     command: 'check',
+    baseMode: 'fork-point',
+    explainBase: false,
+    failOnEmpty: false,
     staged: false,
     format: 'human',
     failOn: 'high',
@@ -165,6 +176,20 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
         break;
       case '--base':
         parsed.base = value('--base');
+        break;
+      case '--base-mode': {
+        const mode = value('--base-mode');
+        if (mode !== 'fork-point' && mode !== 'direct') {
+          throw new UsageError('--base-mode must be fork-point or direct');
+        }
+        parsed.baseMode = mode;
+        break;
+      }
+      case '--explain-base':
+        parsed.explainBase = true;
+        break;
+      case '--fail-on-empty':
+        parsed.failOnEmpty = true;
         break;
       case '--cwd':
         parsed.cwd = value('--cwd');
@@ -262,12 +287,14 @@ export function main(argv: string[], io: Io): number {
     if (args.command === 'report') return runReport(args, io);
     if (args.command === 'mcp') return runMcp(args, io);
 
-    const { report } = run({
+    const { report, steps } = run({
       cwd: args.cwd,
-      // The hook has no human to pass a ref, so it always resolves the range
-      // itself. `check` without --base looks at the working tree, which is what
-      // someone typing it at a prompt means.
-      base: args.command === 'hook' ? (args.base ?? 'auto') : args.base,
+      // `auto` for both: a check run right after the agent committed is exactly
+      // when the working tree is empty and the commits are the whole patch, and
+      // a gate that reported "clean" there was answering a question nobody
+      // asked. `auto` still starts with uncommitted work when there is any.
+      base: args.base ?? 'auto',
+      baseMode: args.baseMode,
       staged: args.staged,
       failOn: args.failOn,
       severities: args.severities,
@@ -277,6 +304,10 @@ export function main(argv: string[], io: Io): number {
       ledger: args.ledger,
       untracked: args.untracked,
     });
+
+    if (args.explainBase) {
+      io.stderr(`overlock: base — ${steps.join(' -> ')}\n`);
+    }
 
     if (args.command === 'hook') {
       const outcome = stopHookOutcome(report, parseStopPayload(io.readStdin()));
@@ -288,6 +319,11 @@ export function main(argv: string[], io: Io): number {
     if (args.format === 'json') io.stdout(`${json(report)}\n`);
     else if (args.format === 'compact') io.stdout(`${compact(report, args.limit)}\n`);
     else io.stdout(`${human(report, useColor({ isTTY: io.isTTY }, io.env))}\n`);
+
+    // An empty patch is not a pass and not an error: nothing was examined, and
+    // only the caller knows whether that is expected. `--fail-on-empty` is for
+    // the callers for which it never is.
+    if (args.failOnEmpty && isEmptyPatch(report)) return 1;
 
     return report.ok ? 0 : 1;
   } catch (error) {
@@ -322,10 +358,11 @@ function runReport(args: ParsedArgs, io: Io): number {
 function runMcp(args: ParsedArgs, io: Io): number {
   const deps = {
     version: VERSION,
-    check: (call: { base?: string; staged?: boolean; failOn?: string }) =>
+    check: (call: { base?: string; baseMode?: string; staged?: boolean; failOn?: string }) =>
       run({
         cwd: args.cwd,
         base: call.base ?? 'auto',
+        baseMode: call.baseMode === 'direct' ? 'direct' : args.baseMode,
         ...(call.staged === undefined ? {} : { staged: call.staged }),
         failOn: (call.failOn ?? 'high') as Severity | 'none',
         severities: args.severities,

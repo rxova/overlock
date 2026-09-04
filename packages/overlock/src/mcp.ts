@@ -56,8 +56,17 @@ export const TOOLS = [
         base: {
           type: 'string',
           description:
-            'Git ref to diff against, or "auto" to work it out (uncommitted work if any, ' +
-            "otherwise this branch's commits). Default: auto.",
+            'Git ref to diff against — read as where this branch left it, not as the ref ' +
+            'itself — or "auto" to work it out (uncommitted work if any, otherwise this ' +
+            "branch's commits). Default: auto.",
+        },
+        baseMode: {
+          type: 'string',
+          enum: ['fork-point', 'direct'],
+          description:
+            'How an explicit base is read. "direct" compares against the ref itself, so ' +
+            'anything the ref gained since this branch left it reads as a deletion. ' +
+            'Default: fork-point.',
         },
         staged: { type: 'boolean', description: 'Check only what is staged. Default: false.' },
         failOn: {
@@ -86,7 +95,7 @@ export const TOOLS = [
 ] as const;
 
 export interface McpDeps {
-  check: (args: { base?: string; staged?: boolean; failOn?: string }) => Report;
+  check: (args: { base?: string; baseMode?: string; staged?: boolean; failOn?: string }) => Report;
   report: (args: { days?: number }) => Summary;
   version: string;
 }
@@ -186,6 +195,9 @@ function callTool(
 
       const report = deps.check({
         ...(typeof args.base === 'string' ? { base: args.base } : {}),
+        ...(args.baseMode === 'direct' || args.baseMode === 'fork-point'
+          ? { baseMode: args.baseMode }
+          : {}),
         ...(typeof args.staged === 'boolean' ? { staged: args.staged } : {}),
         ...(typeof args.failOn === 'string' ? { failOn: args.failOn } : {}),
       });

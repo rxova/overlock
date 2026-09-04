@@ -198,6 +198,107 @@ describe('overlock check', () => {
   });
 });
 
+describe('which patch got examined', () => {
+  /** A branch that forked before main moved on, with a test added on main. */
+  function forkedRepo(): TempRepo {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.commit('feat: add auth');
+
+    r.git(['checkout', '--quiet', '-b', 'feature']);
+    r.write('src/feature.ts', 'export const x = 1;\n');
+    r.commit('feat: a branch that touches no test');
+
+    r.git(['checkout', '--quiet', 'main']);
+    r.write('src/billing.test.ts', PASSING_TEST);
+    r.commit('feat: a test added on main, after the fork');
+    r.git(['checkout', '--quiet', 'feature']);
+
+    return r;
+  }
+
+  it('does not report a file main gained as a deletion on this branch', () => {
+    const r = forkedRepo();
+    const result = overlock(['check', '--base', 'main'], { cwd: r.dir });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).not.toContain('TEST_REMOVED');
+    expect(result.stdout).not.toContain('billing.test.ts');
+  });
+
+  it('still compares against the ref itself when asked to', () => {
+    const r = forkedRepo();
+    const result = overlock(['check', '--base', 'main', '--base-mode', 'direct'], { cwd: r.dir });
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('TEST_REMOVED');
+  });
+
+  it('rejects a base mode it does not have', () => {
+    const r = cleanRepo();
+    const result = overlock(['check', '--base-mode', 'sideways'], { cwd: r.dir });
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('--base-mode must be fork-point or direct');
+  });
+
+  it('sees work the agent committed, with no ref passed', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.commit('feat: add auth');
+    r.git(['checkout', '--quiet', '-b', 'feature']);
+    r.write('src/auth.test.ts', SKIPPED_TEST);
+    r.commit('chore: tidy the suite');
+
+    // Nothing is uncommitted, which is exactly the state a pre-push gate runs
+    // in. Reporting "clean" here is the failure this covers.
+    const result = overlock(['check'], { cwd: r.dir });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('TEST_SKIPPED_ADDED');
+  });
+
+  it('says what it examined on a clean run', () => {
+    const r = cleanRepo();
+    const result = overlock(['check'], { cwd: r.dir });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('nothing weakened');
+    expect(result.stdout).toMatch(/1 file, against/);
+  });
+
+  it('does not call an empty patch clean', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.commit('feat: add auth');
+    r.write('src/auth.test.ts', SKIPPED_TEST);
+    r.commit('chore: tidy the suite');
+    // On the default branch with nothing uncommitted and one commit behind
+    // reachable, `auto` still has a patch. Ask for a range that holds nothing.
+    // `--no-ledger` because the ledger this harness writes lands inside the
+    // repository, and an untracked file is part of the patch — which is the
+    // counting working, not a nuisance.
+    const result = overlock(['check', '--base', 'HEAD', '--no-ledger'], { cwd: r.dir });
+
+    expect(result.stdout).toContain('nothing to examine');
+    expect(result.status).toBe(0);
+    expect(
+      overlock(['check', '--base', 'HEAD', '--fail-on-empty', '--no-ledger'], { cwd: r.dir })
+        .status,
+    ).toBe(1);
+  });
+
+  it('explains how it chose the base', () => {
+    const r = cleanRepo();
+    const result = overlock(['check', '--explain-base'], { cwd: r.dir });
+
+    expect(result.stderr).toContain('overlock: base —');
+    expect(result.stderr).toContain('auto');
+    expect(result.stderr).toContain('the working tree');
+  });
+});
+
 describe('overlock hook claude', () => {
   it('blocks with exit 2 and the documented JSON on stdout', () => {
     const r = weakenedRepo();

@@ -112,6 +112,28 @@ export interface RangeOptions {
   /** An explicit ref, `auto`, or undefined for the working tree. */
   base?: string | undefined;
   staged?: boolean | undefined;
+  /**
+   * How an explicit ref is read. `fork-point` diffs against where this branch
+   * left that ref; `direct` diffs against the ref itself.
+   */
+  baseMode?: BaseMode | undefined;
+}
+
+/** See `RangeOptions.baseMode`. */
+export type BaseMode = 'fork-point' | 'direct';
+
+/**
+ * A resolved range and the reasoning that produced it.
+ *
+ * The steps exist because every base bug this tool has had was survivable on
+ * its own and expensive only because nothing said which patch had been read.
+ * `--explain-base` prints them.
+ */
+export interface ResolvedRange {
+  /** What is handed to `git diff`. */
+  range: string;
+  /** How it was chosen, in the order it was decided. */
+  steps: string[];
 }
 
 /**
@@ -123,26 +145,73 @@ export interface RangeOptions {
  * the check has to cover both without the caller knowing which happened. So:
  * uncommitted changes if there are any, otherwise the branch's commits since it
  * left the default branch, otherwise the last commit.
+ *
+ * An explicit ref is a fork point, not the ref itself. `git diff main` compares
+ * main's tip to this working tree, so the moment main moves ahead, every file
+ * main gained reads as a deletion in this branch — a test file among them is
+ * reported as TEST_REMOVED, at HIGH, for a branch that never touched it. What
+ * a caller passing `--base main` means is `main...HEAD`: what this branch did
+ * since it left main. `--base-mode direct` asks for the literal comparison.
  */
-export function resolveRange(options: RangeOptions): string {
-  const { cwd, base, staged } = options;
+export function explainRange(options: RangeOptions): ResolvedRange {
+  const { cwd, base, staged, baseMode = 'fork-point' } = options;
+  const steps: string[] = [];
 
-  if (staged) return '--cached';
+  if (staged) {
+    steps.push('--staged: the index');
+    return { range: '--cached', steps };
+  }
+
   if (base && base !== 'auto') {
     assertSafeRef(base);
-    return base;
+    steps.push(`explicit --base ${base}`);
+
+    if (baseMode === 'direct') {
+      steps.push('--base-mode direct: comparing against the ref itself');
+      return { range: base, steps };
+    }
+    if (!hasCommits(cwd)) {
+      steps.push('no commits here yet, so there is no fork point to find');
+      return { range: base, steps };
+    }
+
+    try {
+      const mergeBase = git(['merge-base', base, 'HEAD'], cwd).trim();
+      if (mergeBase) {
+        steps.push(`fork point with ${base} is ${mergeBase.slice(0, 7)}`);
+        return { range: mergeBase, steps };
+      }
+      steps.push(`no fork point with ${base}; comparing against the ref itself`);
+    } catch {
+      // Unrelated histories, or a ref that names something git cannot merge-base
+      // (a tree, a tag object). The literal comparison is still answerable.
+      steps.push(`no common history with ${base}; comparing against the ref itself`);
+    }
+    return { range: base, steps };
   }
 
   // Nothing to diff against before the first commit, so everything in the tree
   // is an addition. An agent scaffolding a new project is exactly that case,
   // and it used to be reported as "not a git repository". Checked after an
   // explicit ref, which the caller means literally either way.
-  if (!hasCommits(cwd)) return EMPTY_TREE;
+  if (!hasCommits(cwd)) {
+    steps.push('no commits yet: everything in the tree is an addition');
+    return { range: EMPTY_TREE, steps };
+  }
 
-  if (base === undefined) return 'HEAD';
+  if (base === undefined) {
+    steps.push('no --base: the working tree');
+    return { range: 'HEAD', steps };
+  }
+
+  steps.push('auto');
 
   const dirty = git(['status', '--porcelain'], cwd).trim();
-  if (dirty) return 'HEAD';
+  if (dirty) {
+    steps.push('uncommitted changes present: the working tree');
+    return { range: 'HEAD', steps };
+  }
+  steps.push('nothing uncommitted');
 
   const branch = currentBranch(cwd);
   const trunk = defaultBranch(cwd);
@@ -150,20 +219,64 @@ export function resolveRange(options: RangeOptions): string {
     try {
       const mergeBase = git(['merge-base', trunk, 'HEAD'], cwd).trim();
       const ahead = git(['rev-list', '--count', `${mergeBase}..HEAD`], cwd).trim();
-      if (mergeBase && ahead !== '0') return mergeBase;
+      if (mergeBase && ahead !== '0') {
+        steps.push(
+          `${branch} is ${ahead} commit(s) ahead of ${trunk} since ${mergeBase.slice(0, 7)}`,
+        );
+        return { range: mergeBase, steps };
+      }
+      steps.push(`${branch} is level with ${trunk}`);
     } catch {
       // Unrelated histories, or the trunk ref is not reachable from here.
+      steps.push(`no common history with ${trunk}`);
     }
+  } else if (trunk) {
+    steps.push(`on ${trunk} itself, so there are no branch commits to read`);
+  } else {
+    steps.push('no default branch to measure against');
   }
 
   // A repository with exactly one commit has no HEAD~1 to compare against.
   try {
     git(['rev-parse', '--verify', '--quiet', 'HEAD~1'], cwd);
-    return 'HEAD~1';
+    steps.push('falling back to the last commit');
+    return { range: 'HEAD~1', steps };
   } catch {
-    return EMPTY_TREE;
+    steps.push('only one commit here, so it is the whole patch');
+    return { range: EMPTY_TREE, steps };
   }
 }
+
+/** The range alone, for callers with nothing to explain. */
+export function resolveRange(options: RangeOptions): string {
+  return explainRange(options).range;
+}
+
+/**
+ * How much the range actually covers, so a run can say what it examined.
+ *
+ * Counted from git rather than from the parsed diff: untracked files are added
+ * to the diff afterwards, and a caller comparing "83 files" against `git diff
+ * --stat` should get the same number.
+ */
+export function rangeScope(range: string, cwd: string): { files: number; commits: number } {
+  const files = countLines(
+    range === '--cached'
+      ? git(['diff', '--cached', '--name-only', '--'], cwd)
+      : git(['diff', '--name-only', range, '--'], cwd),
+  );
+
+  if (range === '--cached' || range === 'HEAD') return { files, commits: 0 };
+
+  try {
+    const commits = Number(git(['rev-list', '--count', `${range}..HEAD`], cwd).trim());
+    return { files, commits: Number.isFinite(commits) ? commits : 0 };
+  } catch {
+    return { files, commits: 0 };
+  }
+}
+
+const countLines = (text: string): number => text.split('\n').filter(Boolean).length;
 
 /** git's canonical empty tree, so the first commit in a repo can be diffed. */
 export const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';

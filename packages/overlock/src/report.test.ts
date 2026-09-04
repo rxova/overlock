@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { analyze } from './analyze.js';
-import { compact, human, json, useColor } from './report.js';
+import { compact, describeScope, human, isEmptyPatch, json, useColor } from './report.js';
 import { diffOf, hunk } from './__fixtures__/diffs.js';
 
 const ESC = '\u001B[';
 
 const clean = analyze({ diff: '' });
+/** What `run` produces: the same report, plus what the range actually held. */
+const withScope = (report: typeof clean, files: number, commits: number) => ({
+  ...report,
+  scope: { files, commits },
+});
 const dirty = analyze({
   diff:
     diffOf('src/a.test.ts', hunk("+  it.skip('rejects expired tokens', () => {})")) +
@@ -27,6 +32,22 @@ describe('human', () => {
     expect(text).toContain('->');
   });
 
+  it('says what it examined, so a clean run is not the same line as an empty one', () => {
+    const text = human(withScope(clean, 83, 3), false);
+    expect(text).toContain('nothing weakened');
+    expect(text).toContain('83 files, 3 commits, against HEAD');
+  });
+
+  it('warns instead of passing when the resolved patch is empty', () => {
+    const text = human(withScope(clean, 0, 0), false);
+    expect(text).toContain('nothing to examine');
+    expect(text).not.toContain('nothing weakened');
+  });
+
+  it('reports the scope alongside findings too', () => {
+    expect(human(withScope(dirty, 4, 1), false)).toContain('4 files, 1 commit, against HEAD');
+  });
+
   it('emits escape codes only when colour is on', () => {
     expect(human(dirty, false)).not.toContain(ESC);
     expect(human(dirty, true)).toContain(ESC);
@@ -34,8 +55,14 @@ describe('human', () => {
 });
 
 describe('compact', () => {
-  it('is one line when clean', () => {
-    expect(compact(clean)).toBe('overlock: clean.');
+  it('is one line when clean, and says what it read', () => {
+    expect(compact(withScope(clean, 83, 3))).toBe(
+      'overlock: clean — 83 files, 3 commits, against HEAD.',
+    );
+  });
+
+  it('does not call an empty patch clean', () => {
+    expect(compact(withScope(clean, 0, 0))).toContain('nothing to examine');
   });
 
   it('shows at most the limit and says how many it held back', () => {
@@ -165,5 +192,32 @@ describe('a patch the rest of the patch explains', () => {
 
   it('says the same thing in the form a phone can read', () => {
     expect(compact(report)).toContain('trainmotherfoca -> trainmf explains');
+  });
+});
+
+describe('describeScope', () => {
+  it('says the base alone when nothing counted it', () => {
+    expect(describeScope(clean)).toBe('against HEAD');
+  });
+
+  it('leaves the commit count out when there is none', () => {
+    expect(describeScope(withScope(clean, 1, 0))).toBe('1 file, against HEAD');
+  });
+
+  it('reads the empty tree and the index by name', () => {
+    expect(describeScope({ ...clean, base: '--cached' })).toBe('against staged');
+    expect(describeScope({ ...clean, base: '4b825dc642cb6eb9a060e54bf8d69288fbee4904' })).toBe(
+      'against no commits yet',
+    );
+  });
+});
+
+describe('isEmptyPatch', () => {
+  it('is true only when a run counted nothing and found nothing', () => {
+    expect(isEmptyPatch(withScope(clean, 0, 0))).toBe(true);
+    expect(isEmptyPatch(withScope(clean, 3, 1))).toBe(false);
+    expect(isEmptyPatch(withScope(dirty, 0, 0))).toBe(false);
+    // A report from `analyze` alone was never counted, so it cannot be empty.
+    expect(isEmptyPatch(clean)).toBe(false);
   });
 });

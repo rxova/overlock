@@ -120,20 +120,57 @@ function renameBlock(report: Report, color: boolean): string[] {
   return lines;
 }
 
+/**
+ * What a run examined, for the line that reports it.
+ *
+ * A verdict without this is the same sentence whether the patch held 83 files
+ * or none, which is how a wrong base stays invisible until CI disagrees.
+ */
+export function describeScope(report: Report): string {
+  const parts: string[] = [];
+  const scope = report.scope;
+  if (scope) {
+    parts.push(`${scope.files} file${scope.files === 1 ? '' : 's'}`);
+    if (scope.commits > 0) parts.push(`${scope.commits} commit${scope.commits === 1 ? '' : 's'}`);
+  }
+  parts.push(`against ${describeBase(report.base)}`);
+  return parts.join(', ');
+}
+
+/** True when the resolved range held nothing, so nothing was examined. */
+export function isEmptyPatch(report: Report): boolean {
+  return report.scope?.files === 0 && report.findings.length === 0;
+}
+
+/**
+ * Said out loud rather than reported as a pass, because an empty patch and a
+ * clean patch are the same green line and only one of them means anything.
+ */
+export const EMPTY_PATCH_NOTE = 'nothing to examine — the resolved patch is empty';
+
 /** The terminal view: everything, grouped, with the evidence inline. */
 export function human(report: Report, color: boolean): string {
   if (report.findings.length === 0) {
-    return paint(
-      `✓ overlock: nothing weakened in this patch.${suppressedNote(report)}`,
-      ANSI.green,
-      color,
+    if (isEmptyPatch(report)) {
+      return paint(
+        `! overlock: ${EMPTY_PATCH_NOTE} (${describeScope(report)}).${suppressedNote(report)}`,
+        ANSI.yellow,
+        color,
+      );
+    }
+    return (
+      paint(
+        `✓ overlock: nothing weakened in this patch.${suppressedNote(report)}`,
+        ANSI.green,
+        color,
+      ) + paint(`  (${describeScope(report)})`, ANSI.dim, color)
     );
   }
 
   const lines: string[] = [];
   lines.push(
     paint(`overlock — ${summarize(report)}`, ANSI.bold, color) +
-      paint(`  (${describeBase(report.base)})${suppressedNote(report)}`, ANSI.dim, color),
+      paint(`  (${describeScope(report)})${suppressedNote(report)}`, ANSI.dim, color),
   );
   lines.push('');
   lines.push(...renameBlock(report, color));
@@ -184,7 +221,12 @@ export function human(report: Report, color: boolean): string {
  * the untruncated text.
  */
 export function compact(report: Report, limit = 3): string {
-  if (report.findings.length === 0) return `overlock: clean.${suppressedNote(report)}`;
+  if (isEmptyPatch(report)) {
+    return `overlock: ${EMPTY_PATCH_NOTE} (${describeScope(report)}).${suppressedNote(report)}`;
+  }
+  if (report.findings.length === 0) {
+    return `overlock: clean — ${describeScope(report)}.${suppressedNote(report)}`;
+  }
 
   const unexplained = report.findings.filter((f) => f.explained_by === undefined);
   const groups = groupFindings(unexplained);

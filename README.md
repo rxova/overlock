@@ -92,6 +92,35 @@ Only **high** blocks by default. The `low` tier exists because it is true often
 enough that blocking on it would train you to uninstall the tool; it earns its
 place by telling you which implementation change the other findings are about.
 
+`--severity TEST_REMOVED=medium` regrades one rule without touching the rest. It
+exists because the alternative — dropping `--fail-on` to `medium` to unblock one
+rule — also unblocks `TEST_SKIPPED_ADDED`, `ASSERTION_WEAKENED` and
+`COVERAGE_THRESHOLD_LOWERED`. An escape from one rule should not disarm four.
+
+### What a deleted test file is graded on
+
+`TEST_REMOVED` on a deleted file asks the question a reviewer is actually
+asking — _did any coverage go with it?_ — by matching the case names the file
+lost against every case name the patch adds, anywhere in it:
+
+```
+✗ HIGH  apps/web/app.test.tsx  TEST_REMOVED
+     Test file deleted — 33 of 37 cases reappear elsewhere in this patch.
+     4 did not: refuses a PDF larger than the store will take, cannot be given
+     an amount that is not a number, formats the amount as US dollars while it
+     is typed, keeps the row open when the period has been emptied
+```
+
+Every name re-homed grades it `medium`; some missing keeps it `high` and names
+them. Deleting the module the file is named after — `api.test.ts` alongside
+`api.ts` — also grades it `medium`, because deleting a feature deletes its
+tests. A module that was merely _modified_ does not: a test file deleted while
+the code it covered lives on is the case worth stopping for.
+
+Name matching is a heuristic and is meant as one: a renamed case reads as
+vanished, and a same-named case that now asserts nothing reads as re-homed. It
+grades the finding and tells you where to look. It does not replace you.
+
 Languages: TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, Ruby and C#
 conventions are recognised out of the box. `--test-glob` adds your own.
 
@@ -140,7 +169,12 @@ a PR is the merge commit and would report nothing — and posts a single finding
 comment, edited in place on later pushes rather than appended to. A bot that
 comments again on every push buries the review it is meant to support.
 
-`fail-on`, `base`, `working-directory`, `version` and `comment` are all inputs;
+The comment leads with what blocks; everything that does not is grouped by rule
+and folded into a `<details>`, because a flat table that gives a blocking
+`TEST_REMOVED` the same weight as six `TEST_AND_IMPL_TOGETHER` rows makes you do
+the sorting the tool already did.
+
+`fail-on`, `severity`, `base`, `working-directory`, `version` and `comment` are all inputs;
 `ok`, `findings` and `report` are outputs. The action never writes a ledger: that
 file is a record of what your agents did on your machine, and a CI runner is
 neither.
@@ -165,6 +199,21 @@ The rule ID and the reason are **both required**. A directive with no written
 reason silences nothing, an unknown rule ID silences nothing, there is no
 wildcard, and one quoted inside a string literal is documentation rather than
 permission. A suppression covers one rule on one line in one file.
+
+Some findings have no line to sit on. A deleted test file is the case: it is
+reported against a path that no longer has a line 1, so there is nowhere to put
+the comment. Name the path instead, from any line the patch still has — the
+replacement test file, most often:
+
+```ts
+// overlock-ignore TEST_REMOVED src/api.test.ts -- module deleted; cases re-homed here
+```
+
+That is not a wildcard either: a directive naming a path covers only the
+findings in it that carry no line of their own, so it can never blanket-silence
+a rule across a file. It works at Stop time as well as in CI, which is why it is
+a directive rather than a commit trailer — when the hook runs, the work is
+usually still uncommitted and there is no commit message to read.
 
 **A directive the patch itself added stops the Stop hook once.** It still
 silences the finding, but the agent cannot reach a silent exit 0 by writing its
@@ -223,6 +272,7 @@ overlock --base main             # against a ref
 overlock --json                  # the full report, for a script or an agent
 overlock --compact               # the short form a phone can read
 overlock --fail-on medium        # high | medium | low | none
+overlock --severity TEST_REMOVED=medium   # regrade one rule, repeatable
 overlock --test-glob '\.check\.ts$'
 overlock --no-untracked             # ignore files git does not track yet
 ```
@@ -259,6 +309,10 @@ changing what an existing ID means is a breaking one.
   ]
 }
 ```
+
+`line` is `null` when the finding is about the file rather than a line in it —
+a deleted test file has no line 1 to send you to — and `id` is then
+`<rule>:<file>` with no line suffix.
 
 ## Programmatic use
 

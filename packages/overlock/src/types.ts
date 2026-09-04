@@ -41,16 +41,24 @@ export interface Evidence {
 
 export interface Finding {
   /**
-   * Stable within a patch: `<rule>:<file>:<line>`. Deduplicates a finding that
-   * two runs of the same check would both report, and gives the ledger
+   * Stable within a patch: `<rule>:<file>:<line>`, or `<rule>:<file>` when the
+   * finding is about the file rather than a line in it. Deduplicates a finding
+   * that two runs of the same check would both report, and gives the ledger
    * something to join on.
    */
   id: string;
   rule: RuleId;
   severity: Severity;
   file: string;
-  /** 1-indexed, in the post-image for additions and the pre-image for removals. */
-  line: number;
+  /**
+   * 1-indexed, in the post-image for additions and the pre-image for removals.
+   *
+   * Null when the finding is about the file as a whole and no line could
+   * honestly be pointed at — a deleted test file has no line 1 to go and look
+   * at, and reporting one sends a reviewer to a file that is not there. It is
+   * also what makes such a finding suppressable: the key is the path.
+   */
+  line: number | null;
   message: string;
   evidence: Evidence;
   fix_hint: string;
@@ -79,7 +87,14 @@ export interface Report {
    */
   suppressed_new: number;
   /** What the new directives claimed, so a human can judge the claim. */
-  suppressions_new: { rule: RuleId; file: string; line: number; reason: string }[];
+  suppressions_new: {
+    rule: RuleId;
+    file: string;
+    line: number;
+    /** The path the directive named, when it named one. */
+    target: string | null;
+    reason: string;
+  }[];
 }
 
 export type DiffLineKind = 'add' | 'del' | 'ctx';

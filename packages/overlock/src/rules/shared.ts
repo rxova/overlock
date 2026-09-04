@@ -55,7 +55,8 @@ export function finding(input: {
   rule: RuleId;
   severity: Severity;
   file: string;
-  line: number;
+  /** Null for a finding about the file itself, which then keys on the path. */
+  line: number | null;
   message: string;
   fix_hint: string;
   before?: string;
@@ -65,11 +66,13 @@ export function finding(input: {
   if (input.before !== undefined) evidence.before = sanitize(input.before.trim());
   if (input.after !== undefined) evidence.after = sanitize(input.after.trim());
 
+  const path = sanitizePath(input.file);
+
   return {
-    id: `${input.rule}:${sanitizePath(input.file)}:${input.line}`,
+    id: input.line === null ? `${input.rule}:${path}` : `${input.rule}:${path}:${input.line}`,
     rule: input.rule,
     severity: input.severity,
-    file: sanitizePath(input.file),
+    file: path,
     line: input.line,
     message: sanitize(input.message),
     evidence,

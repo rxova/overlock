@@ -115,6 +115,19 @@ describe('overlock check', () => {
     );
   });
 
+  it('regrades one rule with --severity, leaving the others alone', () => {
+    const r = weakenedRepo();
+    const graded = overlock(['check', '--base', 'auto', '--severity', 'TEST_SKIPPED_ADDED=low'], {
+      cwd: r.dir,
+    });
+    expect(graded.status).toBe(0);
+    expect(graded.stdout).toContain('LOW');
+
+    const typo = overlock(['check', '--severity', 'TEST_SKIPPED=low'], { cwd: r.dir });
+    expect(typo.status).toBe(2);
+    expect(typo.stderr).toContain('known rule');
+  });
+
   it('checks only what is staged with --staged', () => {
     const r = weakenedRepo();
     expect(overlock(['check', '--staged'], { cwd: r.dir }).status).toBe(0);

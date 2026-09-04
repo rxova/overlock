@@ -27,8 +27,8 @@ the test are not.
 ## Commands
 
 - `overlock check` — the current patch. `--base <ref>`, `--staged`, `--json`,
-  `--compact`, `--fail-on high|medium|low|none`, `--test-glob <re>`,
-  `--no-untracked`, `--no-ledger`.
+  `--compact`, `--fail-on high|medium|low|none`, `--severity <rule>=<level>`,
+  `--test-glob <re>`, `--no-untracked`, `--no-ledger`.
 - `overlock hook claude` — Claude Code Stop hook. Blocks on HIGH via exit 2 and
   `blockStopReason`; never blocks twice, so an unfixable finding cannot loop.
 - `overlock init claude|codex|cursor|copilot` — wire it into an agent. For Claude
@@ -95,6 +95,9 @@ same thing in its first line.
 }
 ```
 
+`line` is `null` when the finding is about the file rather than a line in it — a
+deleted test file has no line 1 — and `id` is then `<rule>:<file>`.
+
 ## Silencing a finding
 
 Only when a person has decided the finding is wrong or the skip is deliberate:
@@ -103,8 +106,17 @@ Only when a person has decided the finding is wrong or the skip is deliberate:
 // overlock-ignore TEST_SKIPPED_ADDED -- quarantined pending #412
 ```
 
+A finding whose `line` is `null` is about the file rather than a line in it, so
+there is no line to put a comment on. Name the path instead, from any line the
+patch still has:
+
+```
+// overlock-ignore TEST_REMOVED src/api.test.ts -- module deleted; cases re-homed
+```
+
 The rule ID and the reason are both required; there is no wildcard, one quoted
-inside a string is not a directive, and it covers one rule on one line.
+inside a string is not a directive, and it covers one rule on one line — or,
+when it names a path, only the findings in that path that have no line.
 
 **Do not add one to make a check pass.** A directive added by the same patch it
 silences stops the hook once and quotes your reason back to the person, so it

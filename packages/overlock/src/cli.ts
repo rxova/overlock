@@ -15,7 +15,7 @@ import { run } from './run.js';
 import { ledgerPath } from './ledger.js';
 import { readLedger, summarize } from './summary.js';
 import { MessageBuffer, handleMessage } from './mcp.js';
-import type { Severity } from './types.js';
+import { RULE_IDS, type RuleId, type Severity } from './types.js';
 
 const VERSION = typeof __OVERLOCK_VERSION__ === 'string' ? __OVERLOCK_VERSION__ : '0.0.0';
 
@@ -35,6 +35,8 @@ CHECK OPTIONS
   --json             Machine-readable report on stdout
   --compact          The short form a phone can read
   --fail-on <level>  high | medium | low | none. Default: high
+  --severity <r>=<l> Grade one rule differently, e.g. TEST_REMOVED=medium
+                     (repeatable; a rule graded low never blocks)
   --limit <n>        Findings shown in --compact. Default: 3
   --test-glob <re>   Extra regex marking a path as a test file (repeatable)
   --cwd <dir>        Run against this directory
@@ -45,6 +47,12 @@ SILENCING A FINDING
   Put a comment on the offending line, or the line above it:
 
     // overlock-ignore TEST_SKIPPED_ADDED -- quarantined pending #412
+
+  A finding with no line of its own — a deleted test file has none — is named
+  by its path instead, from any line the patch still has:
+
+    // overlock-ignore TEST_REMOVED src/api.test.ts -- module deleted; cases
+    // re-homed in store.test.ts
 
   The rule ID and the reason are both required. A directive without a written
   reason silences nothing.
@@ -71,6 +79,7 @@ export interface ParsedArgs {
   limit: number;
   days: number;
   testGlobs: RegExp[];
+  severities: Partial<Record<RuleId, Severity>>;
   cwd: string;
   ledger: boolean;
   untracked: boolean;
@@ -87,6 +96,7 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
     limit: 3,
     days: 30,
     testGlobs: [],
+    severities: {},
     cwd,
     ledger: true,
     untracked: true,
@@ -172,6 +182,22 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
         parsed.failOn = level;
         break;
       }
+      case '--severity': {
+        // `RULE=level`, and both halves are checked against the frozen lists.
+        // A typo that silently did nothing would be the worst possible
+        // behaviour here: the person would believe a rule was graded down and
+        // find out otherwise from a blocked merge.
+        const spec = value('--severity');
+        const [rule, level] = spec.split('=');
+        if (!rule || !(RULE_IDS as readonly string[]).includes(rule)) {
+          throw new UsageError(`--severity needs a known rule: ${spec}`);
+        }
+        if (level !== 'high' && level !== 'medium' && level !== 'low') {
+          throw new UsageError(`--severity level must be high, medium or low: ${spec}`);
+        }
+        parsed.severities[rule as RuleId] = level;
+        break;
+      }
       case '--test-glob': {
         const pattern = value('--test-glob');
         try {
@@ -230,6 +256,7 @@ export function main(argv: string[], io: Io): number {
       base: args.command === 'hook' ? (args.base ?? 'auto') : args.base,
       staged: args.staged,
       failOn: args.failOn,
+      severities: args.severities,
       testGlobs: args.testGlobs,
       mode: args.command === 'hook' ? 'hook' : 'check',
       ledger: args.ledger,
@@ -286,6 +313,7 @@ function runMcp(args: ParsedArgs, io: Io): number {
         base: call.base ?? 'auto',
         ...(call.staged === undefined ? {} : { staged: call.staged }),
         failOn: (call.failOn ?? 'high') as Severity | 'none',
+        severities: args.severities,
         testGlobs: args.testGlobs,
         mode: 'check' as const,
         ledger: args.ledger,

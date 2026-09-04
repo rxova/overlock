@@ -16,6 +16,16 @@ export interface AnalyzeOptions {
   testGlobs?: RegExp[];
   /** Severity at or above which the report is not ok. Default `high`. */
   failOn?: Severity | 'none';
+  /**
+   * Per-rule severity, replacing the built-in grade for those rules.
+   *
+   * A repository that deletes test files as a matter of course — because
+   * deleting a feature deletes its tests — otherwise has one lever, `--fail-on
+   * medium`, and pulling it to unblock TEST_REMOVED also unblocks
+   * TEST_SKIPPED_ADDED, ASSERTION_WEAKENED and COVERAGE_THRESHOLD_LOWERED. An
+   * escape from one rule should not disarm four.
+   */
+  severities?: Partial<Record<RuleId, Severity>>;
 }
 
 /**
@@ -31,13 +41,15 @@ export function analyze(options: AnalyzeOptions): Report {
   const { diff, base = 'HEAD', testGlobs = [] } = options;
   const failOn = normalizeFailOn(options.failOn ?? 'high');
 
+  const severities = options.severities ?? {};
+
   const files = parseDiff(diff);
   const ctx = {
     files,
     isTest: (path: string) => isTestFile(path, testGlobs),
   };
 
-  const raw = RULES.flatMap((rule) => rule.run(ctx));
+  const raw = RULES.flatMap((rule) => rule.run(ctx)).map((f) => regrade(f, severities));
   const { kept, suppressed, used } = applySuppressions(
     sortFindings(dedupe(raw)),
     collectSuppressions(files),
@@ -65,9 +77,20 @@ export function analyze(options: AnalyzeOptions): Report {
       rule: s.rule,
       file: s.file,
       line: s.line,
+      target: s.target,
       reason: sanitize(s.reason),
     })),
   };
+}
+
+/**
+ * Applied before sorting, deduplication and suppression, so an override changes
+ * the order a finding is reported in and whether it blocks, not merely the word
+ * printed beside it.
+ */
+function regrade(f: Finding, severities: Partial<Record<RuleId, Severity>>): Finding {
+  const override = severities[f.rule];
+  return override === undefined || override === f.severity ? f : { ...f, severity: override };
 }
 
 /**
@@ -106,6 +129,8 @@ function sortFindings(findings: Finding[]): Finding[] {
     const byRule = RULE_ORDER[a.rule] - RULE_ORDER[b.rule];
     if (byRule !== 0) return byRule;
     if (a.file !== b.file) return a.file < b.file ? -1 : 1;
-    return a.line - b.line;
+    // A finding about the whole file sorts above the lines inside it, which is
+    // also the order a person would read them in.
+    return (a.line ?? 0) - (b.line ?? 0);
   });
 }

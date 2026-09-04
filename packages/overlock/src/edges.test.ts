@@ -30,7 +30,7 @@ describe('ordering', () => {
       ),
     );
 
-    const lines = analyze({ diff }).findings.map((f) => f.line);
+    const lines = analyze({ diff }).findings.map((f) => f.line ?? 0);
     expect(lines).toEqual([...lines].sort((a, b) => a - b));
     expect(lines.length).toBe(2);
   });

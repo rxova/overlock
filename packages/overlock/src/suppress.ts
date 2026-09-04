@@ -1,9 +1,9 @@
-import { withoutStringContents } from './rules/shared.js';
+import { sanitizePath, withoutStringContents } from './rules/shared.js';
 import type { DiffFile, Finding, RuleId } from './types.js';
 import { RULE_IDS } from './types.js';
 
 /**
- * `overlock-ignore <RULE_ID> -- <reason>`
+ * `overlock-ignore <RULE_ID> [<path>] -- <reason>`
  *
  * The reason is not optional, and that is the entire design.
  *
@@ -14,12 +14,29 @@ import { RULE_IDS } from './types.js';
  * named rule and a written reason keeps the hatch usable by a person explaining
  * themselves and useless to an agent looking for the shortest path to green.
  */
-const SUPPRESSION = /overlock-ignore\s+([A-Z_]+)\s*--\s*(\S.*?)\s*$/;
+const SUPPRESSION = /overlock-ignore\s+([A-Z_]+)(?:\s+(?!--)(\S+))?\s*--\s*(\S.*?)\s*$/;
 
 export interface Suppression {
   rule: RuleId;
   reason: string;
+  /** The file the directive is written in. */
   file: string;
+  /**
+   * The path the directive covers, when it names one.
+   *
+   * This exists for the findings that have no line to sit on. A deleted test
+   * file is the case: the rule reports on a path that no longer has a line 1,
+   * so a comment cannot be put on the offending line — there isn't one. Naming
+   * the path from a line that does exist (the replacement test file, most
+   * often) is the only form that works, and it works in the hook's case as well
+   * as in CI, which a commit trailer would not: at Stop time the work is
+   * usually still uncommitted and has no commit message to read.
+   *
+   * It is not a wildcard. A path-carrying directive covers only findings that
+   * have no line of their own, so it can never blanket-silence a rule across a
+   * file the way `eslint-disable-file` does.
+   */
+  target: string | null;
   /** Post-image line the comment sits on. */
   line: number;
   /**
@@ -58,7 +75,8 @@ export function collectSuppressions(files: DiffFile[]): Suppression[] {
         // string is documentation or a fixture, not permission.
         const match = SUPPRESSION.exec(withoutStringContents(line.text));
         const rule = match?.[1];
-        const reason = match?.[2];
+        const target = match?.[2];
+        const reason = match?.[3];
         // A malformed directive — no rule, an unknown rule, or no reason —
         // suppresses nothing. Silently ignoring it is deliberate: the finding it
         // failed to suppress is the feedback.
@@ -67,6 +85,7 @@ export function collectSuppressions(files: DiffFile[]): Suppression[] {
         found.push({
           rule,
           reason,
+          target: target === undefined ? null : sanitizePath(target),
           file: file.path,
           line: line.newLine,
           added: line.kind === 'add',
@@ -90,6 +109,10 @@ export interface SuppressionResult {
  * at the end of the offending line or on the line above it. It never covers a
  * whole file or a whole rule: blanket suppression is the failure mode this
  * format exists to avoid.
+ *
+ * A directive that names a path covers, in that path, only the findings that
+ * carry no line — the ones no comment could ever sit on. Same ceiling: one
+ * named rule, one named path, one written reason.
  */
 export function applySuppressions(
   findings: Finding[],
@@ -99,6 +122,10 @@ export function applySuppressions(
 
   const covered = new Map<string, Suppression>();
   for (const s of suppressions) {
+    if (s.target !== null) {
+      covered.set(`${s.rule}:${s.target}`, s);
+      continue;
+    }
     covered.set(`${s.rule}:${s.file}:${s.line}`, s);
     covered.set(`${s.rule}:${s.file}:${s.line + 1}`, s);
   }
@@ -108,7 +135,11 @@ export function applySuppressions(
   const used: Suppression[] = [];
 
   for (const finding of findings) {
-    const directive = covered.get(`${finding.rule}:${finding.file}:${finding.line}`);
+    const key =
+      finding.line === null
+        ? `${finding.rule}:${finding.file}`
+        : `${finding.rule}:${finding.file}:${finding.line}`;
+    const directive = covered.get(key);
     if (directive) {
       suppressed.push(finding);
       if (!used.includes(directive)) used.push(directive);

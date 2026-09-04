@@ -146,3 +146,71 @@ describe('through analyze', () => {
     expect(analyze({ diff: '' }).suppressed).toBe(0);
   });
 });
+
+/**
+ * The one finding that had no way out. A deleted test file is reported on a
+ * path with no line for a comment to sit on, so the directive names the path
+ * from a line the patch still has.
+ */
+describe('a directive that names a path', () => {
+  const deleted = diffOf('src/auth.test.ts', hunk("-it('rejects', () => {})"), {
+    status: 'deleted',
+  });
+
+  it('silences a finding that has no line of its own', () => {
+    const diff =
+      deleted +
+      diffOf(
+        'src/store.test.ts',
+        hunk('+// overlock-ignore TEST_REMOVED src/auth.test.ts -- module gone; cases re-homed'),
+        { status: 'added' },
+      );
+
+    const report = analyze({ diff });
+    expect(report.findings.filter((f) => f.rule === 'TEST_REMOVED')).toEqual([]);
+    expect(report.suppressed).toBe(1);
+    expect(report.suppressions_new[0]).toMatchObject({
+      rule: 'TEST_REMOVED',
+      target: 'src/auth.test.ts',
+      reason: 'module gone; cases re-homed',
+    });
+  });
+
+  it('covers only that path', () => {
+    const diff =
+      deleted +
+      diffOf('src/other.test.ts', hunk("-it('elsewhere', () => {})"), { status: 'deleted' }) +
+      diffOf('src/store.test.ts', hunk('+// overlock-ignore TEST_REMOVED src/auth.test.ts -- r'), {
+        status: 'added',
+      });
+
+    const files = analyze({ diff }).findings.map((f) => f.file);
+    expect(files).toContain('src/other.test.ts');
+    expect(files).not.toContain('src/auth.test.ts');
+  });
+
+  it('is not a blanket: line findings in the same file still stand', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          '+  // overlock-ignore TEST_SKIPPED_ADDED src/a.test.ts -- named the file, not the line',
+          '+  const x = 1;',
+          "+  it.skip('rejects', () => {})",
+        ].join('\n'),
+      ),
+    );
+
+    expect(analyze({ diff }).findings.map((f) => f.rule)).toContain('TEST_SKIPPED_ADDED');
+  });
+
+  it('still requires a reason', () => {
+    const diff =
+      deleted +
+      diffOf('src/store.test.ts', hunk('+// overlock-ignore TEST_REMOVED src/auth.test.ts'), {
+        status: 'added',
+      });
+
+    expect(analyze({ diff }).suppressed).toBe(0);
+  });
+});

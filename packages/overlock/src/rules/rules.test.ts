@@ -54,6 +54,71 @@ describe('TEST_REMOVED', () => {
     expect(rulesFor(diff)).not.toContain('TEST_REMOVED');
   });
 
+  it('grades down when every case reappears elsewhere in the patch', () => {
+    const diff =
+      diffOf(
+        'src/auth.test.ts',
+        hunk(["-it('rejects expired', () => {})", "-it('accepts fresh', () => {})"].join('\n')),
+        { status: 'deleted' },
+      ) +
+      diffOf(
+        'src/auth/tokens.test.ts',
+        hunk(["+it('rejects expired', () => {})", "+it('accepts fresh', () => {})"].join('\n')),
+        { status: 'added' },
+      );
+
+    const [found] = findingsOf(diff, 'TEST_REMOVED');
+    expect(found?.severity).toBe('medium');
+    expect(found?.message).toContain('all 2');
+  });
+
+  it('names the cases that did not reappear, and only those', () => {
+    const diff =
+      diffOf(
+        'src/auth.test.ts',
+        hunk(
+          ["-it('rejects expired', () => {})", "-it('formats the amount', () => {})"].join('\n'),
+        ),
+        { status: 'deleted' },
+      ) +
+      diffOf('src/auth/tokens.test.ts', hunk("+it('rejects expired', () => {})"), {
+        status: 'added',
+      });
+
+    const [found] = findingsOf(diff, 'TEST_REMOVED');
+    expect(found?.severity).toBe('high');
+    expect(found?.message).toContain('1 of 2');
+    expect(found?.message).toContain('formats the amount');
+    expect(found?.message).not.toContain('rejects expired');
+  });
+
+  it('grades down when the module under test was deleted too', () => {
+    const diff =
+      diffOf('src/api.test.ts', hunk("-it('rejects', () => {})"), { status: 'deleted' }) +
+      diffOf('src/api.ts', hunk('-export const api = 1;'), { status: 'deleted' });
+
+    const [found] = findingsOf(diff, 'TEST_REMOVED');
+    expect(found?.severity).toBe('medium');
+    expect(found?.message).toContain('src/api.ts');
+  });
+
+  it('does not grade down when the module under test was merely modified', () => {
+    const diff =
+      diffOf('src/api.test.ts', hunk("-it('rejects', () => {})"), { status: 'deleted' }) +
+      diffOf('src/api.ts', hunk('-const a = 1;\n+const a = 2;'));
+
+    expect(findingsOf(diff, 'TEST_REMOVED')[0]?.severity).toBe('high');
+  });
+
+  it('points at the file rather than a line that no longer exists', () => {
+    const diff = diffOf('src/auth.test.ts', hunk("-it('rejects', () => {})"), {
+      status: 'deleted',
+    });
+    const [found] = findingsOf(diff, 'TEST_REMOVED');
+    expect(found?.line).toBeNull();
+    expect(found?.id).toBe('TEST_REMOVED:src/auth.test.ts');
+  });
+
   it('recognises python and go declarations', () => {
     const py = diffOf('tests/test_auth.py', hunk('-def test_rejects_expired():'));
     expect(findingsOf(py, 'TEST_REMOVED')[0]?.message).toContain('test_rejects_expired');

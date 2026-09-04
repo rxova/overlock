@@ -14,7 +14,7 @@ export interface LedgerEntry {
   blocked: boolean;
   counts: Record<Severity, number>;
   suppressed: number;
-  rules: { rule: string; severity: Severity; file: string; line: number }[];
+  rules: { rule: string; severity: Severity; file: string; line: number | null }[];
 }
 
 export function ledgerPath(env: NodeJS.ProcessEnv = process.env): string {

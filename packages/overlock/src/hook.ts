@@ -27,7 +27,8 @@ function suppressionNotice(report: Report): string {
   const lines = [`overlock: this patch silenced ${report.suppressed_new} of its own findings.`, ''];
 
   for (const s of report.suppressions_new) {
-    lines.push(`! ${s.file}:${s.line} ${s.rule}`);
+    const covers = s.target === null ? '' : ` (covering ${s.target})`;
+    lines.push(`! ${s.file}:${s.line} ${s.rule}${covers}`);
     lines.push(`   overlock-ignore ... -- ${s.reason}`);
   }
 

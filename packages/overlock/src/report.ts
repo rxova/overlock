@@ -28,6 +28,15 @@ function paint(text: string, code: string, color: boolean): string {
   return color ? `${code}${text}${ANSI.reset}` : text;
 }
 
+/**
+ * Where to go and look. A finding with no line renders as the bare path: a
+ * deleted file has nothing at line 1, and printing `api.test.ts:1` sends a
+ * reviewer looking for something that is not there.
+ */
+function where(f: Finding): string {
+  return f.line === null ? f.file : `${f.file}:${f.line}`;
+}
+
 function severityColor(severity: Severity): string {
   if (severity === 'high') return ANSI.red;
   if (severity === 'medium') return ANSI.yellow;
@@ -54,7 +63,7 @@ export function human(report: Report, color: boolean): string {
   for (const f of report.findings) {
     const head = `${MARK[f.severity]} ${LABEL[f.severity]}`;
     lines.push(
-      `${paint(head, severityColor(f.severity), color)}  ${f.file}:${f.line}  ${paint(
+      `${paint(head, severityColor(f.severity), color)}  ${where(f)}  ${paint(
         f.rule,
         ANSI.dim,
         color,
@@ -89,7 +98,7 @@ export function compact(report: Report, limit = 3): string {
   const lines: string[] = [`overlock: ${summarize(report)}.${suppressedNote(report)}`, ''];
 
   for (const f of shown) {
-    lines.push(`${MARK[f.severity]} ${LABEL[f.severity].trim()} ${f.file}:${f.line} ${f.rule}`);
+    lines.push(`${MARK[f.severity]} ${LABEL[f.severity].trim()} ${where(f)} ${f.rule}`);
     lines.push(`   ${f.message}`);
     const evidence = f.evidence.after ?? f.evidence.before;
     if (evidence) {

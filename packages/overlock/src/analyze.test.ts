@@ -43,6 +43,19 @@ describe('analyze', () => {
     expect(first?.id).toContain('TEST_SKIPPED_ADDED');
   });
 
+  it('regrades a rule when a severity override names it', () => {
+    const report = analyze({ diff: skip, severities: { TEST_SKIPPED_ADDED: 'low' } });
+    expect(report.findings[0]?.severity).toBe('low');
+    expect(report.counts).toMatchObject({ high: 0, low: 1 });
+    expect(report.ok).toBe(true);
+  });
+
+  it('leaves the rules it does not name at their built-in grade', () => {
+    const report = analyze({ diff: skip, severities: { TEST_REMOVED: 'low' } });
+    expect(report.findings[0]?.severity).toBe('high');
+    expect(report.ok).toBe(false);
+  });
+
   it('honours extra test globs', () => {
     const diff = diffOf('checks/login.check.ts', hunk("+  it.skip('x', () => {})"));
     expect(analyze({ diff }).findings).toHaveLength(0);

@@ -8,13 +8,15 @@ import {
   untrackedFiles,
 } from './git.js';
 import { appendLedger, toEntry } from './ledger.js';
-import type { Report, Severity } from './types.js';
+import type { Report, RuleId, Severity } from './types.js';
 
 export interface RunOptions {
   cwd: string;
   base?: string | undefined;
   staged?: boolean | undefined;
   failOn?: Severity | 'none';
+  /** Per-rule severity, replacing the built-in grade for those rules. */
+  severities?: Partial<Record<RuleId, Severity>>;
   testGlobs?: RegExp[];
   mode?: 'check' | 'hook';
   ledger?: boolean;
@@ -35,6 +37,7 @@ export function run(options: RunOptions): RunResult {
     base,
     staged,
     failOn = 'high',
+    severities = {},
     testGlobs = [],
     mode = 'check',
     ledger = true,
@@ -52,7 +55,7 @@ export function run(options: RunOptions): RunResult {
   const diff =
     readDiff(range, cwd) + (includeUntracked ? untrackedDiff(cwd, untrackedFiles(cwd)) : '');
 
-  const report = analyze({ diff, base: range, testGlobs, failOn });
+  const report = analyze({ diff, base: range, testGlobs, failOn, severities });
 
   if (ledger) {
     appendLedger(toEntry({ report, repo, branch, mode, blocked: mode === 'hook' && !report.ok }));

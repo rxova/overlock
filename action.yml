@@ -23,6 +23,13 @@ inputs:
       later runs rather than added to. Needs `pull-requests: write`.
     required: false
     default: 'true'
+  severity:
+    description: >-
+      Per-rule severity overrides, one `RULE_ID=level` per line. Lets a
+      repository that deletes test files routinely grade TEST_REMOVED down
+      without dropping fail-on globally and disarming every other rule.
+    required: false
+    default: ''
   working-directory:
     description: Directory to run in.
     required: false
@@ -84,6 +91,7 @@ runs:
       env:
         BASE: ${{ steps.range.outputs.base }}
         FAIL_ON: ${{ inputs.fail-on }}
+        SEVERITY: ${{ inputs.severity }}
         VERSION: ${{ inputs.version }}
         CLI_PATH: ${{ inputs.cli-path }}
       run: |
@@ -129,10 +137,23 @@ runs:
 
         report="$RUNNER_TEMP/overlock-report.json"
 
+        # One --severity flag per non-empty line. Built as an array rather than
+        # a string so a value containing whitespace stays one argument, and with
+        # an `if` rather than an `&&` list: `shell: bash` runs with -e, so a
+        # trailing AND-list that evaluates false on the empty input would abort
+        # the step for everyone who does not set this input.
+        severity_args=()
+        while IFS= read -r line; do
+          if [ -n "$line" ]; then
+            severity_args+=(--severity "$line")
+          fi
+        done <<< "$SEVERITY"
+
         # The ledger is a record of what a person's agents did on their machine.
         # A CI runner is neither, and it is thrown away, so nothing is written.
         set +e
-        run_overlock check --base "$BASE" --fail-on "$FAIL_ON" --no-ledger --json > "$report"
+        run_overlock check --base "$BASE" --fail-on "$FAIL_ON" "${severity_args[@]}" \
+          --no-ledger --json > "$report"
         status=$?
         set -e
 
@@ -157,7 +178,7 @@ runs:
 
         # The human-readable form in the log, regardless of pass or fail.
         set +e
-        run_overlock check --base "$BASE" --fail-on none --no-ledger
+        run_overlock check --base "$BASE" --fail-on none "${severity_args[@]}" --no-ledger
         set -e
 
     - name: Comment on the pull request
@@ -167,6 +188,7 @@ runs:
         GH_TOKEN: ${{ inputs.github-token }}
         REPORT: ${{ steps.check.outputs.report }}
         FINDINGS: ${{ steps.check.outputs.findings }}
+        FAIL_ON: ${{ inputs.fail-on }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         REPO: ${{ github.repository }}
       run: |
@@ -174,30 +196,99 @@ runs:
         marker="<!-- overlock-report -->"
         body="$RUNNER_TEMP/overlock-comment.md"
 
-        if [ "$FINDINGS" = "0" ]; then
-          printf '%s\n\n**overlock**: nothing weakened in this patch.\n' "$marker" > "$body"
-        else
-          {
-            printf '%s\n\n**overlock** found %s thing(s) this patch does to its tests:\n\n' "$marker" "$FINDINGS"
-            printf '| Severity | Rule | Where |\n| --- | --- | --- |\n'
-            node -e '
-              const report = require(process.env.REPORT);
-              // Rule and path come from the diff, so on any pull request they are
-              // chosen by whoever opened it. A backtick closes the code span and a
-              // newline ends the row and starts one the attacker writes. Both are
-              // stripped rather than escaped: neither belongs in either field.
-              const cell = (value) =>
-                String(value)
-                  .replace(/[\u0000-\u001F\u007F\u0060]/g, "")
-                  .replace(/\|/g, "\\|")
-                  .slice(0, 200);
-              for (const f of report.findings) {
-                process.stdout.write(`| ${cell(f.severity)} | \`${cell(f.rule)}\` | \`${cell(f.file)}:${Number(f.line) || 0}\` |\n`);
+        # The whole body is built here rather than by printf, because what the
+        # comment has to say depends on which findings block: a flat table that
+        # gives a blocking TEST_REMOVED the same weight as a low
+        # TEST_AND_IMPL_TOGETHER makes a reviewer do the sorting the tool
+        # already knows how to do.
+        MARKER="$marker" node -e '
+          const report = require(process.env.REPORT);
+          // Rule and path come from the diff, so on any pull request they are
+          // chosen by whoever opened it. A backtick closes the code span and a
+          // newline ends the row and starts one the attacker writes. Both are
+          // stripped rather than escaped: neither belongs in either field.
+          const cell = (value) =>
+            String(value)
+              .replace(/[\u0000-\u001F\u007F\u0060]/g, "")
+              .replace(/\|/g, "\\|")
+              .slice(0, 200);
+
+          const rank = { high: 0, medium: 1, low: 2 };
+          const failOn = process.env.FAIL_ON || "high";
+          const blocks = (f) => failOn !== "none" && rank[f.severity] <= (rank[failOn] ?? 0);
+          // A finding with no line is about the file itself — a deleted test
+          // file has no line 1 to send anyone to.
+          const where = (f) =>
+            f.line == null ? cell(f.file) : cell(f.file) + ":" + (Number(f.line) || 0);
+          const plural = (n, word) => n + " " + word + (n === 1 ? "" : "s");
+
+          const out = [process.env.MARKER, ""];
+          const findings = report.findings || [];
+
+          if (findings.length === 0) {
+            out.push("**overlock**: nothing weakened in this patch.");
+          } else {
+            const blocking = findings.filter(blocks);
+            const context = findings.filter((f) => !blocks(f));
+
+            const verdict =
+              blocking.length > 0
+                ? plural(blocking.length, "finding") + " block this merge" +
+                  (context.length > 0 ? "; " + context.length + " more are context." : ".")
+                : "nothing blocks this merge; " + plural(context.length, "finding") +
+                  " worth a look.";
+            out.push("**overlock** — " + verdict, "");
+
+            if (blocking.length > 0) {
+              out.push("| Severity | Rule | Where | What |", "| --- | --- | --- | --- |");
+              for (const f of blocking) {
+                out.push(
+                  "| " + cell(f.severity) + " | `" + cell(f.rule) + "` | `" + where(f) +
+                    "` | " + cell(f.message) + " |",
+                );
               }
-            '
-            printf '\nSilence one deliberately with `// overlock-ignore RULE_ID -- reason`.\n'
-          } > "$body"
-        fi
+              out.push("");
+            }
+
+            // Collapsed, and grouped by rule: TEST_AND_IMPL_TOGETHER firing
+            // once per file is noise at any patch size above trivial, and six
+            // identical rows say nothing the count does not.
+            if (context.length > 0) {
+              const groups = new Map();
+              for (const f of context) {
+                const key = f.severity + " " + f.rule;
+                if (!groups.has(key)) groups.set(key, { severity: f.severity, rule: f.rule, files: [] });
+                const group = groups.get(key);
+                if (!group.files.includes(f.file)) group.files.push(f.file);
+              }
+
+              out.push(
+                "<details><summary>" + plural(context.length, "finding") +
+                  " that do not block</summary>",
+                "",
+                "| Severity | Rule | Count | Where |",
+                "| --- | --- | --- | --- |",
+              );
+              for (const g of groups.values()) {
+                const shown = g.files.slice(0, 3).map((f) => "`" + cell(f) + "`").join(", ");
+                const rest = g.files.length - Math.min(g.files.length, 3);
+                out.push(
+                  "| " + cell(g.severity) + " | `" + cell(g.rule) + "` | " + g.files.length +
+                    " | " + shown + (rest > 0 ? ", and " + rest + " more" : "") + " |",
+                );
+              }
+              out.push("", "</details>", "");
+            }
+
+            out.push(
+              "Silence one deliberately with `// overlock-ignore RULE_ID -- reason`, or " +
+                "`// overlock-ignore RULE_ID <path> -- reason` for a finding with no line " +
+                "of its own.",
+            );
+          }
+
+          process.stdout.write(out.join("\n") + "\n");
+        ' > "$body"
 
         # One comment, edited in place. A bot that appends on every push buries
         # the review it is supposed to support.

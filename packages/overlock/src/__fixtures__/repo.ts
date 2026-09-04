@@ -21,11 +21,12 @@ export class TempRepo {
     this.git(['config', 'commit.gpgsign', 'false']);
   }
 
-  git(args: string[]): string {
+  git(args: string[], env: NodeJS.ProcessEnv = {}): string {
     return execFileSync('git', args, {
       cwd: this.dir,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, ...env },
     });
   }
 
@@ -35,9 +36,18 @@ export class TempRepo {
     writeFileSync(file, contents, 'utf8');
   }
 
-  commit(message: string): void {
+  /**
+   * `at` backdates the commit. Anything measured against a clock needs it: git
+   * timestamps are whole seconds, so a test that makes its setup commit and the
+   * commit under test in the same second is not testing a boundary at all.
+   */
+  commit(message: string, options: { at?: Date } = {}): void {
     this.git(['add', '-A']);
-    this.git(['commit', '--quiet', '--no-verify', '-m', message]);
+    const when = options.at?.toISOString();
+    this.git(
+      ['commit', '--quiet', '--no-verify', '-m', message],
+      when === undefined ? {} : { GIT_AUTHOR_DATE: when, GIT_COMMITTER_DATE: when },
+    );
   }
 
   cleanup(): void {

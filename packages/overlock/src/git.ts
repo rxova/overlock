@@ -278,6 +278,28 @@ export function rangeScope(range: string, cwd: string): { files: number; commits
 
 const countLines = (text: string): number => text.split('\n').filter(Boolean).length;
 
+/**
+ * The last commit made at or before a moment, or null when there is none.
+ *
+ * At or before, not before: git's `--before` is inclusive, and it works in whole
+ * seconds. Callers wanting a strict boundary subtract one.
+ *
+ * This is how a session gets a base: everything the agent committed during it,
+ * plus whatever it left in the working tree, is `<that commit>..now`. `--before`
+ * reads committer date, which is the one git updates on a rebase or an amend —
+ * so work rewritten during the session stays inside the session's range, which
+ * is the conservative direction and the correct one.
+ */
+export function commitBefore(when: Date, cwd: string): string | null {
+  try {
+    const sha = git(['rev-list', '-1', `--before=${when.toISOString()}`, 'HEAD'], cwd).trim();
+    return sha || null;
+  } catch {
+    // No commits, or no HEAD. Either way there is no "before" to point at.
+    return null;
+  }
+}
+
 /** git's canonical empty tree, so the first commit in a repo can be diffed. */
 export const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 
@@ -285,9 +307,10 @@ export const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
  * The commit messages in the range, for `Overlock-Allow:` trailers.
  *
  * Empty for the working tree and for a staged check, which is the honest
- * answer: uncommitted work has no commit message, so the trailer does nothing
- * at Stop time. Failure is empty rather than fatal — a range with no commits in
- * it is the normal case, not an error.
+ * answer: uncommitted work has no commit message to read. A session-scoped Stop
+ * hook does have commits in its range, so a trailer written during the session
+ * is read there. Failure is empty rather than fatal — a range with no commits
+ * in it is the normal case, not an error.
  */
 export function readMessages(range: string, cwd: string): string {
   if (range === '--cached' || range === EMPTY_TREE || range === 'HEAD') return '';

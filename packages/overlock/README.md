@@ -46,6 +46,12 @@ Installed as a Claude Code Stop hook, `overlock` makes that self-report
 falsifiable. The agent cannot end its turn claiming success while a HIGH finding
 stands, and the reason it gets back is written to be read one-handed.
 
+At Stop time the patch is the session: everything the agent committed since the
+session began, plus whatever it left in the working tree. Agents commit and then
+stop, so a hook that read only uncommitted work saw nothing in the ordinary
+case — which is a strange blind spot for a tool whose whole subject is what your
+coding agent did to your tests.
+
 ## Install
 
 ```bash

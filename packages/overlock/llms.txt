@@ -142,8 +142,8 @@ form is a trailer in a commit message or pull request body:
 Overlock-Allow: TEST_AND_IMPL_TOGETHER -- rename only, no behaviour changed
 ```
 
-It needs a written reason too, and it does nothing at Stop time, where
-uncommitted work has no commit message.
+It needs a written reason too. At Stop time it covers what the agent committed
+during the session; work still in the tree has no commit message to read.
 
 **Do not add one to make a check pass.** A directive added by the same patch it
 silences stops the hook once and quotes your reason back to the person, so it

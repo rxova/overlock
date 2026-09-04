@@ -11,6 +11,7 @@ export {
 export { parseDiff, addedLines, removedLines } from './diff.js';
 export {
   assertSafeRef,
+  commitBefore,
   explainRange,
   hasCommits,
   rangeScope,
@@ -21,7 +22,13 @@ export {
   type RangeOptions,
   type ResolvedRange,
 } from './git.js';
-export { stopHookOutcome, parseStopPayload, type HookOutcome } from './hook.js';
+export {
+  parseStopPayload,
+  sessionBase,
+  sessionStart,
+  stopHookOutcome,
+  type HookOutcome,
+} from './hook.js';
 export {
   AGENTS,
   HOOK_COMMAND,

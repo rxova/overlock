@@ -30,7 +30,8 @@ export interface Suppression {
    * the path from a line that does exist (the replacement test file, most
    * often) is the only form that works, and it works in the hook's case as well
    * as in CI, which a commit trailer would not: at Stop time the work is
-   * usually still uncommitted and has no commit message to read.
+   * usually still uncommitted and has no commit message to read; only what was
+   * committed during the session does.
    *
    * It is not a wildcard. A path-carrying directive covers only findings that
    * have no line of their own, so it can never blanket-silence a rule across a

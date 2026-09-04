@@ -19,10 +19,10 @@ import { RULE_IDS } from './types.js';
  * which is the whole point — and what it costs is that the acknowledgement is
  * written where a reviewer reads it rather than buried in a source file.
  *
- * It is deliberately a trailer and not a second inline syntax: at Stop time the
- * work is usually still uncommitted and has no commit message, so this does
- * nothing there. That is why it is an addition to the inline directive rather
- * than a replacement for it.
+ * It is deliberately a trailer and not a second inline syntax: at Stop time it
+ * covers only what the agent committed during the session, and work still in
+ * the tree has no commit message to read. That is why it is an addition to the
+ * inline directive rather than a replacement for it.
  */
 const TRAILER = /^\s*Overlock-Allow:\s*([A-Z_]+)(?:\s+(?!--)(\S+))?\s*--\s*(\S.*?)\s*$/i;
 

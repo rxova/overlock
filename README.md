@@ -50,6 +50,12 @@ Installed as a Claude Code Stop hook, `overlock` makes that self-report
 falsifiable. The agent cannot end its turn claiming success while a HIGH finding
 stands, and the reason it gets back is written to be read one-handed.
 
+At Stop time the patch is the session: everything the agent committed since the
+session began, plus whatever it left in the working tree. Agents commit and then
+stop, so a hook that read only uncommitted work saw nothing in the ordinary
+case — which is a strange blind spot for a tool whose whole subject is what your
+coding agent did to your tests.
+
 ## Install
 
 ```bash
@@ -240,8 +246,8 @@ wildcard across rules, and a path may narrow it further. It is reported and
 counted like any other suppression, and the Stop hook quotes it back at you
 once, because a trailer is written by the patch by definition.
 
-It does nothing at Stop time. When the hook runs, the work is usually still
-uncommitted and there is no commit message to read — which is why this is an
+At Stop time it covers what the agent committed during the session; work still
+sitting in the tree has no commit message to read — which is why this is an
 addition to the inline directive and not a replacement for it.
 
 ## Silencing a finding
@@ -273,7 +279,8 @@ That is not a wildcard either: a directive naming a path covers only the
 findings in it that carry no line of their own, so it can never blanket-silence
 a rule across a file. It works at Stop time as well as in CI, which is why it is
 a directive rather than a commit trailer — when the hook runs, the work is
-usually still uncommitted and there is no commit message to read.
+usually still uncommitted and there is no commit message to read; a trailer in
+a commit the agent made during the session is read.
 
 **A directive the patch itself added stops the Stop hook once.** It still
 silences the finding, but the agent cannot reach a silent exit 0 by writing its

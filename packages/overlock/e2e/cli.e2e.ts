@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PASSING_TEST, SKIPPED_TEST, TempRepo } from '../src/__fixtures__/repo.js';
 
@@ -378,6 +379,127 @@ describe('repository settings', () => {
 
     const report: unknown = JSON.parse(overlock(['check', '--json'], { cwd: r.dir }).stdout);
     expect(report).toMatchObject({ fail_on: 'medium' });
+  });
+});
+
+describe('what the agent did this session', () => {
+  /** A transcript file, standing in for the one Claude Code writes. */
+  function transcript(): string {
+    const file = join(mkdtempSync(join(tmpdir(), 'overlock-session-')), 'session.jsonl');
+    writeFileSync(file, '{}\n', 'utf8');
+    return file;
+  }
+
+  /**
+   * Well before the session starts. git timestamps are whole seconds, so a test
+   * that makes its setup commit in the same second as the commit under test is
+   * not testing a boundary at all — it is testing whichever way the rounding
+   * fell on that run.
+   */
+  const EARLIER = new Date(Date.now() - 60 * 60 * 1000);
+
+  it('blocks on a weakening the agent committed before stopping', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.commit('feat: add auth', { at: EARLIER });
+
+    // The session starts here, and then the agent commits twice and stops —
+    // the ordinary workflow the hook used to be blind to. The second commit
+    // matters: it puts the weakening out of reach of every fallback, so this
+    // can only pass by reading the session.
+    const file = transcript();
+    r.write('src/auth.test.ts', SKIPPED_TEST);
+    r.commit('chore: tidy the suite');
+    r.write('README.md', '# docs\n');
+    r.commit('docs: unrelated');
+
+    const result = overlock(['hook', 'claude'], {
+      cwd: r.dir,
+      stdin: JSON.stringify({ transcript_path: file }),
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).toContain('blockStopReason');
+    expect(result.stderr).toContain('TEST_SKIPPED_ADDED');
+
+    // And without the session, the same repository looks clean — which is the
+    // bug, held in place so it cannot come back unnoticed.
+    expect(overlock(['check', '--base', 'auto'], { cwd: r.dir }).status).toBe(0);
+  });
+
+  it('covers the working tree in the same breath', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.commit('feat: add auth', { at: EARLIER });
+
+    const file = transcript();
+    r.write('src/other.ts', 'export const x = 1;\n');
+    r.commit('feat: something committed');
+    r.write('src/auth.test.ts', SKIPPED_TEST);
+
+    const result = overlock(['hook', 'claude'], {
+      cwd: r.dir,
+      stdin: JSON.stringify({ transcript_path: file }),
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('TEST_SKIPPED_ADDED');
+  });
+
+  it('reads a trailer from a commit the agent made during the session', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.commit('feat: add auth', { at: EARLIER });
+
+    const file = transcript();
+    r.write('src/auth.test.ts', SKIPPED_TEST);
+    r.git(['add', '-A']);
+    r.git([
+      'commit',
+      '--quiet',
+      '--no-verify',
+      '-m',
+      'chore: quarantine the flake\n\nOverlock-Allow: TEST_SKIPPED_ADDED -- flaky, tracked in #412',
+    ]);
+
+    const result = overlock(['hook', 'claude'], {
+      cwd: r.dir,
+      stdin: JSON.stringify({ transcript_path: file }),
+    });
+
+    // Allowed, so not blocking on the finding — but the acknowledgement is put
+    // in front of the person exactly once, which is the standing behaviour.
+    expect(result.stderr).toContain('silenced');
+    expect(result.stderr).toContain('flaky, tracked in #412');
+  });
+
+  it('falls back to auto when there is no transcript to date the session', () => {
+    const r = weakenedRepo();
+    const result = overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' });
+
+    // The weakening is uncommitted here, which `auto` still covers.
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('TEST_SKIPPED_ADDED');
+  });
+
+  it('says the session is where the base came from', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.commit('feat: add auth', { at: EARLIER });
+    const file = transcript();
+    r.write('README.md', '# docs\n');
+    r.commit('docs: nothing to do with tests');
+
+    const result = overlock(['hook', 'claude', '--explain-base'], {
+      cwd: r.dir,
+      stdin: JSON.stringify({ transcript_path: file }),
+    });
+
+    expect(result.stderr).toContain('overlock: base — this session ->');
   });
 });
 

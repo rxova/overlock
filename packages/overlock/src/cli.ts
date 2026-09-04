@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { CONFIG_FILE, loadConfig, type OverlockConfig } from './config.js';
 import { type BaseMode, GitError, repoRoot } from './git.js';
-import { parseStopPayload, stopHookOutcome } from './hook.js';
+import { parseStopPayload, sessionBase, stopHookOutcome } from './hook.js';
 import {
   AGENTS,
   type Agent,
@@ -70,8 +70,9 @@ ACKNOWLEDGING A WHOLE PATCH
 
     Overlock-Allow: TEST_AND_IMPL_TOGETHER -- rename, no behaviour changed
 
-  It needs a written reason like everything else here, and it does nothing at
-  Stop time: uncommitted work has no commit message to read.
+  It needs a written reason like everything else here. At Stop time it applies
+  to whatever the agent committed during the session; work still sitting in the
+  tree has no commit message to read, so a trailer cannot cover it.
 
 SILENCING A FINDING
   Put a comment on the offending line, or the line above it:
@@ -361,14 +362,23 @@ export function main(argv: string[], io: Io): number {
     if (args.command === 'report') return runReport(args, io);
     if (args.command === 'mcp') return runMcp(args, io);
 
+    // Read before the run, not after it: the payload names the transcript, and
+    // the transcript is what dates the session the base is measured from.
+    const payload = args.command === 'hook' ? parseStopPayload(io.readStdin()) : {};
+    const session =
+      args.command === 'hook' && args.base === undefined ? sessionBase(payload, args.cwd) : null;
+
     const { report, steps } = run({
       cwd: args.cwd,
       // `auto` for both: a check run right after the agent committed is exactly
       // when the working tree is empty and the commits are the whole patch, and
       // a gate that reported "clean" there was answering a question nobody
       // asked. `auto` still starts with uncommitted work when there is any.
-      base: args.base ?? 'auto',
-      baseMode: args.baseMode,
+      // A session base is a commit, and it is wanted literally: everything from
+      // there to now, commits and working tree alike. Fork-pointing it would
+      // resolve to itself anyway, but saying `direct` is saying what is meant.
+      base: session ?? args.base ?? 'auto',
+      baseMode: session !== null ? 'direct' : args.baseMode,
       staged: args.staged,
       failOn: args.failOn,
       severities: args.severities,
@@ -384,11 +394,12 @@ export function main(argv: string[], io: Io): number {
         settingsPath !== null && settings.base !== undefined && !args.explicit.has('--base')
           ? `${settingsPath} -> `
           : '';
-      io.stderr(`overlock: base — ${from}${steps.join(' -> ')}\n`);
+      const how = session !== null ? 'this session -> ' : '';
+      io.stderr(`overlock: base — ${how}${from}${steps.join(' -> ')}\n`);
     }
 
     if (args.command === 'hook') {
-      const outcome = stopHookOutcome(report, parseStopPayload(io.readStdin()));
+      const outcome = stopHookOutcome(report, payload);
       if (outcome.stdout) io.stdout(outcome.stdout);
       if (outcome.stderr) io.stderr(outcome.stderr);
       return outcome.exitCode;

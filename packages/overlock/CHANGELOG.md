@@ -1,5 +1,81 @@
 # overlock
 
+## 0.2.0
+
+### Minor Changes
+
+- [#13](https://github.com/rxova/overlock/pull/13) [`984f7ff`](https://github.com/rxova/overlock/commit/984f7ffea07f490b9ec572b2f8986e9913373e5c) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Grade a deleted test file on what the patch does with its cases, and give it a
+  way out.
+
+  `TEST_REMOVED` now matches the case names a deleted file lost against every name
+  the patch adds anywhere in it, rather than per file — so splitting one test file
+  into six is visible to it. All names re-homed grades `medium`; some missing
+  stays `high` and names the ones that went. Deleting the module a test file is
+  named after also grades `medium`, since deleting a feature deletes its tests.
+
+  Findings about a file rather than a line now report `line: null` and an `id` of
+  `<rule>:<file>`, instead of pointing at a line 1 that a deleted file does not
+  have. They are silenced by naming the path from a line the patch still has:
+  `// overlock-ignore TEST_REMOVED src/api.test.ts -- reason`. Previously they
+  could not be silenced at all.
+
+  `--severity RULE_ID=level` (and the action's `severity` input) regrades one rule
+  without dropping `--fail-on` globally and disarming the others.
+
+  The action's pull request comment now leads with what blocks and folds the rest,
+  grouped by rule, into a `<details>`.
+
+- [#13](https://github.com/rxova/overlock/pull/13) [`1c1a469`](https://github.com/rxova/overlock/commit/1c1a469b4e887f3eb7ad92e671a7a449d93cd650) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Answer the question a rename actually raises: what changed that it does not
+  explain?
+
+  A substitution the patch applies wholesale is now inferred from the patch
+  itself, and every finding is marked against it. A rename across six hundred
+  files reports as three lines — the rename, how many findings are consistent with
+  it, and how many are not — with the residual printed in full above the fold.
+  The same comparison sees through a formatter, so a line the shorter name let
+  prettier re-join is not read as a change, and `TEST_AND_IMPL_TOGETHER` no longer
+  fires on pure re-wrapping.
+
+  Nothing is decided by the inference. An explained finding keeps its severity,
+  still counts, and still blocks — a patch large enough to establish a rename is
+  large enough to hide one real edit inside, and that residual is the whole point.
+
+  `Overlock-Allow: RULE_ID [path] -- reason`, read from the commit messages in the
+  range and from `--allow-file` (the action passes the pull request body), is the
+  proportionate way to acknowledge a whole patch. It needs a written reason like
+  every other escape hatch here, and it does nothing at Stop time, where
+  uncommitted work has no commit message to read.
+
+  Repeated findings are collapsed wherever they are printed: the same edit in
+  twenty files is one row with a count.
+
+  `overlock report` now counts each rule once per run rather than once per
+  finding, so one afternoon's rename cannot dominate a month of history.
+
+### Patch Changes
+
+- [#16](https://github.com/rxova/overlock/pull/16) [`ae706ff`](https://github.com/rxova/overlock/commit/ae706ffd28e16dcc278d3dd24e28bd7ab61b1a4d) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - See a weakened assertion the same commit's rename would have hidden.
+
+  `ASSERTION_WEAKENED` and `EXPECTED_VALUE_CHANGED` pair a removed line with an
+  added one by comparing their text, so a rename that lands in the subject broke
+  the pair and the rule fired nothing at all:
+  `expect(trainmotherfoca.total()).toBe(42)` becoming
+  `expect(trainmf.total()).toBeDefined()` reported as silence. Both rules now pair
+  against the pre-image with the patch's inferred substitution applied — the
+  residual analysis can only mark findings that exist, and there was no finding to
+  mark. Evidence still shows the lines as the patch wrote them.
+
+- [#17](https://github.com/rxova/overlock/pull/17) [`b114d45`](https://github.com/rxova/overlock/commit/b114d4529783343b6dbb9e496d09dc13f30e040e) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Move the test toolchain to the workspace root
+
+  `vitest`, `@vitest/coverage-v8` and `@types/node` are declared once at the root
+  instead of per package. Declaring them in both packages had them resolving
+  vite's optional `esbuild` peer differently, which carried two full vite and
+  vitest trees in the lockfile and a second esbuild download in every CI job.
+
+  This is a development-time change only: devDependencies are never installed for
+  consumers of the package, so nothing about the published build, its runtime
+  dependencies or its public API changes.
+
 ## 0.1.0
 
 ### Minor Changes

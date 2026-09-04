@@ -145,6 +145,11 @@ comments again on every push buries the review it is meant to support.
 file is a record of what your agents did on your machine, and a CI runner is
 neither.
 
+The CLI is installed once per job and then invoked as a local file. The
+analysis itself takes seconds; almost all of a slow run is npm, so pinning
+`version` to an exact release lets the runner's npm cache hit, where `latest`
+has to ask the registry what that means every time.
+
 ## Silencing a finding
 
 Sometimes a skip is deliberate — a test quarantined behind a real bug, waiting

@@ -28,7 +28,9 @@ inputs:
     required: false
     default: '.'
   version:
-    description: Version of overlock to run.
+    description: >-
+      Version of overlock to run. Pinning an exact version lets the runner's npm
+      cache hit; "latest" has to ask the registry what that means on every run.
     required: false
     default: 'latest'
   cli-path:
@@ -87,11 +89,43 @@ runs:
       run: |
         set -o pipefail
 
+        # Resolved once, then invoked as a local file.
+        #
+        # `npx -y overlock@latest` re-resolves the package against the registry
+        # on every call, and this step calls the CLI twice — once for the JSON
+        # report and once for the human-readable log. That is two downloads per
+        # job, each of which is a network round trip that can take minutes when
+        # the registry is slow, for a tool whose own analysis finishes in
+        # seconds. Installing once and running `node` twice makes the second
+        # invocation free.
         if [ -n "$CLI_PATH" ]; then
-          run_overlock() { node "$CLI_PATH" "$@"; }
+          cli="$CLI_PATH"
         else
-          run_overlock() { npx -y "overlock@$VERSION" "$@"; }
+          echo "::group::Install overlock@$VERSION"
+          install_dir="$RUNNER_TEMP/overlock-cli"
+          mkdir -p "$install_dir"
+          # --prefer-offline reuses the runner's npm cache when it has the
+          # tarball; --no-audit and --no-fund drop two registry calls that
+          # nothing here reads.
+          npm install --prefix "$install_dir" --no-save --no-audit --no-fund \
+            --prefer-offline --loglevel error "overlock@$VERSION"
+          # The bin path is read from the installed package rather than
+          # hardcoded, so a future change to the package layout does not
+          # silently break the action.
+          cli=$(INSTALL_DIR="$install_dir" node -e '
+            const { join, dirname } = require("node:path");
+            const manifest = require.resolve("overlock/package.json", {
+              paths: [process.env.INSTALL_DIR],
+            });
+            const { bin } = require(manifest);
+            const entry = typeof bin === "string" ? bin : bin.overlock;
+            process.stdout.write(join(dirname(manifest), entry));
+          ')
+          echo "using $cli"
+          echo "::endgroup::"
         fi
+
+        run_overlock() { node "$cli" "$@"; }
 
         report="$RUNNER_TEMP/overlock-report.json"
 

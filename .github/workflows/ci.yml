@@ -31,6 +31,7 @@ jobs:
   commitlint:
     name: commit messages
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -109,6 +110,7 @@ jobs:
     needs: [commitlint]
     if: needs.commitlint.outputs.code-changed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-pnpm
@@ -128,6 +130,7 @@ jobs:
     needs: [commitlint]
     if: needs.commitlint.outputs.code-changed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         # The package supports Node >= 20.11; pnpm 11 needs >= 22.13 to install,
@@ -158,6 +161,7 @@ jobs:
     needs: [commitlint]
     if: needs.commitlint.outputs.code-changed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-pnpm
@@ -218,6 +222,7 @@ jobs:
     needs: [commitlint]
     if: needs.commitlint.outputs.code-changed == 'true'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -245,6 +250,7 @@ jobs:
     needs: [commitlint]
     if: needs.commitlint.outputs.code-changed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-pnpm
@@ -269,6 +275,7 @@ jobs:
     needs: [commitlint]
     if: needs.commitlint.outputs.code-changed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-pnpm
@@ -290,6 +297,7 @@ jobs:
     needs: [commitlint]
     if: github.event_name == 'pull_request' && needs.commitlint.outputs.code-changed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       # The action posts a single findings comment, edited in place.
@@ -316,6 +324,7 @@ jobs:
     needs: [commitlint]
     if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
         with:

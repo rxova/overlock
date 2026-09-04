@@ -110,9 +110,21 @@ runs:
         echo "$home" >> "$GITHUB_PATH"
         echo "$home/bin" >> "$GITHUB_PATH"
 
+    # The ordinary path, taken on a cache miss. pnpm/action-setup installs pnpm
+    # with npm, so this is the one step in the job that must reach the npm
+    # registry before anything is cached, and it is where a registry outage was
+    # measured stalling for 4m52s. npm's default is 2 retries with a 5-minute
+    # timeout each; unlike pnpm, npm does honour these as environment
+    # variables, so the wait is capped here rather than left to the job
+    # timeout. A cold install is worth ~40s of patience, not five minutes.
     - name: Setup pnpm
       if: steps.restored.outputs.usable != 'true'
       uses: pnpm/action-setup@v6
+      env:
+        npm_config_fetch_timeout: '20000'
+        npm_config_fetch_retries: '1'
+        npm_config_fetch_retry_mintimeout: '5000'
+        npm_config_fetch_retry_maxtimeout: '10000'
 
     - name: Setup Node
       uses: actions/setup-node@v6

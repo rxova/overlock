@@ -7,8 +7,9 @@
  * enough that putting it here would train people to use --no-verify.
  */
 import { execSync } from 'node:child_process';
+import { isEntry } from './entry.js';
 
-const steps: [name: string, command: string][] = [
+export const STEPS: [name: string, command: string][] = [
   ['lint', 'pnpm lint'],
   ['format', 'pnpm format:check'],
   ['build', 'pnpm exec turbo run build'],
@@ -20,14 +21,38 @@ const steps: [name: string, command: string][] = [
   ['audit', 'pnpm run audit:check'],
 ];
 
-for (const [name, command] of steps) {
-  process.stdout.write(`\nverify: ${name}\n`);
-  try {
-    execSync(command, { stdio: 'inherit' });
-  } catch {
-    process.stderr.write(`\nverify: ${name} failed\n`);
-    process.exit(1);
-  }
-}
+/** Runs one step. Injected so the sequencing can be tested without running it. */
+export type Runner = (command: string) => void;
 
-process.stdout.write('\nverify: all checks passed\n');
+export const shell: Runner = (command) => {
+  execSync(command, { stdio: 'inherit' });
+};
+
+/**
+ * Stops at the first failure, because the second failure is usually the first
+ * one wearing a different hat. Returns the process exit code.
+ */
+export const verify = (
+  steps: [name: string, command: string][] = STEPS,
+  { run = shell }: { run?: Runner } = {},
+): number => {
+  for (const [name, command] of steps) {
+    process.stdout.write(`\nverify: ${name}\n`);
+    try {
+      run(command);
+    } catch {
+      process.stderr.write(`\nverify: ${name} failed\n`);
+      return 1;
+    }
+  }
+
+  process.stdout.write('\nverify: all checks passed\n');
+  return 0;
+};
+
+/* v8 ignore start -- the entry shell: running it for real runs the entire
+   pipeline, which is the thing this file exists to invoke. */
+if (isEntry(import.meta.url)) {
+  process.exit(verify());
+}
+/* v8 ignore stop */

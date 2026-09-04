@@ -23,28 +23,39 @@
  */
 import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
+import { isEntry } from './entry.js';
 
-const base = process.env.BASE_SHA;
-const head = process.env.HEAD_SHA;
+/** The only thing this module needs a repository for. Injected for tests. */
+export type Git = (...args: string[]) => string;
 
-const git = (...args: string[]): string =>
+export const git: Git = (...args) =>
   execFileSync('git', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
 
 /** True when the only edited lines in a file are its `"version":` line. */
-const versionBumpOnly = (file: string): boolean => {
-  const edits = git('diff', '--unified=0', `${base}...${head}`, '--', file)
+export const versionBumpOnly = (
+  file: string,
+  range: { base: string; head: string },
+  run: Git,
+): boolean => {
+  const edits = run('diff', '--unified=0', `${range.base}...${range.head}`, '--', file)
     .split('\n')
     .filter((line) => /^[+-]/.test(line) && !/^(\+\+\+|---)/.test(line));
   return edits.length > 0 && edits.every((line) => /^[+-]\s*"version":\s*"[^"]*",?\s*$/.test(line));
 };
 
 /** True when a path only ever carries release bookkeeping. */
-const isReleaseMetadata = (file: string): boolean =>
+export const isReleaseMetadata = (file: string): boolean =>
   (file.startsWith('.changeset/') && file.endsWith('.md')) ||
   file === 'CHANGELOG.md' ||
   file.endsWith('/CHANGELOG.md');
 
-const verdict = ((): { codeChanged: boolean; reason: string } => {
+export type Scope = { codeChanged: boolean; reason: string };
+
+export const decideScope = (
+  base: string | undefined,
+  head: string | undefined,
+  run: Git = git,
+): Scope => {
   // An initial push reports an all-zero `before`, and a force-push can report a
   // commit that is no longer reachable. Neither is a licence to skip.
   if (!base || !head || /^0+$/.test(base)) {
@@ -53,7 +64,7 @@ const verdict = ((): { codeChanged: boolean; reason: string } => {
 
   let changed: string[];
   try {
-    changed = git('diff', '--name-only', `${base}...${head}`).split('\n').filter(Boolean);
+    changed = run('diff', '--name-only', `${base}...${head}`).split('\n').filter(Boolean);
   } catch {
     return { codeChanged: true, reason: 'could not diff the range' };
   }
@@ -62,7 +73,9 @@ const verdict = ((): { codeChanged: boolean; reason: string } => {
 
   const releaseOnly = changed.every((file) => {
     if (isReleaseMetadata(file)) return true;
-    if (file === 'package.json' || file.endsWith('/package.json')) return versionBumpOnly(file);
+    if (file === 'package.json' || file.endsWith('/package.json')) {
+      return versionBumpOnly(file, { base, head }, run);
+    }
     return false;
   });
 
@@ -72,11 +85,27 @@ const verdict = ((): { codeChanged: boolean; reason: string } => {
         reason: `release commit — ${changed.length} file(s), version and changelog only`,
       }
     : { codeChanged: true, reason: `${changed.length} file(s) changed` };
-})();
+};
 
-console.log(`check-scope: ${verdict.reason}`);
-console.log(`check-scope: code-changed=${verdict.codeChanged}`);
+/** Returns the process exit code rather than taking it, so tests can call it. */
+export const main = (
+  env: NodeJS.ProcessEnv = process.env,
+  { run = git }: { run?: Git } = {},
+): number => {
+  const verdict = decideScope(env.BASE_SHA, env.HEAD_SHA, run);
 
-if (process.env.GITHUB_OUTPUT) {
-  appendFileSync(process.env.GITHUB_OUTPUT, `code-changed=${verdict.codeChanged}\n`);
+  console.log(`check-scope: ${verdict.reason}`);
+  console.log(`check-scope: code-changed=${verdict.codeChanged}`);
+
+  if (env.GITHUB_OUTPUT) {
+    appendFileSync(env.GITHUB_OUTPUT, `code-changed=${verdict.codeChanged}\n`);
+  }
+  return 0;
+};
+
+/* v8 ignore start -- the entry shell; covered by the test that spawns this
+   file, which reports no coverage back into this run. */
+if (isEntry(import.meta.url)) {
+  process.exit(main());
 }
+/* v8 ignore stop */

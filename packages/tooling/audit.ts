@@ -27,7 +27,7 @@
  */
 import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { isEntry } from './entry.js';
 
 /** Severities in the order `--audit-level` ranks them. */
 export const SEVERITIES = ['info', 'low', 'moderate', 'high', 'critical'] as const;
@@ -299,7 +299,7 @@ export const main = async (
 /* v8 ignore start -- the entry shell: it can only run in a child process, and
    nothing a child does is reported back into this run's coverage. It is covered
    by the test that spawns this file, which asserts the exit code it sets. */
-if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+if (isEntry(import.meta.url)) {
   process.exit(await main(process.argv.slice(2)));
 }
 /* v8 ignore stop */

@@ -408,3 +408,31 @@ describe('TEST_AND_IMPL_TOGETHER', () => {
     expect(rulesFor(diff)).not.toContain('TEST_AND_IMPL_TOGETHER');
   });
 });
+
+describe('TEST_AND_IMPL_TOGETHER and reformatting', () => {
+  const reflow = (path: string): string =>
+    diffOf(
+      path,
+      hunk(['-const value = {', '-  a: 1', '-};', '+const value = { a: 1 };'].join('\n')),
+    );
+
+  it('stays quiet when the implementation was only re-wrapped', () => {
+    const diff =
+      reflow('src/auth.ts') + diffOf('src/auth.test.ts', hunk("+  it('rejects', () => {})"));
+    expect(rulesFor(diff)).not.toContain('TEST_AND_IMPL_TOGETHER');
+  });
+
+  it('stays quiet when the test file was only re-wrapped', () => {
+    const diff =
+      diffOf('src/auth.ts', hunk(['-const a = 1;', '+const a = 2;'].join('\n'))) +
+      reflow('src/auth.test.ts');
+    expect(rulesFor(diff)).not.toContain('TEST_AND_IMPL_TOGETHER');
+  });
+
+  it('still fires when both really changed', () => {
+    const diff =
+      diffOf('src/auth.ts', hunk(['-const a = 1;', '+const a = 2;'].join('\n'))) +
+      diffOf('src/auth.test.ts', hunk("+  it('rejects', () => {})"));
+    expect(rulesFor(diff)).toContain('TEST_AND_IMPL_TOGETHER');
+  });
+});

@@ -1,7 +1,9 @@
 import { analyze } from './analyze.js';
+import { readFileSync } from 'node:fs';
 import {
   currentBranch,
   readDiff,
+  readMessages,
   repoRoot,
   resolveRange,
   untrackedDiff,
@@ -22,6 +24,12 @@ export interface RunOptions {
   ledger?: boolean;
   /** Include files git does not track yet. Default true, except for --staged. */
   untracked?: boolean;
+  /**
+   * A file holding extra text to read `Overlock-Allow:` trailers from — the
+   * pull request body, in the action. The commit messages in the range are read
+   * regardless.
+   */
+  allowFile?: string | undefined;
 }
 
 export interface RunResult {
@@ -42,6 +50,7 @@ export function run(options: RunOptions): RunResult {
     mode = 'check',
     ledger = true,
     untracked,
+    allowFile,
   } = options;
 
   const repo = repoRoot(cwd);
@@ -55,7 +64,18 @@ export function run(options: RunOptions): RunResult {
   const diff =
     readDiff(range, cwd) + (includeUntracked ? untrackedDiff(cwd, untrackedFiles(cwd)) : '');
 
-  const report = analyze({ diff, base: range, testGlobs, failOn, severities });
+  // Unreadable is the same as absent: a missing pull request body must never be
+  // the reason a gate stops gating.
+  let allowText = readMessages(range, cwd);
+  if (allowFile !== undefined) {
+    try {
+      allowText += `\n${readFileSync(allowFile, 'utf8')}`;
+    } catch {
+      // Nothing to add.
+    }
+  }
+
+  const report = analyze({ diff, base: range, testGlobs, failOn, severities, allowText });
 
   if (ledger) {
     appendLedger(toEntry({ report, repo, branch, mode, blocked: mode === 'hook' && !report.ok }));

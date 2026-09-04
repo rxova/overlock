@@ -174,7 +174,8 @@ and folded into a `<details>`, because a flat table that gives a blocking
 `TEST_REMOVED` the same weight as six `TEST_AND_IMPL_TOGETHER` rows makes you do
 the sorting the tool already did.
 
-`fail-on`, `severity`, `base`, `working-directory`, `version` and `comment` are all inputs;
+The comment leads with the rename when there is one. `fail-on`, `severity`, `base`,
+`working-directory`, `version` and `comment` are all inputs;
 `ok`, `findings` and `report` are outputs. The action never writes a ledger: that
 file is a record of what your agents did on your machine, and a CI runner is
 neither.
@@ -183,6 +184,65 @@ The CLI is installed once per job and then invoked as a local file. The
 analysis itself takes seconds; almost all of a slow run is npm, so pinning
 `version` to an exact release lets the runner's npm cache hit, where `latest`
 has to ask the registry what that means every time.
+
+## When the patch is a rename
+
+A rename touching six hundred files makes every line it touches look edited.
+Each finding is true, and none of them is what a reviewer wants: their question
+is _what changed that the rename does not explain?_
+
+overlock infers the substitution from the patch itself and answers that
+question directly:
+
+```
+overlock — 293 findings (293 low)  (origin/main)
+
+  rename detected  trainmotherfoca -> trainmf  (607 files, 6 casings)
+    293 findings consistent with it
+    0 unexplained
+
+293 findings the patch itself accounts for, not listed. `--json` has all of them.
+```
+
+Three lines instead of 293, and strictly more informative — the absence of
+anything else is an explicit claim rather than something you verify by reading
+a table. Whatever the substitution does _not_ account for is printed in full,
+above the fold.
+
+The same machinery sees through a formatter: a name that got thirteen
+characters shorter lets prettier re-join an import that no longer needs
+wrapping, and a file whose only delta is whitespace is not a change in any
+sense the rules mean.
+
+**What this deliberately does not do is decide anything.** An explained finding
+keeps its severity, still counts, and still blocks if it was going to. The
+inference is a heuristic, and a patch big enough to establish a rename is a
+patch big enough to hide one real edit inside — so a rename is never a reason
+the gate stops gating. It changes what you read first, not what you are told.
+
+Repeated findings are collapsed wherever they are printed. The same edit in
+twenty files is one row with a count, not twenty rows.
+
+## Acknowledging a whole patch
+
+The inline directive is the right shape for a finding about a line. It is the
+wrong shape for a rename, where using it means adding twenty comments to source
+files and deleting them again — worse than the noise it silences.
+
+Put a trailer in the commit message, or in the pull request body:
+
+```
+Overlock-Allow: TEST_AND_IMPL_TOGETHER -- rename only, no behaviour changed
+```
+
+Same ceiling as everywhere else: a named rule and a written reason, never a
+wildcard across rules, and a path may narrow it further. It is reported and
+counted like any other suppression, and the Stop hook quotes it back at you
+once, because a trailer is written by the patch by definition.
+
+It does nothing at Stop time. When the hook runs, the work is usually still
+uncommitted and there is no commit message to read — which is why this is an
+addition to the inline directive and not a replacement for it.
 
 ## Silencing a finding
 
@@ -273,6 +333,7 @@ overlock --json                  # the full report, for a script or an agent
 overlock --compact               # the short form a phone can read
 overlock --fail-on medium        # high | medium | low | none
 overlock --severity TEST_REMOVED=medium   # regrade one rule, repeatable
+overlock --allow-file pr-body.txt         # read Overlock-Allow trailers from a file
 overlock --test-glob '\.check\.ts$'
 overlock --no-untracked             # ignore files git does not track yet
 ```
@@ -313,6 +374,10 @@ changing what an existing ID means is a breaking one.
 `line` is `null` when the finding is about the file rather than a line in it —
 a deleted test file has no line 1 to send you to — and `id` is then
 `<rule>:<file>` with no line suffix.
+
+`explained_by` is present when the rest of the patch accounts for the change —
+`"trainmotherfoca -> trainmf"` or `"reformatting only"`. The report also
+carries `renames`, `explained` and `allowed` alongside `findings`.
 
 ## Programmatic use
 

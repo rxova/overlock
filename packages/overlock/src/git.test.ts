@@ -6,6 +6,7 @@ import {
   defaultBranch,
   hasCommits,
   readDiff,
+  readMessages,
   repoRoot,
   resolveRange,
 } from './git.js';
@@ -152,5 +153,48 @@ describe('readDiff', () => {
     r.git(['mv', 'a.test.ts', 'a.helpers.ts']);
 
     expect(readDiff('HEAD', r.dir)).toContain('rename to a.helpers.ts');
+  });
+});
+
+describe('readMessages', () => {
+  it('returns the commit messages in the range', () => {
+    const r = makeRepo();
+    r.write('src/a.test.ts', PASSING_TEST);
+    r.commit('feat: the base');
+    r.write('src/a.test.ts', SKIPPED_TEST);
+    r.git(['add', '-A']);
+    r.git(['commit', '-m', 'chore: quarantine\n\nOverlock-Allow: TEST_SKIPPED_ADDED -- see #412']);
+
+    expect(readMessages('HEAD~1', r.dir)).toContain('Overlock-Allow: TEST_SKIPPED_ADDED');
+  });
+
+  /**
+   * The honest answer for uncommitted work, which is the Stop hook's usual
+   * case: there is no commit message, so there is no trailer.
+   */
+  it('is empty for the working tree, the index and an empty repository', () => {
+    const r = makeRepo();
+    r.write('src/a.test.ts', PASSING_TEST);
+    r.commit('feat: the base');
+
+    expect(readMessages('HEAD', r.dir)).toBe('');
+    expect(readMessages('--cached', r.dir)).toBe('');
+    expect(readMessages(EMPTY_TREE, r.dir)).toBe('');
+  });
+
+  it('is empty rather than fatal when the range cannot be read', () => {
+    const r = makeRepo();
+    r.write('src/a.test.ts', PASSING_TEST);
+    r.commit('feat: the base');
+
+    expect(readMessages('no-such-ref', r.dir)).toBe('');
+  });
+
+  it('refuses a ref that git would read as an option', () => {
+    const r = makeRepo();
+    r.write('src/a.test.ts', PASSING_TEST);
+    r.commit('feat: the base');
+
+    expect(() => readMessages('--output=/tmp/pwned', r.dir)).toThrow(GitError);
   });
 });

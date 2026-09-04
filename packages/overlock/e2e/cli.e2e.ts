@@ -128,6 +128,38 @@ describe('overlock check', () => {
     expect(typo.stderr).toContain('known rule');
   });
 
+  it('honours an Overlock-Allow trailer in a commit message', () => {
+    const committed = (message: string): number => {
+      const r = weakenedRepo();
+      r.git(['add', '-A']);
+      r.git(['commit', '-m', message]);
+      // Against the previous commit, so the message just written is in the range.
+      const status = overlock(['check', '--base', 'HEAD~1'], { cwd: r.dir }).status;
+      // Two repositories in one test, and afterEach only knows about the last.
+      r.cleanup();
+      return status;
+    };
+
+    expect(committed('chore: quarantine the login test')).toBe(1);
+    expect(committed('chore: quarantine\n\nOverlock-Allow: TEST_SKIPPED_ADDED -- see #412')).toBe(
+      0,
+    );
+  });
+
+  it('reads Overlock-Allow trailers from --allow-file too', () => {
+    const r = weakenedRepo();
+    r.write(
+      'pr-body.txt',
+      'Overlock-Allow: TEST_SKIPPED_ADDED -- rename only, no behaviour change\n',
+    );
+
+    const result = overlock(
+      ['check', '--base', 'auto', '--allow-file', join(r.dir, 'pr-body.txt')],
+      { cwd: r.dir },
+    );
+    expect(result.status).toBe(0);
+  });
+
   it('checks only what is staged with --staged', () => {
     const r = weakenedRepo();
     expect(overlock(['check', '--staged'], { cwd: r.dir }).status).toBe(0);

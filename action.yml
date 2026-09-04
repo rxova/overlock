@@ -92,6 +92,7 @@ runs:
         BASE: ${{ steps.range.outputs.base }}
         FAIL_ON: ${{ inputs.fail-on }}
         SEVERITY: ${{ inputs.severity }}
+        PR_BODY: ${{ github.event.pull_request.body }}
         VERSION: ${{ inputs.version }}
         CLI_PATH: ${{ inputs.cli-path }}
       run: |
@@ -137,6 +138,13 @@ runs:
 
         report="$RUNNER_TEMP/overlock-report.json"
 
+        # `Overlock-Allow:` trailers are read from the commits in the range, and
+        # from the pull request body — which is where a reviewer of a six
+        # hundred file rename is actually looking. Through a file rather than an
+        # argument: the body is written by whoever opened the pull request.
+        allow="$RUNNER_TEMP/overlock-allow.txt"
+        printf '%s\n' "$PR_BODY" > "$allow"
+
         # One --severity flag per non-empty line. Built as an array rather than
         # a string so a value containing whitespace stays one argument, and with
         # an `if` rather than an `&&` list: `shell: bash` runs with -e, so a
@@ -153,7 +161,7 @@ runs:
         # A CI runner is neither, and it is thrown away, so nothing is written.
         set +e
         run_overlock check --base "$BASE" --fail-on "$FAIL_ON" "${severity_args[@]}" \
-          --no-ledger --json > "$report"
+          --allow-file "$allow" --no-ledger --json > "$report"
         status=$?
         set -e
 
@@ -178,7 +186,8 @@ runs:
 
         # The human-readable form in the log, regardless of pass or fail.
         set +e
-        run_overlock check --base "$BASE" --fail-on none "${severity_args[@]}" --no-ledger
+        run_overlock check --base "$BASE" --fail-on none "${severity_args[@]}" \
+          --allow-file "$allow" --no-ledger
         set -e
 
     - name: Comment on the pull request
@@ -221,6 +230,7 @@ runs:
           const where = (f) =>
             f.line == null ? cell(f.file) : cell(f.file) + ":" + (Number(f.line) || 0);
           const plural = (n, word) => n + " " + word + (n === 1 ? "" : "s");
+          const verb = (n, one, many) => (n === 1 ? one : many);
 
           const out = [process.env.MARKER, ""];
           const findings = report.findings || [];
@@ -228,13 +238,34 @@ runs:
           if (findings.length === 0) {
             out.push("**overlock**: nothing weakened in this patch.");
           } else {
-            const blocking = findings.filter(blocks);
-            const context = findings.filter((f) => !blocks(f));
+            // A rename is the patch, not a finding about it. Said first, and
+            // said as a claim: the number that matters is how much of this
+            // patch it does *not* account for.
+            const explained = findings.filter((f) => f.explained_by !== undefined);
+            const rest = findings.filter((f) => f.explained_by === undefined);
+            for (const rename of report.renames || []) {
+              const casings = rename.casings === 1 ? "" : ", " + rename.casings + " casings";
+              out.push(
+                "**rename detected** — `" + cell(rename.from) + "` to `" + cell(rename.to) +
+                  "` (" + rename.files + " files" + casings + "). " +
+                  explained.length + verb(explained.length, " finding is", " findings are") +
+                  " consistent with it; " + rest.length + verb(rest.length, " is", " are") +
+                  " not.",
+                "",
+              );
+            }
+
+            const blocking = rest.filter(blocks);
+            const context = rest.filter((f) => !blocks(f));
 
             const verdict =
               blocking.length > 0
-                ? plural(blocking.length, "finding") + " block this merge" +
-                  (context.length > 0 ? "; " + context.length + " more are context." : ".")
+                ? plural(blocking.length, "finding") +
+                  verb(blocking.length, " blocks", " block") + " this merge" +
+                  (context.length > 0
+                    ? "; " + context.length + " more " +
+                      verb(context.length, "is", "are") + " context."
+                    : ".")
                 : "nothing blocks this merge; " + plural(context.length, "finding") +
                   " worth a look.";
             out.push("**overlock** — " + verdict, "");
@@ -264,7 +295,8 @@ runs:
 
               out.push(
                 "<details><summary>" + plural(context.length, "finding") +
-                  " that do not block</summary>",
+                  verb(context.length, " that does not block", " that do not block") +
+                  "</summary>",
                 "",
                 "| Severity | Rule | Count | Where |",
                 "| --- | --- | --- | --- |",
@@ -280,10 +312,19 @@ runs:
               out.push("", "</details>", "");
             }
 
+            if (explained.length > 0 && (report.renames || []).length === 0) {
+              out.push(
+                plural(explained.length, "further finding") +
+                  verb(explained.length, " is", " are") + " accounted for by reformatting.",
+                "",
+              );
+            }
+
             out.push(
               "Silence one deliberately with `// overlock-ignore RULE_ID -- reason`, or " +
                 "`// overlock-ignore RULE_ID <path> -- reason` for a finding with no line " +
-                "of its own.",
+                "of its own. Acknowledge a whole patch with an `Overlock-Allow: RULE_ID -- " +
+                "reason` trailer in this description or a commit message.",
             );
           }
 

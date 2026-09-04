@@ -43,6 +43,83 @@ function severityColor(severity: Severity): string {
   return ANSI.dim;
 }
 
+/**
+ * Findings that are the same edit seen in several places, collapsed.
+ *
+ * Keyed on the rule and the evidence rather than the message, because the
+ * message names the file and the whole point is that the file is not the
+ * interesting part. Twenty rows saying `trainmotherfoca` became `trainmf` are
+ * one fact; printing them twenty times is how a patch of any size stops being
+ * readable.
+ */
+interface Group {
+  first: Finding;
+  files: string[];
+  count: number;
+}
+
+export function groupFindings(findings: Finding[]): Group[] {
+  const groups = new Map<string, Group>();
+
+  for (const f of findings) {
+    const key = [f.rule, f.severity, f.evidence.before ?? '', f.evidence.after ?? ''].join(
+      '\u0000',
+    );
+    const group = groups.get(key);
+    if (group === undefined) {
+      groups.set(key, { first: f, files: [f.file], count: 1 });
+      continue;
+    }
+    group.count += 1;
+    if (!group.files.includes(f.file)) group.files.push(f.file);
+  }
+
+  return [...groups.values()];
+}
+
+/** At most this many paths named before a group is summarised by its count. */
+const MAX_PATHS = 3;
+
+function groupWhere(group: Group): string {
+  if (group.count === 1) return where(group.first);
+  const shown = group.files.slice(0, MAX_PATHS).join(', ');
+  const rest = group.files.length - Math.min(group.files.length, MAX_PATHS);
+  return `${shown}${rest > 0 ? `, and ${rest} more` : ''}  (${group.count})`;
+}
+
+/**
+ * What the rest of the patch already accounts for, as a claim rather than a
+ * table.
+ *
+ * This is the block a reviewer actually reads on a rename: three lines that say
+ * what the patch is and, crucially, that nothing else is hiding in it. The
+ * absence of anything unexplained is the finding.
+ */
+function renameBlock(report: Report, color: boolean): string[] {
+  if (report.renames.length === 0) return [];
+
+  const lines: string[] = [];
+  for (const rename of report.renames) {
+    const casings = rename.casings === 1 ? '' : `, ${rename.casings} casings`;
+    lines.push(
+      paint(
+        `  rename detected  ${rename.from} -> ${rename.to}  (${rename.files} files${casings})`,
+        ANSI.bold,
+        color,
+      ),
+    );
+  }
+
+  const unexplained = report.findings.length - report.explained;
+  lines.push(paint(`    ${report.explained} findings consistent with it`, ANSI.dim, color));
+  lines.push(
+    paint(`    ${unexplained} unexplained`, unexplained === 0 ? ANSI.green : ANSI.yellow, color),
+  );
+  lines.push('');
+
+  return lines;
+}
+
 /** The terminal view: everything, grouped, with the evidence inline. */
 export function human(report: Report, color: boolean): string {
   if (report.findings.length === 0) {
@@ -59,11 +136,15 @@ export function human(report: Report, color: boolean): string {
       paint(`  (${describeBase(report.base)})${suppressedNote(report)}`, ANSI.dim, color),
   );
   lines.push('');
+  lines.push(...renameBlock(report, color));
 
-  for (const f of report.findings) {
+  const unexplained = report.findings.filter((f) => f.explained_by === undefined);
+
+  for (const group of groupFindings(unexplained)) {
+    const f = group.first;
     const head = `${MARK[f.severity]} ${LABEL[f.severity]}`;
     lines.push(
-      `${paint(head, severityColor(f.severity), color)}  ${where(f)}  ${paint(
+      `${paint(head, severityColor(f.severity), color)}  ${groupWhere(group)}  ${paint(
         f.rule,
         ANSI.dim,
         color,
@@ -74,6 +155,19 @@ export function human(report: Report, color: boolean): string {
     if (f.evidence.after) lines.push(paint(`     + ${f.evidence.after}`, ANSI.green, color));
     lines.push(paint(`     -> ${f.fix_hint}`, ANSI.dim, color));
     lines.push('');
+  }
+
+  // Stated, never silently dropped: the inference is a heuristic, and a count
+  // nobody can see is one nobody can distrust.
+  if (report.explained > 0) {
+    lines.push(
+      paint(
+        `${report.explained} finding${report.explained === 1 ? '' : 's'} the patch itself ` +
+          'accounts for, not listed. `--json` has all of them.',
+        ANSI.dim,
+        color,
+      ),
+    );
   }
 
   return lines.join('\n').trimEnd();
@@ -92,13 +186,25 @@ export function human(report: Report, color: boolean): string {
 export function compact(report: Report, limit = 3): string {
   if (report.findings.length === 0) return `overlock: clean.${suppressedNote(report)}`;
 
-  const shown = report.findings.slice(0, limit);
-  const hidden = report.findings.length - shown.length;
+  const unexplained = report.findings.filter((f) => f.explained_by === undefined);
+  const groups = groupFindings(unexplained);
+  const shown = groups.slice(0, limit);
+  const hidden = groups.length - shown.length;
 
   const lines: string[] = [`overlock: ${summarize(report)}.${suppressedNote(report)}`, ''];
 
-  for (const f of shown) {
-    lines.push(`${MARK[f.severity]} ${LABEL[f.severity].trim()} ${where(f)} ${f.rule}`);
+  const rename = report.renames[0];
+  if (rename !== undefined) {
+    lines.push(
+      `rename ${rename.from} -> ${rename.to} explains ${report.explained} of them; ` +
+        `${report.findings.length - report.explained} unexplained.`,
+      '',
+    );
+  }
+
+  for (const group of shown) {
+    const f = group.first;
+    lines.push(`${MARK[f.severity]} ${LABEL[f.severity].trim()} ${groupWhere(group)} ${f.rule}`);
     lines.push(`   ${f.message}`);
     const evidence = f.evidence.after ?? f.evidence.before;
     if (evidence) {

@@ -168,6 +168,25 @@ export function resolveRange(options: RangeOptions): string {
 /** git's canonical empty tree, so the first commit in a repo can be diffed. */
 export const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 
+/**
+ * The commit messages in the range, for `Overlock-Allow:` trailers.
+ *
+ * Empty for the working tree and for a staged check, which is the honest
+ * answer: uncommitted work has no commit message, so the trailer does nothing
+ * at Stop time. Failure is empty rather than fatal — a range with no commits in
+ * it is the normal case, not an error.
+ */
+export function readMessages(range: string, cwd: string): string {
+  if (range === '--cached' || range === EMPTY_TREE || range === 'HEAD') return '';
+
+  assertSafeRef(range);
+  try {
+    return git(['log', '--format=%B', `${range}..HEAD`, '--'], cwd);
+  } catch {
+    return '';
+  }
+}
+
 export function readDiff(range: string, cwd: string): string {
   const args = [
     'diff',

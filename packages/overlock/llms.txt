@@ -28,7 +28,7 @@ the test are not.
 
 - `overlock check` — the current patch. `--base <ref>`, `--staged`, `--json`,
   `--compact`, `--fail-on high|medium|low|none`, `--severity <rule>=<level>`,
-  `--test-glob <re>`, `--no-untracked`, `--no-ledger`.
+  `--test-glob <re>`, `--allow-file <path>`, `--no-untracked`, `--no-ledger`.
 - `overlock hook claude` — Claude Code Stop hook. Blocks on HIGH via exit 2 and
   `blockStopReason`; never blocks twice, so an unfixable finding cannot loop.
 - `overlock init claude|codex|cursor|copilot` — wire it into an agent. For Claude
@@ -98,6 +98,12 @@ same thing in its first line.
 `line` is `null` when the finding is about the file rather than a line in it — a
 deleted test file has no line 1 — and `id` is then `<rule>:<file>`.
 
+`explained_by` is present when the rest of the patch accounts for the change: a
+substitution the patch applies wholesale, or whitespace alone. Report those
+findings as consistent with the rename and lead with the ones that are not.
+An explained finding is still a finding — it keeps its severity and still
+blocks. The inference never decides anything on its own.
+
 ## Silencing a finding
 
 Only when a person has decided the finding is wrong or the skip is deliberate:
@@ -117,6 +123,16 @@ patch still has:
 The rule ID and the reason are both required; there is no wildcard, one quoted
 inside a string is not a directive, and it covers one rule on one line — or,
 when it names a path, only the findings in that path that have no line.
+
+A rename cannot be answered with hundreds of inline comments. The patch-level
+form is a trailer in a commit message or pull request body:
+
+```
+Overlock-Allow: TEST_AND_IMPL_TOGETHER -- rename only, no behaviour changed
+```
+
+It needs a written reason too, and it does nothing at Stop time, where
+uncommitted work has no commit message.
 
 **Do not add one to make a check pass.** A directive added by the same patch it
 silences stops the hook once and quotes your reason back to the person, so it

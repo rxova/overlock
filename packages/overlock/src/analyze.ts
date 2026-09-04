@@ -1,4 +1,6 @@
+import { applyAllowances, collectAllowances } from './allow.js';
 import { parseDiff } from './diff.js';
+import { explainPatch, type PatchExplanation } from './substitution.js';
 import { isTestFile } from './paths.js';
 import { RULES } from './rules/index.js';
 import { sanitize } from './rules/shared.js';
@@ -26,6 +28,12 @@ export interface AnalyzeOptions {
    * escape from one rule should not disarm four.
    */
   severities?: Partial<Record<RuleId, Severity>>;
+  /**
+   * Commit messages and pull request body for the patch, searched for
+   * `Overlock-Allow:` trailers. Empty at Stop time, where uncommitted work has
+   * no message to read.
+   */
+  allowText?: string;
 }
 
 /**
@@ -44,6 +52,7 @@ export function analyze(options: AnalyzeOptions): Report {
   const severities = options.severities ?? {};
 
   const files = parseDiff(diff);
+  const explanation = explainPatch(files);
   const ctx = {
     files,
     isTest: (path: string) => isTestFile(path, testGlobs),
@@ -54,7 +63,10 @@ export function analyze(options: AnalyzeOptions): Report {
     sortFindings(dedupe(raw)),
     collectSuppressions(files),
   );
-  const findings = kept;
+  const allowances = collectAllowances(options.allowText ?? '');
+  const { kept: standing, allowed, used: usedAllowances } = applyAllowances(kept, allowances);
+
+  const findings = standing.map((f) => annotate(f, explanation));
   const freshlyAdded = used.filter((s) => s.added);
 
   const counts: Record<Severity, number> = { high: 0, medium: 0, low: 0 };
@@ -71,7 +83,13 @@ export function analyze(options: AnalyzeOptions): Report {
     base,
     findings,
     counts,
-    suppressed: suppressed.length,
+    renames: explanation.renames,
+    explained: findings.filter((f) => f.explained_by !== undefined).length,
+    allowed: usedAllowances,
+    // Allowed findings are counted here too: a silenced finding that leaves no
+    // trace in the output is how a gate ends up passing everything, and the
+    // mechanism that silenced it does not change that.
+    suppressed: suppressed.length + allowed.length,
     suppressed_new: freshlyAdded.length,
     suppressions_new: freshlyAdded.map((s) => ({
       rule: s.rule,
@@ -80,6 +98,35 @@ export function analyze(options: AnalyzeOptions): Report {
       target: s.target,
       reason: sanitize(s.reason),
     })),
+  };
+}
+
+/**
+ * Marks a finding the rest of the patch accounts for.
+ *
+ * Evidence first, because it is the specific claim: these two lines are the
+ * same line with the substitution applied. Where a rule reports no before and
+ * after — a file-level finding — the file's own verdict stands in.
+ *
+ * Note what this deliberately does not do: it does not touch `severity`, and it
+ * is not subtracted from `ok`. An inferred substitution is a heuristic, and a
+ * patch large enough to establish one is a patch large enough to hide a real
+ * edit inside. Deciding a rename is fine is a person's call, and
+ * `Overlock-Allow:` is where they make it.
+ */
+function annotate(f: Finding, explanation: PatchExplanation): Finding {
+  const { before, after } = f.evidence;
+  const verdict =
+    (before !== undefined && after !== undefined
+      ? explanation.explainsEdit(before, after)
+      : null) ??
+    explanation.files.get(f.file) ??
+    null;
+
+  if (verdict === null) return f;
+  return {
+    ...f,
+    explained_by: verdict === 'rename' ? (explanation.label ?? 'a rename') : 'reformatting only',
   };
 }
 

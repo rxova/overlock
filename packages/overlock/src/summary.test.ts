@@ -96,7 +96,10 @@ describe('summarize', () => {
   it('counts a run once however many rules fired', () => {
     const s = summarize([entry({ rules: [...high, ...high] })], { now: NOW });
     expect(s.caught).toBe(1);
-    expect(s.byRule[0]?.count).toBe(2);
+    // Runs, not findings: one mass rename produces hundreds of findings in a
+    // single run, and counting them individually would let one afternoon's
+    // refactor dominate a month of history.
+    expect(s.byRule[0]?.count).toBe(1);
   });
 
   it('honours the day window', () => {
@@ -131,11 +134,15 @@ describe('summarize', () => {
     ]);
   });
 
-  it('orders rules by frequency', () => {
-    const s = summarize([entry({ rules: [...high, ...high] }), entry({ rules: low })], {
-      now: NOW,
-    });
-    expect(s.byRule.map((r) => r.rule)).toEqual(['TEST_SKIPPED_ADDED', 'TEST_AND_IMPL_TOGETHER']);
+  it('orders rules by how many runs they fired in', () => {
+    const s = summarize(
+      [entry({ rules: high }), entry({ rules: [...high, ...low] }), entry({ rules: high })],
+      { now: NOW },
+    );
+    expect(s.byRule).toEqual([
+      { rule: 'TEST_SKIPPED_ADDED', count: 3 },
+      { rule: 'TEST_AND_IMPL_TOGETHER', count: 1 },
+    ]);
   });
 
   it('survives a row written before `suppressed` existed', () => {

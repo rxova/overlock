@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from './run.js';
 import { ledgerPath } from './ledger.js';
@@ -59,5 +59,35 @@ describe('run', () => {
   it('honours OVERLOCK_LEDGER for the default path', () => {
     process.env.OVERLOCK_LEDGER = '/tmp/explicit.jsonl';
     expect(ledgerPath(process.env)).toBe('/tmp/explicit.jsonl');
+  });
+});
+
+describe('reading Overlock-Allow trailers from a file', () => {
+  it('applies what the file says', () => {
+    const r = repoWithWeakenedTest();
+    const body = join(r.dir, 'pr-body.txt');
+    writeFileSync(body, 'Overlock-Allow: TEST_SKIPPED_ADDED -- quarantined pending #412\n', 'utf8');
+
+    const { report } = run({ cwd: r.dir, base: 'auto', ledger: false, allowFile: body });
+
+    expect(report.findings).toEqual([]);
+    expect(report.allowed[0]?.reason).toBe('quarantined pending #412');
+  });
+
+  /**
+   * A missing pull request body must never be the reason a gate stops gating,
+   * so an unreadable file is the same as no file.
+   */
+  it('carries on when the file is not there', () => {
+    const r = repoWithWeakenedTest();
+    const { report } = run({
+      cwd: r.dir,
+      base: 'auto',
+      ledger: false,
+      allowFile: join(r.dir, 'no-such-file.txt'),
+    });
+
+    expect(report.findings).not.toEqual([]);
+    expect(report.allowed).toEqual([]);
   });
 });

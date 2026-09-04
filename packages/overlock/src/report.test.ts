@@ -109,3 +109,61 @@ describe('useColor', () => {
     expect(useColor({}, {})).toBe(false);
   });
 });
+
+describe('grouping repeated findings', () => {
+  /**
+   * The same edit in twenty files is one fact. Printing it twenty times is what
+   * made a rename unreadable on the phone this output is written for.
+   */
+  const repeated = ['a', 'b', 'c', 'd', 'e']
+    .map((name) => diffOf(`src/${name}.test.ts`, hunk(`+  it.skip('rejects', () => {})`)))
+    .join('');
+
+  it('collapses identical findings into one row with a count', () => {
+    const text = human(analyze({ diff: repeated }), false);
+    const rows = text.split('\n').filter((l) => l.includes('TEST_SKIPPED_ADDED'));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toContain('(5)');
+    expect(rows[0]).toContain('and 2 more');
+  });
+
+  it('leaves a single finding exactly as it was', () => {
+    const one = diffOf('src/a.test.ts', hunk(`+  it.skip('rejects', () => {})`));
+    expect(human(analyze({ diff: one }), false)).toContain('src/a.test.ts:1  TEST_SKIPPED_ADDED');
+  });
+});
+
+describe('a patch the rest of the patch explains', () => {
+  const rename = [1, 2, 3]
+    .map((n) =>
+      diffOf(
+        `src/mod${n}.test.ts`,
+        hunk(
+          [
+            `-  it('trainmotherfoca handles ${n}', () => {`,
+            `-    expect(trainmotherfoca.run(${n})).toBe(${n});`,
+            `+  it('trainmf handles ${n}', () => {`,
+            `+    expect(trainmf.run(${n})).toBe(${n});`,
+          ].join('\n'),
+        ),
+      ),
+    )
+    .join('');
+
+  const report = analyze({ diff: rename });
+
+  it('leads with the rename and the residual', () => {
+    const text = human(report, false);
+    expect(text).toContain('rename detected  trainmotherfoca -> trainmf');
+    expect(text).toContain('0 unexplained');
+  });
+
+  it('states what it did not list rather than dropping it silently', () => {
+    expect(human(report, false)).toContain('the patch itself accounts for, not listed');
+  });
+
+  it('says the same thing in the form a phone can read', () => {
+    expect(compact(report)).toContain('trainmotherfoca -> trainmf explains');
+  });
+});

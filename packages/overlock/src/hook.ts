@@ -24,12 +24,21 @@ interface StopPayload {
  * the claim is the thing being put to the person.
  */
 function suppressionNotice(report: Report): string {
-  const lines = [`overlock: this patch silenced ${report.suppressed_new} of its own findings.`, ''];
+  const silenced = report.suppressed_new + report.allowed.length;
+  const lines = [`overlock: this patch silenced ${silenced} of its own findings.`, ''];
 
   for (const s of report.suppressions_new) {
     const covers = s.target === null ? '' : ` (covering ${s.target})`;
     lines.push(`! ${s.file}:${s.line} ${s.rule}${covers}`);
     lines.push(`   overlock-ignore ... -- ${s.reason}`);
+  }
+
+  // A trailer is written by the patch by definition — it lives in the commit
+  // message of a commit in the range — so it is quoted back on the same terms.
+  for (const a of report.allowed) {
+    const covers = a.target === null ? '' : ` (covering ${a.target})`;
+    lines.push(`! commit message ${a.rule}${covers}`);
+    lines.push(`   Overlock-Allow: ... -- ${a.reason}`);
   }
 
   return lines.join('\n');
@@ -61,7 +70,7 @@ export function stopHookOutcome(report: Report, payload: StopPayload): HookOutco
   // nothing, which on a phone is indistinguishable from a clean run. Stopping
   // once is what puts the claim in front of the person: they can accept it and
   // carry on, but they cannot miss it.
-  const laundered = report.ok && report.suppressed_new > 0;
+  const laundered = report.ok && (report.suppressed_new > 0 || report.allowed.length > 0);
   const reason = laundered ? suppressionNotice(report) : compact(report);
 
   if (report.ok && !laundered) {

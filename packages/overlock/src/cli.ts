@@ -40,8 +40,18 @@ CHECK OPTIONS
   --limit <n>        Findings shown in --compact. Default: 3
   --test-glob <re>   Extra regex marking a path as a test file (repeatable)
   --cwd <dir>        Run against this directory
+  --allow-file <f>   Also read Overlock-Allow trailers from this file
   --no-untracked     Skip files git does not track yet (they are included by default)
   --no-ledger        Do not record this run in ~/.overlock/ledger.jsonl
+
+ACKNOWLEDGING A WHOLE PATCH
+  A rename touching six hundred files cannot be answered with six hundred
+  comments. Put a trailer in the commit message or the pull request body:
+
+    Overlock-Allow: TEST_AND_IMPL_TOGETHER -- rename, no behaviour changed
+
+  It needs a written reason like everything else here, and it does nothing at
+  Stop time: uncommitted work has no commit message to read.
 
 SILENCING A FINDING
   Put a comment on the offending line, or the line above it:
@@ -80,6 +90,7 @@ export interface ParsedArgs {
   days: number;
   testGlobs: RegExp[];
   severities: Partial<Record<RuleId, Severity>>;
+  allowFile?: string;
   cwd: string;
   ledger: boolean;
   untracked: boolean;
@@ -157,6 +168,9 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
         break;
       case '--cwd':
         parsed.cwd = value('--cwd');
+        break;
+      case '--allow-file':
+        parsed.allowFile = value('--allow-file');
         break;
       case '--days': {
         const days = Number(value('--days'));
@@ -257,6 +271,7 @@ export function main(argv: string[], io: Io): number {
       staged: args.staged,
       failOn: args.failOn,
       severities: args.severities,
+      allowFile: args.allowFile,
       testGlobs: args.testGlobs,
       mode: args.command === 'hook' ? 'hook' : 'check',
       ledger: args.ledger,

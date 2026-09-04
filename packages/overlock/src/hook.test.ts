@@ -45,3 +45,29 @@ describe('stopHookOutcome', () => {
     expect(outcome.stderr).toContain('not blocking again');
   });
 });
+
+/**
+ * A trailer is written by the patch by definition — it lives in the commit
+ * message of a commit in the range — so the hook puts the claim in front of the
+ * person on the same terms as a directive the patch wrote for itself.
+ */
+describe('a patch that acknowledged itself with a trailer', () => {
+  const allowed = analyze({
+    diff: diffOf('src/a.test.ts', hunk("+  it.skip('x', () => {})")),
+    allowText: 'Overlock-Allow: TEST_SKIPPED_ADDED src/a.test.ts -- quarantined pending #412',
+  });
+
+  it('stops once and quotes the reason back', () => {
+    expect(allowed.ok).toBe(true);
+
+    const outcome = stopHookOutcome(allowed, {});
+    expect(outcome.exitCode).toBe(2);
+    expect(outcome.stderr).toContain('silenced 1 of its own findings');
+    expect(outcome.stderr).toContain('quarantined pending #412');
+    expect(outcome.stderr).toContain('covering src/a.test.ts');
+  });
+
+  it('does not stop twice', () => {
+    expect(stopHookOutcome(allowed, { stop_hook_active: true }).exitCode).toBe(0);
+  });
+});

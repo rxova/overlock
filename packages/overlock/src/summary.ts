@@ -59,6 +59,14 @@ export interface Summary {
   blocked: number;
   suppressed: number;
   repos: number;
+  /**
+   * Runs in which each rule fired, not findings.
+   *
+   * One mass rename produces hundreds of findings in a single run, and counting
+   * them individually lets one afternoon's refactor dominate a month of
+   * history. Counting runs is also what `caught`, `noted` and `blocked` already
+   * do, so the whole summary answers questions of the same shape.
+   */
   byRule: { rule: RuleId; count: number }[];
   bySeverity: Record<Severity, number>;
   byRepo: { repo: string; caught: number }[];
@@ -99,9 +107,11 @@ export function summarize(entries: LedgerEntry[], window: Window = {}): Summary 
     if (entry.blocked) blocked += 1;
     suppressed += entry.suppressed ?? 0;
 
-    for (const r of rules) {
-      byRule.set(r.rule as RuleId, (byRule.get(r.rule as RuleId) ?? 0) + 1);
-      bySeverity[r.severity] += 1;
+    for (const rule of new Set(rules.map((r) => r.rule as RuleId))) {
+      byRule.set(rule, (byRule.get(rule) ?? 0) + 1);
+    }
+    for (const severity of new Set(rules.map((r) => r.severity))) {
+      bySeverity[severity] += 1;
     }
   }
 

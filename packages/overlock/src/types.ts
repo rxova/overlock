@@ -18,6 +18,23 @@
  */
 export type Severity = 'high' | 'medium' | 'low';
 
+/**
+ * A substitution the patch applies wholesale, inferred from the patch itself.
+ *
+ * Part of the wire contract rather than an internal shape, because the number
+ * a reviewer wants — how much of this patch the rename accounts for — is only
+ * useful if a dashboard can read it too.
+ */
+export interface Rename {
+  /** The most frequent casing, which is what the headline says. */
+  from: string;
+  to: string;
+  /** Casing variants folded into this one rename. */
+  casings: number;
+  files: number;
+  count: number;
+}
+
 export const RULE_IDS = [
   'TEST_REMOVED',
   'TEST_SKIPPED_ADDED',
@@ -62,6 +79,17 @@ export interface Finding {
   message: string;
   evidence: Evidence;
   fix_hint: string;
+  /**
+   * What else in the patch accounts for this change, when something does.
+   *
+   * A mass rename makes every line it touches look edited, and a formatter
+   * re-wrapping a line that got shorter does the same. Both are true findings
+   * and neither is what a reviewer is looking for, so they are marked rather
+   * than dropped: the inference is a heuristic, and a heuristic that removed
+   * findings on its own would be a way to launder a real edit through a big
+   * enough rename.
+   */
+  explained_by?: string;
 }
 
 export interface Report {
@@ -86,6 +114,26 @@ export interface Report {
    * and the Stop hook stops once for it.
    */
   suppressed_new: number;
+  /**
+   * Substitutions the patch applies wholesale, inferred from the patch itself.
+   *
+   * Reported so that the answer to "what changed that the rename does not
+   * explain?" is a number rather than an exercise for the reviewer.
+   */
+  renames: Rename[];
+  /** Findings a rename or a reformat accounts for. Never subtracted from `ok`. */
+  explained: number;
+  /**
+   * Patch-level acknowledgements read from the commit messages in the range,
+   * and from the pull request body when the caller supplies it.
+   *
+   * The inline directive is the right shape for a finding about a line. It is
+   * the wrong shape for a rename touching six hundred files, where using it
+   * means adding twenty comments to source files and deleting them again —
+   * worse than the noise it silences. This is the proportionate form: one
+   * written reason, in the artifact the reviewer is already reading.
+   */
+  allowed: { rule: RuleId; target: string | null; reason: string }[];
   /** What the new directives claimed, so a human can judge the claim. */
   suppressions_new: {
     rule: RuleId;

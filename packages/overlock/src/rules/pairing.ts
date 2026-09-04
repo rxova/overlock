@@ -1,4 +1,5 @@
 import { isSnapshotFile, sourceSubject, testSubject } from '../paths.js';
+import { isReformatOnly } from '../substitution.js';
 import type { Finding } from '../types.js';
 import { finding, productionFiles, type Rule, type RuleContext } from './shared.js';
 
@@ -36,11 +37,18 @@ export const testAndImplTogether: Rule = {
     const production = productionFiles(ctx);
     if (production.length === 0) return [];
 
-    const subjects = new Map(production.map((f) => [sourceSubject(f.path), f.path]));
+    // A file whose only delta is whitespace did not change in any sense this
+    // rule means. It happens for real: a rename that shortens a name lets a
+    // formatter re-join lines that no longer need wrapping, and firing on that
+    // is true by the letter and false in spirit.
+    const subjects = new Map(
+      production.filter((f) => !isReformatOnly(f)).map((f) => [sourceSubject(f.path), f.path]),
+    );
     const findings: Finding[] = [];
 
     for (const file of ctx.files) {
       if (!ctx.isTest(file.path) || file.status === 'deleted') continue;
+      if (isReformatOnly(file)) continue;
       const subject = testSubject(file.path);
       if (!subject) continue;
       const impl = subjects.get(subject);

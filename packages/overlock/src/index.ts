@@ -1,4 +1,13 @@
 export { analyze, type AnalyzeOptions } from './analyze.js';
+export {
+  CONFIG_FILE,
+  CONFIG_KEY,
+  ConfigError,
+  loadConfig,
+  parseConfig,
+  type LoadedConfig,
+  type OverlockConfig,
+} from './config.js';
 export { parseDiff, addedLines, removedLines } from './diff.js';
 export {
   assertSafeRef,

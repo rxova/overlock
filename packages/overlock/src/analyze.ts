@@ -82,6 +82,7 @@ export function analyze(options: AnalyzeOptions): Report {
     schema: 1,
     ok,
     base,
+    fail_on: failOn,
     findings,
     counts,
     renames: explanation.renames,

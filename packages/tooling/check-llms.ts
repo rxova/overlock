@@ -16,6 +16,7 @@ export const COMMANDS = [
   'overlock init',
   'overlock report',
   'overlock mcp',
+  'overlock config',
 ] as const;
 
 /** Anything that looks like a rule ID: SCREAMING_SNAKE, seven characters up. */

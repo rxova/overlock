@@ -339,6 +339,7 @@ overlock --severity TEST_REMOVED=medium   # regrade one rule, repeatable
 overlock --allow-file pr-body.txt         # read Overlock-Allow trailers from a file
 overlock --test-glob '\.check\.ts$'
 overlock --no-untracked             # ignore files git does not track yet
+overlock config                  # the settings in force, and where from
 ```
 
 Exit codes: `0` clean, `1` findings at or above `--fail-on`, `2` overlock
@@ -363,6 +364,44 @@ and a range that turned out to hold nothing is reported as such rather than as a
 pass. `--fail-on-empty` turns that into exit 1; `--explain-base` prints how the
 base was chosen, which is the quickest way to find out why a run saw less than
 you expected.
+
+## Repository settings
+
+One repository, one answer. `overlock.config.json` beside your `package.json` —
+or an `overlock` key inside it — is read by the CLI, the Stop hook and the
+GitHub action alike, so the same patch cannot pass locally and block in CI with
+nothing to point at:
+
+```json
+{
+  "base": "origin/main",
+  "baseMode": "fork-point",
+  "failOn": "high",
+  "failOnEmpty": false,
+  "severity": { "TEST_REMOVED": "medium" },
+  "testGlob": ["\\.check\\.ts$"],
+  "untracked": true
+}
+```
+
+A flag always wins over the file — the file is the default, not a cage. The
+nearest declaration at or above the working directory is the one that applies,
+so a package in a monorepo can have its own answer. `--config <file>` points at
+one directly; `--no-config` ignores the search entirely.
+
+An unknown setting or a bad value stops the run with exit 2. A `failon` typo
+that silently did nothing would leave you certain a rule was graded down and
+finding out otherwise from a blocked merge, which is the failure this file
+exists to remove.
+
+`overlock config` prints what is in force and where each value came from:
+
+```
+overlock: /repo/overlock.config.json
+  base = "origin/main"  (config)
+  baseMode = "fork-point"  (default)
+  failOn = "low"  (flag)
+```
 
 ## The JSON contract
 

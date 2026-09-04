@@ -24,6 +24,13 @@ marker, re-adding an assertion or putting a threshold back is the fix. Editing
 overlock's output, adding a suppression without reading the finding, or deleting
 the test are not.
 
+## Settings
+
+`overlock.config.json` beside package.json — or an `overlock` key inside it — is
+read by the CLI, the Stop hook and the GitHub action alike: `base`, `baseMode`,
+`failOn`, `failOnEmpty`, `severity`, `testGlob`, `untracked`. A flag always wins
+over the file. An unknown setting or a bad value is an error, not a warning.
+
 ## Commands
 
 - `overlock check` — the current patch. `--base <ref>` (the fork point with that
@@ -39,6 +46,8 @@ the test are not.
 - `overlock report [--days N]` — what the local ledger recorded. History only.
 - `overlock mcp` — serve over stdio as MCP. Tools: `overlock_check`,
   `overlock_report`.
+- `overlock config` — the settings in force and where each came from. `--json`
+  for the same as data.
 
 ## What it looks for
 

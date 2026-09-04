@@ -299,6 +299,88 @@ describe('which patch got examined', () => {
   });
 });
 
+describe('repository settings', () => {
+  it('obeys the file, and says so', () => {
+    const r = weakenedRepo();
+    r.write('overlock.config.json', JSON.stringify({ failOn: 'none' }));
+
+    // The finding is still reported; the threshold it is measured against is
+    // what the file changed.
+    const result = overlock(['check'], { cwd: r.dir });
+    expect(result.stdout).toContain('TEST_SKIPPED_ADDED');
+    expect(result.status).toBe(0);
+  });
+
+  it('lets a flag win over the file', () => {
+    const r = weakenedRepo();
+    r.write('overlock.config.json', JSON.stringify({ failOn: 'none' }));
+    expect(overlock(['check', '--fail-on', 'high'], { cwd: r.dir }).status).toBe(1);
+  });
+
+  it('can be told to ignore the file', () => {
+    const r = weakenedRepo();
+    r.write('overlock.config.json', JSON.stringify({ failOn: 'none' }));
+    expect(overlock(['check', '--no-config'], { cwd: r.dir }).status).toBe(1);
+  });
+
+  it('reads a file it is pointed at', () => {
+    const r = weakenedRepo();
+    r.write('ci/policy.json', JSON.stringify({ failOn: 'none' }));
+    expect(overlock(['check', '--config', 'ci/policy.json'], { cwd: r.dir }).status).toBe(0);
+  });
+
+  it('refuses to run on a setting it does not understand', () => {
+    const r = weakenedRepo();
+    r.write('overlock.config.json', JSON.stringify({ failon: 'none' }));
+
+    const result = overlock(['check'], { cwd: r.dir });
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('unknown setting "failon"');
+  });
+
+  it('grades a rule from the file', () => {
+    const r = weakenedRepo();
+    r.write('overlock.config.json', JSON.stringify({ severity: { TEST_SKIPPED_ADDED: 'low' } }));
+    expect(overlock(['check'], { cwd: r.dir }).status).toBe(0);
+  });
+
+  it('prints what is in force and where each answer came from', () => {
+    const r = cleanRepo();
+    r.write('overlock.config.json', JSON.stringify({ failOn: 'medium' }));
+
+    const result = overlock(['config', '--fail-on', 'low'], { cwd: r.dir });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('overlock.config.json');
+    expect(result.stdout).toContain('failOn = "low"  (flag)');
+    expect(result.stdout).toContain('baseMode = "fork-point"  (default)');
+  });
+
+  it('prints the same thing as data', () => {
+    const r = cleanRepo();
+    r.write('overlock.config.json', JSON.stringify({ failOn: 'medium' }));
+
+    const parsed: unknown = JSON.parse(overlock(['config', '--json'], { cwd: r.dir }).stdout);
+    expect(parsed).toMatchObject({
+      declared: { failOn: 'medium' },
+      effective: { failOn: 'medium', base: 'auto' },
+      from: { failOn: 'config', base: 'default' },
+    });
+  });
+
+  it('says plainly when there is no file at all', () => {
+    const r = cleanRepo();
+    expect(overlock(['config'], { cwd: r.dir }).stdout).toContain('no config file');
+  });
+
+  it('reports the threshold it applied, for whoever renders the result', () => {
+    const r = weakenedRepo();
+    r.write('overlock.config.json', JSON.stringify({ failOn: 'medium' }));
+
+    const report: unknown = JSON.parse(overlock(['check', '--json'], { cwd: r.dir }).stdout);
+    expect(report).toMatchObject({ fail_on: 'medium' });
+  });
+});
+
 describe('overlock hook claude', () => {
   it('blocks with exit 2 and the documented JSON on stdout', () => {
     const r = weakenedRepo();

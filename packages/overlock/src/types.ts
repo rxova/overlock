@@ -99,6 +99,12 @@ export interface Report {
   /** The git range actually analysed, as resolved — never the literal `auto`. */
   base: string;
   /**
+   * The threshold `ok` was decided against. Reported so that a consumer showing
+   * "findings at or above X" reads X from the run rather than from its own idea
+   * of the default, which is how two surfaces come to disagree in public.
+   */
+  fail_on: Severity | 'none';
+  /**
    * How much that range covered. Present whenever the report came from a run
    * against a repository; absent when `analyze` was handed a diff directly,
    * which has no repository to count against.

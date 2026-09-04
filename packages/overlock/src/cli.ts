@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
+import { CONFIG_FILE, loadConfig, type OverlockConfig } from './config.js';
 import { type BaseMode, GitError, repoRoot } from './git.js';
 import { parseStopPayload, stopHookOutcome } from './hook.js';
 import {
@@ -27,6 +28,7 @@ USAGE
   overlock init <agent>          Wire it into an agent: ${AGENTS.join(', ')}
   overlock report [--days N]     What the ledger has been recording
   overlock mcp                   Serve as an MCP tool over stdio
+  overlock config                Show the settings in force, and where from
 
 CHECK OPTIONS
   --base <ref>       Diff against where this branch left <ref>. Default: auto
@@ -48,6 +50,19 @@ CHECK OPTIONS
   --allow-file <f>   Also read Overlock-Allow trailers from this file
   --no-untracked     Skip files git does not track yet (they are included by default)
   --no-ledger        Do not record this run in ~/.overlock/ledger.jsonl
+  --config <file>    Read settings from this file instead of searching
+  --no-config        Ignore ${CONFIG_FILE} entirely
+
+REPOSITORY SETTINGS
+  ${CONFIG_FILE} beside your package.json — or an "overlock" key
+  inside it — is read by the CLI, the Stop hook and the GitHub action alike, so
+  one repository has one answer instead of three:
+
+    { "base": "origin/main", "failOn": "high",
+      "severity": { "TEST_REMOVED": "medium" },
+      "testGlob": ["\\.check\\.ts$"] }
+
+  A flag always wins over the file. "overlock config" prints what is in force.
 
 ACKNOWLEDGING A WHOLE PATCH
   A rename touching six hundred files cannot be answered with six hundred
@@ -85,7 +100,7 @@ Findings are advisory. The tool reads a diff; it never edits your code, and it
 makes no network calls.`;
 
 export interface ParsedArgs {
-  command: 'check' | 'hook' | 'init' | 'report' | 'mcp' | 'help' | 'version';
+  command: 'check' | 'hook' | 'init' | 'report' | 'mcp' | 'config' | 'help' | 'version';
   target?: string;
   base?: string;
   baseMode: BaseMode;
@@ -102,6 +117,10 @@ export interface ParsedArgs {
   cwd: string;
   ledger: boolean;
   untracked: boolean;
+  configPath?: string;
+  config: boolean;
+  /** Flags the caller actually passed, so the file never overrides them. */
+  explicit: Set<string>;
 }
 
 export class UsageError extends Error {}
@@ -122,13 +141,15 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
     cwd,
     ledger: true,
     untracked: true,
+    config: true,
+    explicit: new Set<string>(),
   };
 
   const rest = [...argv];
   const first = rest[0];
 
   if (first !== undefined && !first.startsWith('-')) {
-    const commands = ['check', 'hook', 'init', 'report', 'mcp'] as const;
+    const commands = ['check', 'hook', 'init', 'report', 'mcp', 'config'] as const;
     if (!(commands as readonly string[]).includes(first)) {
       throw new UsageError(`Unknown command: ${first}`);
     }
@@ -149,6 +170,7 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
 
   while (rest.length > 0) {
     const arg = rest.shift() as string;
+    parsed.explicit.add(arg);
 
     switch (arg) {
       case '-h':
@@ -170,6 +192,12 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
         break;
       case '--no-ledger':
         parsed.ledger = false;
+        break;
+      case '--no-config':
+        parsed.config = false;
+        break;
+      case '--config':
+        parsed.configPath = value('--config');
         break;
       case '--no-untracked':
         parsed.untracked = false;
@@ -254,6 +282,34 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
   return parsed;
 }
 
+/**
+ * Fills in what the caller did not say. A flag that was passed is left alone,
+ * including a `--no-` flag, which is a decision like any other.
+ */
+export function applyConfig(args: ParsedArgs, config: OverlockConfig): ParsedArgs {
+  const said = (...flags: string[]): boolean => flags.some((f) => args.explicit.has(f));
+
+  if (config.base !== undefined && !said('--base')) args.base = config.base;
+  if (config.baseMode !== undefined && !said('--base-mode')) args.baseMode = config.baseMode;
+  if (config.failOn !== undefined && !said('--fail-on')) args.failOn = config.failOn;
+  if (config.failOnEmpty !== undefined && !said('--fail-on-empty')) {
+    args.failOnEmpty = config.failOnEmpty;
+  }
+  if (config.untracked !== undefined && !said('--no-untracked')) args.untracked = config.untracked;
+
+  // The repeatable options are all-or-nothing rather than merged: a caller
+  // passing one --severity means that list, and quietly adding the file's
+  // entries to it would produce a policy nobody wrote down anywhere.
+  if (config.severity !== undefined && !said('--severity')) {
+    args.severities = { ...config.severity };
+  }
+  if (config.testGlob !== undefined && !said('--test-glob')) {
+    args.testGlobs = config.testGlob.map((pattern) => new RegExp(pattern));
+  }
+
+  return args;
+}
+
 export interface Io {
   stdout: (text: string) => void;
   stderr: (text: string) => void;
@@ -282,7 +338,25 @@ export function main(argv: string[], io: Io): number {
     return 0;
   }
 
+  let settings: OverlockConfig = {};
+  let settingsPath: string | null = null;
   try {
+    if (args.config) {
+      const loaded = loadConfig({ cwd: args.cwd, path: args.configPath });
+      settings = loaded.config;
+      settingsPath = loaded.path;
+      applyConfig(args, settings);
+    }
+  } catch (error) {
+    // A declared policy that cannot be read is not a policy. Failing here is
+    // the whole point: silently running with the built-in defaults is how the
+    // three surfaces drifted apart in the first place.
+    io.stderr(`overlock: ${error instanceof Error ? error.message : String(error)}\n`);
+    return 2;
+  }
+
+  try {
+    if (args.command === 'config') return runConfig(args, settings, settingsPath, io);
     if (args.command === 'init') return runInit(args, io);
     if (args.command === 'report') return runReport(args, io);
     if (args.command === 'mcp') return runMcp(args, io);
@@ -306,7 +380,11 @@ export function main(argv: string[], io: Io): number {
     });
 
     if (args.explainBase) {
-      io.stderr(`overlock: base — ${steps.join(' -> ')}\n`);
+      const from =
+        settingsPath !== null && settings.base !== undefined && !args.explicit.has('--base')
+          ? `${settingsPath} -> `
+          : '';
+      io.stderr(`overlock: base — ${from}${steps.join(' -> ')}\n`);
     }
 
     if (args.command === 'hook') {
@@ -385,6 +463,56 @@ function runMcp(args: ParsedArgs, io: Io): number {
     }
   });
 
+  return 0;
+}
+
+/**
+ * What is in force, and where it came from.
+ *
+ * The question this answers is the one that made the drift expensive: three
+ * surfaces, three answers, and no way to ask any of them what it thought.
+ */
+function runConfig(args: ParsedArgs, config: OverlockConfig, path: string | null, io: Io): number {
+  const effective = {
+    base: args.base ?? 'auto',
+    baseMode: args.baseMode,
+    failOn: args.failOn,
+    failOnEmpty: args.failOnEmpty,
+    severity: args.severities,
+    testGlob: args.testGlobs.map((r) => r.source),
+    untracked: args.untracked,
+  };
+
+  /** The flag that would set each setting, so each line can say who won. */
+  const FLAGS: Record<string, string> = {
+    base: '--base',
+    baseMode: '--base-mode',
+    failOn: '--fail-on',
+    failOnEmpty: '--fail-on-empty',
+    severity: '--severity',
+    testGlob: '--test-glob',
+    untracked: '--no-untracked',
+  };
+
+  const origin = (key: string): 'flag' | 'config' | 'default' => {
+    if (args.explicit.has(FLAGS[key] as string)) return 'flag';
+    return Object.hasOwn(config, key) ? 'config' : 'default';
+  };
+
+  if (args.format === 'json') {
+    const sources = Object.fromEntries(Object.keys(effective).map((key) => [key, origin(key)]));
+    io.stdout(
+      `${JSON.stringify({ source: path, declared: config, effective, from: sources }, null, 2)}\n`,
+    );
+    return 0;
+  }
+
+  io.stdout(
+    path === null ? 'overlock: no config file; built-in defaults\n' : `overlock: ${path}\n`,
+  );
+  for (const [key, value] of Object.entries(effective)) {
+    io.stdout(`  ${key} = ${JSON.stringify(value)}  (${origin(key)})\n`);
+  }
   return 0;
 }
 

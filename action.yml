@@ -9,14 +9,18 @@ branding:
 inputs:
   base:
     description: >-
-      Git ref to diff against. Defaults to the pull request's base commit, or
-      "auto" on a push (uncommitted work if any, otherwise this branch's commits).
+      Git ref to diff against, read as the fork point with it. Defaults to the
+      pull request's base commit; on a push, to whatever overlock.config.json
+      says, and otherwise to "auto" (uncommitted work if any, otherwise this
+      branch's commits).
     required: false
     default: ''
   fail-on:
-    description: 'Severity at or above which the job fails: high, medium, low or none.'
+    description: >-
+      Severity at or above which the job fails: high, medium, low or none.
+      Left empty, overlock.config.json decides, and failing that, high.
     required: false
-    default: 'high'
+    default: ''
   comment:
     description: >-
       Post the findings as a single pull request comment, updated in place on
@@ -62,6 +66,9 @@ outputs:
   report:
     description: Path to the JSON report.
     value: ${{ steps.check.outputs.report }}
+  fail-on:
+    description: The severity threshold the run actually applied.
+    value: ${{ steps.check.outputs.fail-on }}
 
 runs:
   using: composite
@@ -76,12 +83,16 @@ runs:
         INPUT_BASE: ${{ inputs.base }}
         PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
       run: |
+        # Empty on a push, deliberately: the flag is then left off entirely so
+        # that overlock.config.json can name the base. Passing "auto" here would
+        # be the action answering a question the repository already answered,
+        # which is exactly the drift the config file exists to end.
         if [ -n "$INPUT_BASE" ]; then
           echo "base=$INPUT_BASE" >> "$GITHUB_OUTPUT"
         elif [ -n "$PR_BASE_SHA" ]; then
           echo "base=$PR_BASE_SHA" >> "$GITHUB_OUTPUT"
         else
-          echo "base=auto" >> "$GITHUB_OUTPUT"
+          echo "base=" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Run overlock
@@ -157,10 +168,23 @@ runs:
           fi
         done <<< "$SEVERITY"
 
+        # An unset input adds no flag, so the repository's own config is what
+        # answers. A set one wins, because someone typed it into the workflow.
+        base_args=()
+        if [ -n "$BASE" ]; then base_args+=(--base "$BASE"); fi
+        fail_args=()
+        if [ -n "$FAIL_ON" ]; then fail_args+=(--fail-on "$FAIL_ON"); fi
+
+        # Said out loud, once, so a surprising verdict starts with the base it
+        # was reached from rather than with a bisect.
+        echo "::group::overlock settings"
+        run_overlock config "${base_args[@]}" "${fail_args[@]}" "${severity_args[@]}" || true
+        echo "::endgroup::"
+
         # The ledger is a record of what a person's agents did on their machine.
         # A CI runner is neither, and it is thrown away, so nothing is written.
         set +e
-        run_overlock check --base "$BASE" --fail-on "$FAIL_ON" "${severity_args[@]}" \
+        run_overlock check "${base_args[@]}" "${fail_args[@]}" "${severity_args[@]}" \
           --allow-file "$allow" --no-ledger --json > "$report"
         status=$?
         set -e
@@ -176,18 +200,22 @@ runs:
         # person's change becomes an injection.
         findings=$(REPORT="$report" node -e 'const r=require(process.env.REPORT);process.stdout.write(String(r.findings.length))')
         ok=$(REPORT="$report" node -e 'const r=require(process.env.REPORT);process.stdout.write(String(r.ok))')
+        # The threshold the run actually applied, which is not necessarily this
+        # action's input: overlock.config.json may have named it.
+        effective_fail_on=$(REPORT="$report" node -e 'const r=require(process.env.REPORT);process.stdout.write(String(r.fail_on ?? "high"))')
 
         {
           echo "ok=$ok"
           echo "findings=$findings"
           echo "report=$report"
           echo "status=$status"
+          echo "fail-on=$effective_fail_on"
         } >> "$GITHUB_OUTPUT"
 
         # The human-readable form in the log, regardless of pass or fail.
         set +e
-        run_overlock check --base "$BASE" --fail-on none "${severity_args[@]}" \
-          --allow-file "$allow" --no-ledger
+        run_overlock check "${base_args[@]}" --fail-on none "${severity_args[@]}" \
+          --allow-file "$allow" --no-ledger --explain-base
         set -e
 
     - name: Comment on the pull request
@@ -223,7 +251,10 @@ runs:
               .slice(0, 200);
 
           const rank = { high: 0, medium: 1, low: 2 };
-          const failOn = process.env.FAIL_ON || "high";
+          // From the run, not from whatever default this action would assume:
+          // the threshold may have come from overlock.config.json, and naming a
+          // different one here is worse than naming none at all.
+          const failOn = report.fail_on || process.env.FAIL_ON || "high";
           const blocks = (f) => failOn !== "none" && rank[f.severity] <= (rank[failOn] ?? 0);
           // A finding with no line is about the file itself — a deleted test
           // file has no line 1 to send anyone to.
@@ -349,7 +380,7 @@ runs:
       # they belong in env even when the values are ones this action computed.
       env:
         FINDINGS: ${{ steps.check.outputs.findings }}
-        FAIL_ON: ${{ inputs.fail-on }}
+        FAIL_ON: ${{ steps.check.outputs.fail-on }}
       run: |
         echo "::error::overlock found $FINDINGS finding(s) at or above $FAIL_ON"
         exit 1

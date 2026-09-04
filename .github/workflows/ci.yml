@@ -253,7 +253,13 @@ jobs:
       # `audit:check` is deliberately not a Turbo task: its verdict depends on
       # the upstream advisory database, which changes without any file here
       # changing, so a cached pass could replay over a fresh CVE.
+      #
+      # It wraps `pnpm audit` rather than calling it, so that an unreachable
+      # advisory endpoint is a warning on a passing job instead of four minutes
+      # of retries and a red check. `timeout-minutes` is the backstop for the
+      # wrapper itself failing to come back.
       - name: Audit dependencies
+        timeout-minutes: 5
         run: pnpm run audit:check
       - name: Check dependency dedupe
         run: pnpm run dedupe:check

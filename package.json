@@ -14,7 +14,7 @@
     "lint:fix": "eslint . --fix --cache --cache-location node_modules/.cache/eslint/.eslintcache",
     "format": "prettier --write . --cache --cache-location node_modules/.cache/prettier/.prettiercache",
     "format:check": "prettier --check . --cache --cache-location node_modules/.cache/prettier/.prettiercache",
-    "audit:check": "pnpm audit --audit-level=high",
+    "audit:check": "node --import tsx ./packages/tooling/audit.ts --audit-level=high",
     "dedupe:check": "pnpm dedupe --check",
     "check:exports": "turbo run check:exports --filter=overlock",
     "pack:smoke": "turbo run pack:smoke --concurrency=1 --filter=overlock",

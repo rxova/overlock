@@ -361,12 +361,13 @@ jobs:
   # Requiring the job names directly does not work. Two runs can report on one
   # commit — a push publishes the real verdicts, then an `edited` or a label
   # publishes the metadata lane, where every heavy job is skipped by its `if:`
-  # and reports a second check run under the same name. Both instances count as
-  # required, a skipped one never satisfies the requirement, and the pull
-  # request sits blocked behind checks whose rollup reads green. The matrix jobs
-  # hide it further: skipped before expansion, they report under the literal
-  # `unit (node ${{ matrix.node-version }})`, so their names drift with the
-  # event that produced them.
+  # and republishes that name as `skipped`. Protection reads the newest report
+  # for a name, a `skipped` one does not satisfy it, and the pull request sits
+  # blocked behind checks whose rollup still reads green. Re-running the earlier
+  # run does not dislodge it, because the metadata run is still the newer report.
+  # The matrix jobs hide it further: skipped before expansion, they report under
+  # the literal `unit (node ${{ matrix.node-version }})`, so their names drift
+  # with the event that produced them and never collide with a required one.
   #
   # One always-reported context sidesteps all of it. `skipped` is the answer
   # this workflow gives deliberately — a metadata event, a release commit — so

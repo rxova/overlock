@@ -175,3 +175,32 @@ export function addedLines(file: DiffFile): DiffLine[] {
 export function removedLines(file: DiffFile): DiffLine[] {
   return file.hunks.flatMap((h) => h.lines.filter((l) => l.kind === 'del'));
 }
+
+/**
+ * A hunk's changed lines, split into the runs they were written as.
+ *
+ * A hunk is a region of the file, not an edit: `git diff` merges edits three
+ * context lines apart into one, so a hunk over a test file routinely spans two
+ * or three unrelated cases. A rule that pairs a removal with an addition across
+ * a whole hunk therefore pairs across test cases, and reports an assertion
+ * deleted in one case as the weakening of an assertion added in another.
+ *
+ * Context ends a run, because a line neither side touched is the boundary
+ * between two edits by definition.
+ */
+export function changeBlocks(hunk: Hunk): DiffLine[][] {
+  const blocks: DiffLine[][] = [];
+  let current: DiffLine[] = [];
+
+  for (const line of hunk.lines) {
+    if (line.kind === 'ctx') {
+      if (current.length > 0) blocks.push(current);
+      current = [];
+      continue;
+    }
+    current.push(line);
+  }
+  if (current.length > 0) blocks.push(current);
+
+  return blocks;
+}

@@ -62,6 +62,6 @@
     "@arethetypeswrong/cli": "^0.18.5",
     "publint": "^0.3.21",
     "tsup": "^8.5.1",
-    "typescript": "^7.0.2"
+    "typescript": "^6.0.3"
   }
 }

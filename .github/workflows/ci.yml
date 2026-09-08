@@ -196,10 +196,16 @@ jobs:
           echo '{"name":"consumer","private":true,"type":"module"}' > package.json
           npm install --no-audit --no-fund /tmp/pkg/*.tgz
           npx --no-install overlock --version
+          # A count would have to be edited here every time a rule is added, and
+          # it fails as "rule registry changed shape" — which is what adding a
+          # rule is. pack:smoke holds the tarball to the source registry exactly;
+          # this job's question is whether the entry loads on the oldest Node
+          # this package supports and exports a registry at all.
           node -e "import('overlock').then(m => {
             const r = m.analyze({ diff: '' });
             if (r.findings.length !== 0) throw new Error('empty diff produced findings');
-            if (m.RULE_IDS.length !== 9) throw new Error('rule registry changed shape');
+            if (!Array.isArray(m.RULE_IDS) || m.RULE_IDS.length === 0) throw new Error('rule registry missing');
+            if (!m.RULE_IDS.includes('TEST_SKIPPED_ADDED')) throw new Error('rule registry changed shape');
             console.log('library entry loads on node 20');
           })"
 

@@ -329,7 +329,7 @@ export function readDiff(range: string, cwd: string): string {
     '--no-color',
     '--no-ext-diff',
     // Renames matter: a test file renamed out of the runner's glob is one of
-    // the nine things this tool looks for, and without -M it reads as an
+    // the things this tool looks for, and without -M it reads as an
     // unrelated add plus delete.
     '--find-renames',
     '--unified=3',

@@ -4,20 +4,24 @@ on:
   push:
     branches: [main]
   pull_request:
-    # `edited` matters because the PR title becomes the squash-merge subject and
-    # nothing else validates it. `labeled`/`unlabeled` matter because the
-    # changeset gate's escape hatch is a label, and without them the label lands
-    # on a PR whose checks never re-run.
-    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+    # Deliberately no `edited`. It fires on body edits as well as title edits and
+    # nothing at the trigger can tell them apart, so a description gaining a link
+    # re-ran this graph — which, because the re-run skipped every heavy job,
+    # republished those names as `skipped` over verdicts that were already green.
+    # The title check moved to pr-title.yml, where the same edit costs one job
+    # under a name nothing requires.
+    #
+    # `labeled`/`unlabeled` stay: the changeset gate's escape hatch is a label,
+    # and without them the label lands on a pull request whose checks never
+    # re-run. They run the full graph like any other event — a label is rare,
+    # and a run that skips its way to a verdict is what this file is now
+    # arranged to avoid.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
 
-# Two lanes per ref. The three metadata-only actions move no file, so they must
-# not cancel a full run already in flight for the same commit and restart the
-# whole graph from zero.
-#
-# On main nothing is cancelled at all. A push there is the last chance to judge
+# One lane per ref. On main nothing is cancelled at all. A push there is the last chance to judge
 # that commit: it is already merged, and the release commit that follows skips
 # the matrix precisely because it trusts its parent's verdict. Cancelling a main
 # run means the next push silently erases the only signal the commit under it
@@ -25,10 +29,7 @@ permissions:
 # publish window has already been missed. Superseded pull request runs stay
 # cancellable — the branch will be judged again on its next push.
 concurrency:
-  group: >-
-    ${{ github.workflow }}-${{ github.ref }}-${{
-    contains(fromJSON('["edited", "labeled", "unlabeled"]'), github.event.action)
-    && 'metadata' || 'code' }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
@@ -44,27 +45,11 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      # Every job that reads the tree is gated on this. A title edit or a label
-      # change leaves HEAD where it was, so re-running lint, types and tests
-      # would recompute a verdict this commit already carries. GitHub counts a
-      # job skipped by `if:` as satisfying a required check, which a trigger
-      # filter would not.
-      code-changed: >-
-        ${{ steps.event-scope.outputs.metadata-only == 'true'
-        && 'false' || steps.scope.outputs.code-changed }}
+      # Every job that reads the tree is gated on this. The one thing that sets
+      # it to false is the release commit below, whose skip the gate job accepts
+      # deliberately.
+      code-changed: ${{ steps.scope.outputs.code-changed }}
     steps:
-      # Recognised without a checkout, so a title edit or a label costs one
-      # short job rather than a clone and an install.
-      - name: Decide whether this event could have touched the tree
-        id: event-scope
-        env:
-          ACTION: ${{ github.event.action }}
-        run: |
-          case "$ACTION" in
-            edited | labeled | unlabeled) echo 'metadata-only=true' >> "$GITHUB_OUTPUT" ;;
-            *) echo 'metadata-only=false' >> "$GITHUB_OUTPUT" ;;
-          esac
-
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -78,7 +63,6 @@ jobs:
       # name or its subject line.
       - name: Decide whether this commit touched the tree
         id: scope
-        if: steps.event-scope.outputs.metadata-only != 'true'
         env:
           BASE_SHA: >-
             ${{ github.event_name == 'pull_request'
@@ -94,20 +78,6 @@ jobs:
           pnpm exec commitlint --verbose
           --from ${{ github.event.pull_request.base.sha }}
           --to ${{ github.event.pull_request.head.sha }}
-
-      # Read the title live from the API rather than out of `github.event`: an
-      # edit no longer cancels the run in flight, so two runs can publish this
-      # check at once and the payload one could affirm a title the edit has since
-      # broken. Piped, never interpolated — a PR title is attacker-controlled text.
-      - name: Lint the PR title
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          set -o pipefail
-          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json title --jq .title \
-            | pnpm exec commitlint --verbose
 
       - name: Lint the pushed commit
         if: github.event_name == 'push'
@@ -358,16 +328,13 @@ jobs:
   # The single context branch protection requires, and the only job here that
   # never skips.
   #
-  # Requiring the job names directly does not work. Two runs can report on one
-  # commit — a push publishes the real verdicts, then an `edited` or a label
-  # publishes the metadata lane, where every heavy job is skipped by its `if:`
-  # and republishes that name as `skipped`. Protection reads the newest report
-  # for a name, a `skipped` one does not satisfy it, and the pull request sits
-  # blocked behind checks whose rollup still reads green. Re-running the earlier
-  # run does not dislodge it, because the metadata run is still the newer report.
-  # The matrix jobs hide it further: skipped before expansion, they report under
-  # the literal `unit (node ${{ matrix.node-version }})`, so their names drift
-  # with the event that produced them and never collide with a required one.
+  # Requiring the job names directly does not work, even now that no event here
+  # skips its way to a verdict. Protection reads the newest report for a name,
+  # and the matrix jobs do not report under a stable one: skipped before
+  # expansion, they publish the literal `unit (node ${{ matrix.node-version }})`
+  # instead of one name per leg. Any future job whose `if:` can go false has the
+  # same problem — a `skipped` report does not satisfy a required context, so
+  # such a job could only ever be required by never being skipped.
   #
   # One always-reported context sidesteps all of it. `skipped` is the answer
   # this workflow gives deliberately — a metadata event, a release commit — so

@@ -2,16 +2,19 @@
  * Decides whether an event actually changed anything a test could fail on, and
  * reports it as the `code-changed` output the rest of the workflow gates on.
  *
- * Two kinds of event reach CI without moving the tree in any meaningful way:
+ * One kind of commit reaches CI without moving the tree in any meaningful way:
+ * the release commit. `changeset version` bumps a version field, writes a
+ * changelog and consumes the changeset files. The source tree is otherwise
+ * byte-identical to a parent CI already proved green, so re-running unit tests
+ * on two Node versions, e2e on three operating systems and the Node 20
+ * compatibility job re-derives a verdict that commit already carries. That
+ * inheritance is only sound because a push to main is never cancelled, so the
+ * parent's verdict is one that actually finished.
  *
- * 1. Metadata actions — `edited`, `labeled`, `unlabeled` — leave HEAD exactly
- *    where it was. The workflow recognises those before this script runs,
- *    because they need no checkout.
- * 2. The release commit. `changeset version` bumps a version field, writes a
- *    changelog and consumes the changeset files. The source tree is otherwise
- *    byte-identical to a parent CI already proved green, so re-running unit
- *    tests on two Node versions, e2e on three operating systems and the Node 20
- *    compatibility job re-derives a verdict that commit already carries.
+ * Pull request metadata used to be the other kind. It no longer reaches this
+ * script: `edited` belongs to pr-title.yml now, and a label runs the full graph,
+ * because a run that skips its way to a verdict republishes those job names as
+ * `skipped` over reports that were already green.
  *
  * The release commit is recognised by its file set, never by its branch name or
  * its subject line, both of which anyone can write. A `package.json` counts only

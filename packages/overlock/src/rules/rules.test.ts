@@ -119,6 +119,102 @@ describe('TEST_REMOVED', () => {
     expect(found?.id).toBe('TEST_REMOVED:src/auth.test.ts');
   });
 
+  /**
+   * Every TEST_REMOVED finding on one reported patch was a case that had been
+   * retitled, not removed. A case is what it asserts; matching on the title
+   * alone reads a rename as a deletion.
+   */
+  it('treats a retitled case with a surviving body as surviving', () => {
+    const diff = diffOf(
+      'src/auth.test.ts',
+      hunk(
+        [
+          "-  it('rejects expired tokens', () => {",
+          '-    const token = expired();',
+          '-    expect(verify(token)).toBe(false);',
+          "+  it('refuses tokens past their expiry', () => {",
+          '+    const token = expired();',
+          '+    expect(verify(token)).toBe(false);',
+        ].join('\n'),
+      ),
+    );
+    expect(rulesFor(diff)).not.toContain('TEST_REMOVED');
+  });
+
+  it('still reports a case whose body went with its title', () => {
+    const diff = diffOf(
+      'src/auth.test.ts',
+      hunk(
+        [
+          "-  it('rejects expired tokens', () => {",
+          '-    const token = expired();',
+          '-    expect(verify(token)).toBe(false);',
+          "+  it('does something else', () => {",
+          '+    expect(other()).toBe(1);',
+        ].join('\n'),
+      ),
+    );
+    expect(findingsOf(diff, 'TEST_REMOVED')[0]?.message).toContain('rejects expired tokens');
+  });
+
+  it('names the case it is about, so an acknowledgement can be about one case', () => {
+    const diff = diffOf(
+      'src/auth.test.ts',
+      hunk([" it('keeps this', () => {})", "-  it('rejects expired', () => {})"].join('\n')),
+    );
+    expect(findingsOf(diff, 'TEST_REMOVED')[0]?.subject).toBe('rejects expired');
+  });
+
+  it("names where a deleted file's cases went", () => {
+    const diff =
+      diffOf(
+        'src/auth.test.ts',
+        hunk(["-it('rejects expired', () => {})", "-it('accepts fresh', () => {})"].join('\n')),
+        { status: 'deleted' },
+      ) +
+      diffOf(
+        'src/auth/tokens.test.ts',
+        hunk(["+it('rejects expired', () => {})", "+it('accepts fresh', () => {})"].join('\n')),
+        { status: 'added' },
+      );
+
+    expect(findingsOf(diff, 'TEST_REMOVED')[0]?.message).toContain(
+      'reappear in src/auth/tokens.test.ts',
+    );
+  });
+
+  /**
+   * Eight moved spec files are one decision. Eight findings are eight
+   * acknowledgements, and a reviewer who has waved through six is not reading
+   * the seventh.
+   */
+  it('collapses several moved spec files into one finding', () => {
+    const moved = (n: number): string =>
+      diffOf(`src/old/spec${n}.test.ts`, hunk(`-it('case ${n}', () => {})`), {
+        status: 'deleted',
+      }) +
+      diffOf(`src/new/spec${n}.test.ts`, hunk(`+it('case ${n}', () => {})`), { status: 'added' });
+
+    const found = findingsOf([1, 2, 3].map(moved).join(''), 'TEST_REMOVED');
+
+    expect(found).toHaveLength(1);
+    expect(found[0]?.severity).toBe('medium');
+    expect(found[0]?.message).toContain('3 test files deleted');
+    expect(found[0]?.message).toContain('src/old/spec1.test.ts -> src/new/spec1.test.ts');
+    expect(found[0]?.file).toBe('src/old/spec1.test.ts');
+  });
+
+  it('leaves a file whose cases did not all land out of the collapsed finding', () => {
+    const diff =
+      diffOf('src/old/a.test.ts', hunk("-it('kept', () => {})"), { status: 'deleted' }) +
+      diffOf('src/new/a.test.ts', hunk("+it('kept', () => {})"), { status: 'added' }) +
+      diffOf('src/old/b.test.ts', hunk("-it('gone', () => {})"), { status: 'deleted' });
+
+    const found = findingsOf(diff, 'TEST_REMOVED');
+    expect(found.map((f) => f.severity).sort()).toEqual(['high', 'medium']);
+    expect(found.find((f) => f.severity === 'high')?.message).toContain('gone');
+  });
+
   it('recognises python and go declarations', () => {
     const py = diffOf('tests/test_auth.py', hunk('-def test_rejects_expired():'));
     expect(findingsOf(py, 'TEST_REMOVED')[0]?.message).toContain('test_rejects_expired');
@@ -224,6 +320,225 @@ describe('ASSERTION_WEAKENED', () => {
     const rules = rulesFor(diff);
     expect(rules).toContain('ASSERTION_WEAKENED');
     expect(rules).not.toContain('EXPECTED_VALUE_CHANGED');
+  });
+});
+
+describe('ASSERTION_WEAKENED, on what counts as an existence check', () => {
+  /**
+   * Two of three findings on one real patch were this shape. `toBeNull()` names
+   * a value as exactly as `toBe(false)` does, and reading it as an existence
+   * check is a false positive on the rule that blocks by default.
+   */
+  it.each([
+    ['toBeNull()', "-  expect(session.token).toBe('abc');", '+  expect(session.token).toBeNull();'],
+    ['toBeUndefined()', '-  expect(cache.hit).toBe(1);', '+  expect(cache.hit).toBeUndefined();'],
+    ['toBe(false)', '-  expect(flags.beta).toBe(1);', '+  expect(flags.beta).toBe(false);'],
+  ])('does not read %s as one — it names a value', (_label, before, after) => {
+    const diff = diffOf('src/a.test.ts', hunk([before, after].join('\n')));
+    expect(rulesFor(diff)).not.toContain('ASSERTION_WEAKENED');
+  });
+
+  it('reads not.toBeNull() as one, because negation is what makes it vague', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        ['-  expect(user.role).toBe("admin");', '+  expect(user.role).not.toBeNull();'].join('\n'),
+      ),
+    );
+    const [found] = findingsOf(diff, 'ASSERTION_WEAKENED');
+    expect(found?.severity).toBe('high');
+    expect(found?.message).toContain('that a value is present');
+  });
+
+  it('says which loose thing the replacement checks', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(['-  expect(list).toHaveLength(3);', '+  expect(list).toBeTruthy();'].join('\n')),
+    );
+    expect(findingsOf(diff, 'ASSERTION_WEAKENED')[0]?.message).toContain(
+      'only checks that a value is truthy',
+    );
+  });
+
+  it('reads a placeholder inside an exact matcher as giving the value up', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          "-  expect(save).toHaveBeenCalledWith('row', 42);",
+          '+  expect(save).toHaveBeenCalledWith(expect.any(String), expect.any(Number));',
+        ].join('\n'),
+      ),
+    );
+    expect(rulesFor(diff)).toContain('ASSERTION_WEAKENED');
+  });
+
+  it('does not read adding a field beside an existing placeholder as one', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          '-  expect(row).toEqual({ id: expect.any(String) });',
+          '+  expect(row).toEqual({ id: expect.any(String), createdAt: expect.any(Date) });',
+        ].join('\n'),
+      ),
+    );
+    expect(rulesFor(diff)).not.toContain('ASSERTION_WEAKENED');
+  });
+});
+
+describe('ASSERTION_WEAKENED, on what counts as a pair', () => {
+  /**
+   * A hunk is a region of the file, not an edit. This one holds two test cases,
+   * and pairing across the context line between them invents a weakening out of
+   * a removal in the first and an addition in the second.
+   */
+  it('does not pair a removal and an addition in different cases', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          "-    expect(store.value).toBe('kept');",
+          '   });',
+          "   it('reads it back', () => {",
+          '+    expect(store.value).toBeDefined();',
+        ].join('\n'),
+      ),
+    );
+    expect(rulesFor(diff)).not.toContain('ASSERTION_WEAKENED');
+  });
+
+  it('does not read a moved assertion as a weakened one', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          '-    expect(total()).toBe(42);',
+          '+    expect(total()).toBeDefined();',
+          '   });',
+          "   it('still checks the total', () => {",
+          '+    expect(total()).toBe(42);',
+        ].join('\n'),
+      ),
+    );
+    expect(rulesFor(diff)).not.toContain('ASSERTION_WEAKENED');
+  });
+
+  it('does not report one loose addition as the answer to two removals', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          '-    expect(row.total).toBe(1);',
+          '-    expect(row.total).toBe(2);',
+          '+    expect(row.total).toBeDefined();',
+        ].join('\n'),
+      ),
+    );
+    expect(findingsOf(diff, 'ASSERTION_WEAKENED')).toHaveLength(1);
+  });
+
+  /**
+   * The complaint this answers: a test that came out of the patch asserting
+   * more than it did before read exactly like one that only lost specificity.
+   */
+  it('grades down when the case gained assertions overall', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          "   it('cancels the lapse', () => {",
+          '-    expect(row.state).toBe("lapsed");',
+          '+    expect(row.state).toBeDefined();',
+          '+    expect(store.writes).toHaveLength(1);',
+          '+    expect(store.last).toEqual({ id: 1 });',
+        ].join('\n'),
+      ),
+    );
+    const [found] = findingsOf(diff, 'ASSERTION_WEAKENED');
+    expect(found?.severity).toBe('medium');
+    expect(found?.message).toContain('gained 2 assertions');
+  });
+
+  it('stays high when the case only lost specificity', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          "   it('cancels the lapse', () => {",
+          '-    expect(row.state).toBe("lapsed");',
+          '+    expect(row.state).toBeDefined();',
+        ].join('\n'),
+      ),
+    );
+    const [found] = findingsOf(diff, 'ASSERTION_WEAKENED');
+    expect(found?.severity).toBe('high');
+    expect(found?.message).not.toContain('gained');
+  });
+});
+
+describe('ASSERTION_NARROWED', () => {
+  /**
+   * Same finding, different reason. The assertion still names a value; what it
+   * stopped doing is covering the rest of the object — and a message that says
+   * "only checks existence" sends a reader looking for the wrong edit.
+   */
+  it('fires when a whole-object assertion becomes one about a field', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          "-    expect(row).toEqual({ id: 1, state: 'lapsed', lapsedAt: 5 });",
+          '+    expect(row.lapsedAt).toBeNull();',
+        ].join('\n'),
+      ),
+    );
+    const [found] = findingsOf(diff, 'ASSERTION_NARROWED');
+    expect(found?.severity).toBe('high');
+    expect(found?.message).toContain('row was checked as a whole, now only row.lapsedAt');
+    expect(rulesFor(diff)).not.toContain('ASSERTION_WEAKENED');
+  });
+
+  it('fires when the same assertion checks fewer values', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          "-    expect(save).toHaveBeenCalledWith('row', 42, true);",
+          "+    expect(save).toHaveBeenCalledWith('row');",
+        ].join('\n'),
+      ),
+    );
+    expect(findingsOf(diff, 'ASSERTION_NARROWED')[0]?.message).toContain(
+      '2 expected values checked, now 1',
+    );
+  });
+
+  /** Lifting an expectation into a variable checks exactly as much as before. */
+  it('does not fire when the expectation moved into a variable', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          '-    expect(row).toEqual({ id: 1, state: 2 });',
+          '+    expect(row).toEqual(expected);',
+        ].join('\n'),
+      ),
+    );
+    expect(rulesFor(diff)).not.toContain('ASSERTION_NARROWED');
+  });
+
+  it('does not double-report the same edit as a value change', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          "-    expect(save).toHaveBeenCalledWith('row', 42);",
+          "+    expect(save).toHaveBeenCalledWith('row');",
+        ].join('\n'),
+      ),
+    );
+    expect(rulesFor(diff)).not.toContain('EXPECTED_VALUE_CHANGED');
   });
 });
 

@@ -65,7 +65,12 @@ export function analyze(options: AnalyzeOptions): Report {
     collectSuppressions(files),
   );
   const allowances = collectAllowances(options.allowText ?? '');
-  const { kept: standing, allowed, used: usedAllowances } = applyAllowances(kept, allowances);
+  const {
+    kept: standing,
+    allowed,
+    used: usedAllowances,
+    unused: unusedAllowances,
+  } = applyAllowances(kept, allowances);
 
   const findings = standing.map((f) => annotate(f, explanation));
   const freshlyAdded = used.filter((s) => s.added);
@@ -88,6 +93,7 @@ export function analyze(options: AnalyzeOptions): Report {
     renames: explanation.renames,
     explained: findings.filter((f) => f.explained_by !== undefined).length,
     allowed: usedAllowances,
+    allowances_unused: unusedAllowances,
     // Allowed findings are counted here too: a silenced finding that leaves no
     // trace in the output is how a gate ends up passing everything, and the
     // mechanism that silenced it does not change that.
@@ -146,25 +152,26 @@ function regrade(f: Finding, severities: Partial<Record<RuleId, Severity>>): Fin
  * Two passes, both narrow on purpose.
  *
  * Identical `id`s collapse — the same rule cannot report the same line twice.
- * And EXPECTED_VALUE_CHANGED is suppressed where ASSERTION_WEAKENED already
- * fired on the same line, because they are the same edit seen twice: replacing
- * `toBe(3)` with `toBeDefined()` changes both the matcher and the literal.
- * Nothing else is merged; findings from different rules are different facts and
- * silently dropping one to shorten the report is how a tool stops being
- * trustworthy.
+ * And EXPECTED_VALUE_CHANGED is suppressed where ASSERTION_WEAKENED or
+ * ASSERTION_NARROWED already fired on the same line, because they are the same
+ * edit seen twice: replacing `toBe(3)` with `toBeDefined()` changes both the
+ * matcher and the literal, and narrowing a whole-object assertion to one field
+ * changes the literals along with the scope. Nothing else is merged; findings
+ * from different rules are different facts and silently dropping one to shorten
+ * the report is how a tool stops being trustworthy.
  */
 function dedupe(findings: Finding[]): Finding[] {
   const byId = new Map<string, Finding>();
   for (const f of findings) if (!byId.has(f.id)) byId.set(f.id, f);
 
-  const weakened = new Set(
+  const loosened = new Set(
     [...byId.values()]
-      .filter((f) => f.rule === 'ASSERTION_WEAKENED')
+      .filter((f) => f.rule === 'ASSERTION_WEAKENED' || f.rule === 'ASSERTION_NARROWED')
       .map((f) => `${f.file}:${f.line}`),
   );
 
   return [...byId.values()].filter(
-    (f) => !(f.rule === 'EXPECTED_VALUE_CHANGED' && weakened.has(`${f.file}:${f.line}`)),
+    (f) => !(f.rule === 'EXPECTED_VALUE_CHANGED' && loosened.has(`${f.file}:${f.line}`)),
   );
 }
 

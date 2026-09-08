@@ -27,6 +27,13 @@ describe('collectAllowances', () => {
     expect(found).toMatchObject({ target: 'src/a.test.ts' });
   });
 
+  it('reads a quoted target, because a case title has spaces in it', () => {
+    const [found] = collectAllowances(
+      'Overlock-Allow: TEST_REMOVED "src/a.test.ts::rejects expired tokens" -- ported to b',
+    );
+    expect(found).toMatchObject({ target: 'src/a.test.ts::rejects expired tokens' });
+  });
+
   it('is case-insensitive about the trailer key, as git is', () => {
     expect(collectAllowances('overlock-allow: TEST_REMOVED -- a reason')).toHaveLength(1);
   });
@@ -84,5 +91,87 @@ describe('a patch-level acknowledgement', () => {
   it('does nothing when there is no trailer text, which is Stop time', () => {
     expect(analyze({ diff: skip }).findings).toHaveLength(1);
     expect(analyze({ diff: skip, allowText: '' }).allowed).toEqual([]);
+  });
+});
+
+/**
+ * A file where fifteen cases were ported and two were not is one file and
+ * seventeen findings. A directive that can only name the file cannot say which
+ * two are the ones nobody has explained.
+ */
+describe('an acknowledgement narrower than a file', () => {
+  const removed = diffOf(
+    'src/a.test.ts',
+    hunk(
+      [
+        " it('kept', () => {})",
+        "-  it('ported to b', () => {})",
+        "-  it('nobody has explained this one', () => {})",
+      ].join('\n'),
+    ),
+  );
+
+  it('covers the case it names and leaves the rest standing', () => {
+    const report = analyze({
+      diff: removed,
+      allowText: 'Overlock-Allow: TEST_REMOVED "src/a.test.ts::ported to b" -- moved to b.test.ts',
+    });
+
+    expect(report.findings.map((f) => f.subject)).toEqual(['nobody has explained this one']);
+    expect(report.suppressed).toBe(1);
+  });
+
+  it('covers one line when it names a line, as the report prints it', () => {
+    const line = analyze({ diff: removed }).findings[0]?.line;
+    const report = analyze({
+      diff: removed,
+      allowText: `Overlock-Allow: TEST_REMOVED src/a.test.ts:${line} -- moved to b.test.ts`,
+    });
+
+    expect(report.findings).toHaveLength(1);
+  });
+
+  it('still covers the whole file when it names the file', () => {
+    const report = analyze({
+      diff: removed,
+      allowText: 'Overlock-Allow: TEST_REMOVED src/a.test.ts -- the whole file moved',
+    });
+    expect(report.findings).toEqual([]);
+  });
+});
+
+/**
+ * An acknowledgement is a claim about a finding. When the finding is not there,
+ * the claim has outlived whatever it was written for — and the one thing a
+ * reviewer must not conclude from a clean run is that every line of it still holds.
+ */
+describe('an acknowledgement that silenced nothing', () => {
+  it('is reported rather than quietly doing nothing', () => {
+    const report = analyze({
+      diff: skip,
+      allowText: [
+        'Overlock-Allow: TEST_SKIPPED_ADDED -- quarantined for the release',
+        'Overlock-Allow: TEST_REMOVED "src/a.test.ts::a case that never landed" -- ported',
+      ].join('\n'),
+    });
+
+    expect(report.allowed).toHaveLength(1);
+    expect(report.allowances_unused).toEqual([
+      {
+        rule: 'TEST_REMOVED',
+        target: 'src/a.test.ts::a case that never landed',
+        reason: 'ported',
+      },
+    ]);
+  });
+
+  it('says so on a run with nothing else to report', () => {
+    const report = analyze({
+      diff: diffOf('src/a.test.ts', hunk('+  const x = 1;')),
+      allowText: 'Overlock-Allow: TEST_REMOVED -- ported every case',
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.allowances_unused).toHaveLength(1);
   });
 });

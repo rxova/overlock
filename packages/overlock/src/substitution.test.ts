@@ -23,6 +23,25 @@ function renamedFile(n: number): string {
 
 const rename = [1, 2, 3, 4].map(renamedFile).join('');
 
+/**
+ * The same rename, plus the one shape it genuinely changes the meaning of: an
+ * identifier inside a string literal. It is a changed expected value by every
+ * measure this tool has, which makes it the honest fixture for "marked, not
+ * suppressed" — a renamed *case title* is no longer a finding at all, because
+ * the case it names is still there under the new title.
+ */
+const renameWithLiteral =
+  rename +
+  diffOf(
+    'src/mod5.test.ts',
+    hunk(
+      [
+        "-    expect(label).toBe('trainmotherfoca core');",
+        "+    expect(label).toBe('trainmf core');",
+      ].join('\n'),
+    ),
+  );
+
 describe('explainPatch', () => {
   it('infers a substitution the patch applies wholesale', () => {
     const { renames, label } = explainPatch(parseDiff(rename));
@@ -82,7 +101,13 @@ describe('explainPatch', () => {
     expect(explainPatch(parseDiff(renamedFile(1))).renames).toEqual([]);
   });
 
-  it('will not infer a rename from a name replaced inconsistently', () => {
+  /**
+   * One real edit used to collapse the whole inference, which turned a patch
+   * that was 95% a rename back into a wall of unexplained findings. The edit is
+   * kept out of the substitution instead: it is not attested anywhere else, so
+   * nothing explains it and it stands on its own.
+   */
+  it('keeps a one-off edit out of the rename rather than dropping the rename', () => {
     const inconsistent =
       rename +
       diffOf(
@@ -90,7 +115,69 @@ describe('explainPatch', () => {
         hunk(['-const a = trainmotherfoca;', '+const a = somethingElse;'].join('\n')),
       );
 
-    expect(explainPatch(parseDiff(inconsistent)).renames).toEqual([]);
+    const { renames, explainsEdit } = explainPatch(parseDiff(inconsistent));
+
+    expect(renames.map((r) => r.to)).toEqual(['trainmf']);
+    expect(explainsEdit('const a = trainmotherfoca;', 'const a = somethingElse;')).toBeNull();
+  });
+
+  /**
+   * Splitting one concept into two is an ordinary refactor, and reading it as
+   * twenty-two unrelated findings is how a reviewer ends up checking one change
+   * twenty-two times.
+   */
+  it('infers a name that became two names', () => {
+    const split = [1, 2, 3]
+      .map((n) =>
+        diffOf(
+          `src/split${n}.ts`,
+          hunk(
+            [
+              `-const a${n} = cloudSync.pull();`,
+              `-const b${n} = cloudSync.push();`,
+              `+const a${n} = cloudBackup.pull();`,
+              `+const b${n} = multiDevice.push();`,
+            ].join('\n'),
+          ),
+        ),
+      )
+      .join('');
+
+    const { renames, label, explainsEdit } = explainPatch(parseDiff(split));
+
+    expect(renames.map((r) => r.to).sort()).toEqual(['cloudBackup', 'multiDevice']);
+    expect(label).toBe('cloudSync -> cloudBackup + multiDevice');
+    expect(explainsEdit('const a = cloudSync.pull();', 'const a = cloudBackup.pull();')).toBe(
+      'rename',
+    );
+    expect(explainsEdit('const b = cloudSync.push();', 'const b = multiDevice.push();')).toBe(
+      'rename',
+    );
+  });
+
+  /** Two is a split. Five is a name being edited, and nothing explains an edit. */
+  it('will not infer a rename from a name replaced five different ways', () => {
+    const scattered = ['one', 'two', 'three', 'four', 'five']
+      .flatMap((word) =>
+        [1, 2, 3].map((n) =>
+          diffOf(
+            `src/${word}${n}.ts`,
+            hunk(
+              [
+                `-const x = manyTargets.of(${n});`,
+                `-const y = manyTargets.of(${n});`,
+                `-const z = manyTargets.of(${n});`,
+                `+const x = becomes${word}.of(${n});`,
+                `+const y = becomes${word}.of(${n});`,
+                `+const z = becomes${word}.of(${n});`,
+              ].join('\n'),
+            ),
+          ),
+        ),
+      )
+      .join('');
+
+    expect(explainPatch(parseDiff(scattered)).renames).toEqual([]);
   });
 
   it('never reads a changed literal as a rename', () => {
@@ -137,8 +224,9 @@ describe('isReformatOnly', () => {
 
 describe('a patch that is mostly a rename', () => {
   it('marks the findings the rename accounts for', () => {
-    const report = analyze({ diff: rename });
+    const report = analyze({ diff: renameWithLiteral });
 
+    expect(report.findings.length).toBeGreaterThan(0);
     expect(report.renames).toHaveLength(1);
     expect(report.explained).toBe(report.findings.length);
     expect(report.findings.every((f) => f.explained_by === 'trainmotherfoca -> trainmf')).toBe(
@@ -241,7 +329,7 @@ describe('a patch that is mostly a rename', () => {
    * enough rename. Marking is not suppressing.
    */
   it('does not change severity or whether the patch blocks', () => {
-    const report = analyze({ diff: rename, failOn: 'medium' });
+    const report = analyze({ diff: renameWithLiteral, failOn: 'medium' });
     expect(report.explained).toBeGreaterThan(0);
     expect(report.ok).toBe(false);
     expect(report.suppressed).toBe(0);

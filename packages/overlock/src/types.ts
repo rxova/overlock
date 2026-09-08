@@ -40,6 +40,7 @@ export const RULE_IDS = [
   'TEST_SKIPPED_ADDED',
   'ASSERTION_REMOVED',
   'ASSERTION_WEAKENED',
+  'ASSERTION_NARROWED',
   'EXPECTED_VALUE_CHANGED',
   'SNAPSHOT_UPDATED_WITH_CODE',
   'COVERAGE_THRESHOLD_LOWERED',
@@ -76,6 +77,16 @@ export interface Finding {
    * also what makes such a finding suppressable: the key is the path.
    */
   line: number | null;
+  /**
+   * The named thing inside the file this finding is about — a test case title,
+   * most often — when the rule can name one.
+   *
+   * It exists so an acknowledgement can be as narrow as the finding. A file
+   * where fifteen cases were ported and two were not is one file and seventeen
+   * findings, and a directive that can only name the file cannot say which two
+   * are the ones nobody has explained yet.
+   */
+  subject?: string;
   message: string;
   evidence: Evidence;
   fix_hint: string;
@@ -150,6 +161,16 @@ export interface Report {
    * written reason, in the artifact the reviewer is already reading.
    */
   allowed: { rule: RuleId; target: string | null; reason: string }[];
+  /**
+   * Acknowledgements that silenced nothing.
+   *
+   * An allowance is a claim about a specific finding — "this case was ported
+   * there". When the finding it names is not in the patch, the claim is stale:
+   * either the case came back, or it never landed where the trailer said it
+   * did. A directive that matches nothing and says nothing is how a list of
+   * acknowledgements outlives the refactor it was written for.
+   */
+  allowances_unused: { rule: RuleId; target: string | null; reason: string }[];
   /** What the new directives claimed, so a human can judge the claim. */
   suppressions_new: {
     rule: RuleId;

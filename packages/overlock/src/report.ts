@@ -88,6 +88,100 @@ function groupWhere(group: Group): string {
 }
 
 /**
+ * Words that appear in every assertion ever written, and so cluster nothing.
+ *
+ * The matchers are matched by shape rather than listed, because the list grows
+ * with every test framework and a missed one would top the chart in a patch
+ * that used it.
+ */
+const VOCABULARY = new Set([
+  'const',
+  'let',
+  'var',
+  'function',
+  'return',
+  'await',
+  'async',
+  'this',
+  'new',
+  'import',
+  'export',
+  'from',
+  'true',
+  'false',
+  'null',
+  'undefined',
+  'it',
+  'test',
+  'describe',
+  'def',
+  'func',
+  'self',
+  'value',
+  'result',
+  'data',
+]);
+
+const MATCHER = /^(?:to[A-Z]|expect$|assert|should$|not$)/;
+
+function identifiersIn(text: string): Set<string> {
+  const found = new Set<string>();
+  for (const token of text.match(/[A-Za-z_][A-Za-z0-9_]{2,}/g) ?? []) {
+    if (VOCABULARY.has(token) || MATCHER.test(token)) continue;
+    found.add(token);
+  }
+  return found;
+}
+
+/** Below this a shared name is a coincidence, not a change. */
+const MIN_CLUSTER = 3;
+
+/**
+ * The one identifier most of these findings are about, when there is one.
+ *
+ * "25 unexplained" reads as 25 things to check. When 22 of them name
+ * `cloud_sync` they are one change seen 22 times, and the difference between
+ * those two readings is the difference between triaging a patch in a glance and
+ * reading every row to discover that. It is stated as a count and never acted
+ * on: this groups the list, it does not shorten it.
+ */
+export function sharedIdentifier(findings: Finding[]): { name: string; count: number } | null {
+  const counts = new Map<string, number>();
+  for (const f of findings) {
+    const text = `${f.evidence.before ?? ''}\n${f.evidence.after ?? ''}`;
+    for (const name of identifiersIn(text)) counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+
+  let best: { name: string; count: number } | null = null;
+  for (const [name, count] of counts) {
+    if (count < MIN_CLUSTER || count * 2 < findings.length) continue;
+    if (best === null || count > best.count) best = { name, count };
+  }
+  return best;
+}
+
+/**
+ * Acknowledgements that silenced nothing, said out loud.
+ *
+ * A trailer is a claim about a finding — "this case was ported, that rename is
+ * deliberate". When the finding it names is not in the patch the claim has
+ * outlived whatever it was written for, and the one thing a reviewer must not
+ * conclude from a clean run is that every line of it was still true.
+ */
+function staleLines(report: Report, color: boolean): string[] {
+  if (report.allowances_unused.length === 0) return [];
+
+  const lines = report.allowances_unused.map((a) =>
+    paint(
+      `  ! allowed nothing: ${a.rule}${a.target === null ? '' : ` ${a.target}`} -- ${a.reason}`,
+      ANSI.yellow,
+      color,
+    ),
+  );
+  return [...lines, paint('    The finding it names is not in this patch.', ANSI.dim, color)];
+}
+
+/**
  * What the rest of the patch already accounts for, as a claim rather than a
  * table.
  *
@@ -152,19 +246,23 @@ export const EMPTY_PATCH_NOTE = 'nothing to examine — the resolved patch is em
 export function human(report: Report, color: boolean): string {
   if (report.findings.length === 0) {
     if (isEmptyPatch(report)) {
-      return paint(
-        `! overlock: ${EMPTY_PATCH_NOTE} (${describeScope(report)}).${suppressedNote(report)}`,
-        ANSI.yellow,
-        color,
-      );
+      return [
+        paint(
+          `! overlock: ${EMPTY_PATCH_NOTE} (${describeScope(report)}).${suppressedNote(report)}`,
+          ANSI.yellow,
+          color,
+        ),
+        ...staleLines(report, color),
+      ].join('\n');
     }
-    return (
+    return [
       paint(
         `✓ overlock: nothing weakened in this patch.${suppressedNote(report)}`,
         ANSI.green,
         color,
-      ) + paint(`  (${describeScope(report)})`, ANSI.dim, color)
-    );
+      ) + paint(`  (${describeScope(report)})`, ANSI.dim, color),
+      ...staleLines(report, color),
+    ].join('\n');
   }
 
   const lines: string[] = [];
@@ -173,9 +271,23 @@ export function human(report: Report, color: boolean): string {
       paint(`  (${describeScope(report)})${suppressedNote(report)}`, ANSI.dim, color),
   );
   lines.push('');
+  lines.push(...staleLines(report, color));
   lines.push(...renameBlock(report, color));
 
   const unexplained = report.findings.filter((f) => f.explained_by === undefined);
+
+  const cluster = sharedIdentifier(unexplained);
+  if (cluster !== null) {
+    lines.push(
+      paint(
+        `  ${cluster.count} of ${unexplained.length} unexplained findings mention ${cluster.name}`,
+        ANSI.bold,
+        color,
+      ),
+      paint('    Read that change once and most of this list goes with it.', ANSI.dim, color),
+      '',
+    );
+  }
 
   for (const group of groupFindings(unexplained)) {
     const f = group.first;
@@ -222,10 +334,10 @@ export function human(report: Report, color: boolean): string {
  */
 export function compact(report: Report, limit = 3): string {
   if (isEmptyPatch(report)) {
-    return `overlock: ${EMPTY_PATCH_NOTE} (${describeScope(report)}).${suppressedNote(report)}`;
+    return `overlock: ${EMPTY_PATCH_NOTE} (${describeScope(report)}).${suppressedNote(report)}${staleNote(report)}`;
   }
   if (report.findings.length === 0) {
-    return `overlock: clean — ${describeScope(report)}.${suppressedNote(report)}`;
+    return `overlock: clean — ${describeScope(report)}.${suppressedNote(report)}${staleNote(report)}`;
   }
 
   const unexplained = report.findings.filter((f) => f.explained_by === undefined);
@@ -244,6 +356,13 @@ export function compact(report: Report, limit = 3): string {
     );
   }
 
+  // One line, because on a phone it is the line that decides whether the list
+  // below is one change or twenty-five.
+  const cluster = sharedIdentifier(unexplained);
+  if (cluster !== null) {
+    lines.push(`${cluster.count} of ${unexplained.length} of them mention ${cluster.name}.`, '');
+  }
+
   for (const group of shown) {
     const f = group.first;
     lines.push(`${MARK[f.severity]} ${LABEL[f.severity].trim()} ${groupWhere(group)} ${f.rule}`);
@@ -257,6 +376,10 @@ export function compact(report: Report, limit = 3): string {
 
   if (hidden > 0) {
     lines.push('', `...and ${hidden} more. Run \`npx overlock check\` for the full list.`);
+  }
+
+  for (const a of report.allowances_unused) {
+    lines.push('', `! allowed nothing: ${a.rule}${a.target === null ? '' : ` ${a.target}`}`);
   }
 
   return lines.join('\n');
@@ -284,6 +407,16 @@ function describeBase(base: string): string {
   if (base === EMPTY_TREE) return 'no commits yet';
   if (base === '--cached') return 'staged';
   return base;
+}
+
+/**
+ * The phone form of the same warning. Two words, because the alternative is a
+ * clean line that quietly stands on a claim nobody checked.
+ */
+function staleNote(report: Report): string {
+  const stale = report.allowances_unused.length;
+  if (stale === 0) return '';
+  return ` (${stale} acknowledgement${stale === 1 ? '' : 's'} matched nothing)`;
 }
 
 function suppressedNote(report: Report): string {

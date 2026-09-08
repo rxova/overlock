@@ -178,7 +178,21 @@ describe('a patch the rest of the patch explains', () => {
     )
     .join('');
 
-  const report = analyze({ diff: rename });
+  // An identifier inside a string literal is the one thing a rename really does
+  // change the value of, so it is what the rename has findings to explain: the
+  // renamed case titles above are no longer reported at all, because the cases
+  // they name are still there.
+  const literal = diffOf(
+    'src/mod5.test.ts',
+    hunk(
+      [
+        "-    expect(label).toBe('trainmotherfoca core');",
+        "+    expect(label).toBe('trainmf core');",
+      ].join('\n'),
+    ),
+  );
+
+  const report = analyze({ diff: rename + literal });
 
   it('leads with the rename and the residual', () => {
     const text = human(report, false);
@@ -192,6 +206,57 @@ describe('a patch the rest of the patch explains', () => {
 
   it('says the same thing in the form a phone can read', () => {
     expect(compact(report)).toContain('trainmotherfoca -> trainmf explains');
+  });
+});
+
+describe('a residual that is one change seen many times', () => {
+  const many = [1, 2, 3, 4]
+    .map((n) =>
+      diffOf(
+        `src/mod${n}.test.ts`,
+        hunk(
+          [
+            `-    expect(cloudSync.state(${n})).toBe(${n});`,
+            `+    expect(cloudSync.state(${n})).toBeDefined();`,
+          ].join('\n'),
+        ),
+      ),
+    )
+    .join('');
+
+  it('says how many of the findings are about the same name', () => {
+    const text = human(analyze({ diff: many }), false);
+    expect(text).toContain('4 of 4 unexplained findings mention cloudSync');
+  });
+
+  it('says it on a phone too, where the list is cut short', () => {
+    expect(compact(analyze({ diff: many }))).toContain('4 of 4 of them mention cloudSync.');
+  });
+
+  it('says nothing when the findings have no name in common', () => {
+    const scattered =
+      diffOf('src/a.test.ts', hunk("+  it.skip('one', () => {})")) +
+      diffOf('src/b.test.ts', hunk("+  it.skip('two', () => {})"));
+    expect(human(analyze({ diff: scattered }), false)).not.toContain(
+      'unexplained findings mention',
+    );
+  });
+});
+
+describe('an acknowledgement that matched nothing', () => {
+  const clean = analyze({
+    diff: diffOf('src/a.test.ts', hunk('+  const x = 1;')),
+    allowText: 'Overlock-Allow: TEST_REMOVED src/gone.test.ts -- ported every case',
+  });
+
+  it('is not hidden by an otherwise clean run', () => {
+    const text = human(clean, false);
+    expect(text).toContain('allowed nothing: TEST_REMOVED src/gone.test.ts');
+    expect(text).toContain('ported every case');
+  });
+
+  it('reaches the phone view as a count', () => {
+    expect(compact(clean)).toContain('1 acknowledgement matched nothing');
   });
 });
 

@@ -1,4 +1,9 @@
-import { assertionRemoved, assertionWeakened, expectedValueChanged } from './assertions.js';
+import {
+  assertionNarrowed,
+  assertionRemoved,
+  assertionWeakened,
+  expectedValueChanged,
+} from './assertions.js';
 import { snapshotUpdatedWithCode, testAndImplTogether } from './pairing.js';
 import { testRemoved } from './removal.js';
 import { testSkippedAdded } from './skip.js';
@@ -10,6 +15,7 @@ export const RULES: Rule[] = [
   testRemoved,
   testSkippedAdded,
   assertionWeakened,
+  assertionNarrowed,
   assertionRemoved,
   expectedValueChanged,
   coverageThresholdLowered,

@@ -71,6 +71,8 @@ export function finding(input: {
   fix_hint: string;
   before?: string;
   after?: string;
+  /** The named thing inside the file this finding is about, when there is one. */
+  subject?: string;
 }): Finding {
   const evidence: Finding['evidence'] = {};
   if (input.before !== undefined) evidence.before = sanitize(input.before.trim());
@@ -84,6 +86,7 @@ export function finding(input: {
     severity: input.severity,
     file: path,
     line: input.line,
+    ...(input.subject === undefined ? {} : { subject: sanitize(input.subject) }),
     message: sanitize(input.message),
     evidence,
     fix_hint: input.fix_hint,

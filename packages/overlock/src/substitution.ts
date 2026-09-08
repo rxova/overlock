@@ -35,6 +35,21 @@ const MIN_TOKEN_LENGTH = 3;
 const MIN_OCCURRENCES = 3;
 const MIN_FILES = 2;
 
+/**
+ * How many things one name is allowed to have become.
+ *
+ * Splitting one concept into two is among the commonest refactors there is —
+ * `cloud_sync` becoming `cloud_backup` in some places and `multi_device` in
+ * others — and refusing to infer it left a patch reporting twenty-five
+ * unexplained findings, twenty-two of which were that one split seen twenty-two
+ * times. A reviewer given that number reads it as twenty-five things to check.
+ *
+ * Two, and not more: each target still has to clear the same recurrence bar on
+ * its own, and a name that became five different things is being edited, not
+ * renamed. That is the line this number draws.
+ */
+const MAX_TARGETS = 2;
+
 /** Beyond this a run is not a renamed line; it is a generated file. */
 const MAX_TOKENS = 400;
 
@@ -144,7 +159,7 @@ function candidatesFor(run: Run): { from: string; to: string }[] | null {
   return pairs;
 }
 
-function explainRun(run: Run, map: Map<string, string>): Explanation | null {
+function explainRun(run: Run, map: Map<string, Set<string>>): Explanation | null {
   const before = tokenize(collapseWhitespace(run.before));
   const after = tokenize(collapseWhitespace(run.after));
 
@@ -155,7 +170,9 @@ function explainRun(run: Run, map: Map<string, string>): Explanation | null {
     const b = before[i] as string;
     const a = after[i] as string;
     if (b === a) continue;
-    if (map.get(b) !== a) return null;
+    // Any of the things this name became: one line took one of the branches of
+    // a split, and which branch it took is not what makes it a rename.
+    if (map.get(b)?.has(a) !== true) return null;
     substituted = true;
   }
 
@@ -177,6 +194,24 @@ function substituter(map: Map<string, string>): (text: string) => string {
   return (text) => text.replace(pattern, (name) => map.get(name) ?? name);
 }
 
+/**
+ * The dominant target per name, for the substitution rules pair against.
+ *
+ * A split has no single answer to "what did this line become", so pairing takes
+ * the busier branch and the other branch simply does not pair. That is the
+ * honest failure: a rule that fires on the branch it could read is better than
+ * one that guesses, and `explainRun` — which is what marks a finding as
+ * accounted for — reads both.
+ */
+function dominant(accepted: Candidate[]): Map<string, string> {
+  const best = new Map<string, Candidate>();
+  for (const entry of accepted) {
+    const current = best.get(entry.from);
+    if (current === undefined || entry.count > current.count) best.set(entry.from, entry);
+  }
+  return new Map([...best].map(([from, entry]) => [from, entry.to]));
+}
+
 interface Candidate {
   from: string;
   to: string;
@@ -188,9 +223,6 @@ export function explainPatch(files: DiffFile[]): PatchExplanation {
   const perFile = files.map((file) => ({ file, runs: runsOf(file) }));
 
   const candidates = new Map<string, Candidate>();
-  // Every target a given name was replaced by, anywhere in the patch. A name
-  // with more than one is not being renamed; it is being edited.
-  const targets = new Map<string, Set<string>>();
 
   for (const { file, runs } of perFile) {
     for (const run of runs) {
@@ -203,20 +235,30 @@ export function explainPatch(files: DiffFile[]): PatchExplanation {
         entry.count += 1;
         entry.files.add(file.path);
         candidates.set(key, entry);
-
-        const seen = targets.get(pair.from) ?? new Set<string>();
-        seen.add(pair.to);
-        targets.set(pair.from, seen);
       }
     }
   }
 
-  const map = new Map<string, string>();
+  // Only the targets that stand on their own count towards the split limit: a
+  // name renamed wholesale plus one line where it was genuinely edited is one
+  // rename, and the edit is the thing that must not be explained away.
+  const attested = new Map<string, Set<string>>();
+  for (const entry of candidates.values()) {
+    if (entry.count < MIN_OCCURRENCES || entry.files.size < MIN_FILES) continue;
+    const seen = attested.get(entry.from) ?? new Set<string>();
+    seen.add(entry.to);
+    attested.set(entry.from, seen);
+  }
+
+  const map = new Map<string, Set<string>>();
   const accepted: Candidate[] = [];
   for (const entry of candidates.values()) {
     if (entry.count < MIN_OCCURRENCES || entry.files.size < MIN_FILES) continue;
-    if (targets.get(entry.from)?.size !== 1) continue;
-    map.set(entry.from, entry.to);
+    const size = attested.get(entry.from)?.size ?? 0;
+    if (size > MAX_TARGETS) continue;
+    const targeted = map.get(entry.from) ?? new Set<string>();
+    targeted.add(entry.to);
+    map.set(entry.from, targeted);
     accepted.push(entry);
   }
 
@@ -266,9 +308,15 @@ export function explainPatch(files: DiffFile[]): PatchExplanation {
     renames,
     files: explained,
     explainsEdit: (before, after) => explainRun({ before, after }, map),
-    applyRenames: substituter(map),
-    label: headline === undefined ? null : `${headline.from} -> ${headline.to}`,
+    applyRenames: substituter(dominant(accepted)),
+    label: headline === undefined ? null : describeRename(headline.from, renames),
   };
+}
+
+/** `cloud_sync -> cloud_backup + multi_device`, so a split reads as one thing. */
+function describeRename(from: string, renames: Rename[]): string {
+  const targets = renames.filter((r) => r.from === from).map((r) => r.to);
+  return `${from} -> ${targets.join(' + ')}`;
 }
 
 /** Whether a file's changes are whitespace and nothing else. */

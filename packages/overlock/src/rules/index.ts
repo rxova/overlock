@@ -5,6 +5,7 @@ import {
   expectedValueChanged,
 } from './assertions.js';
 import { snapshotUpdatedWithCode, testAndImplTogether } from './pairing.js';
+import { predicateNarrowed } from './predicates.js';
 import { testRemoved } from './removal.js';
 import { testSkippedAdded } from './skip.js';
 import { coverageThresholdLowered, testTimeoutRaised } from './thresholds.js';
@@ -16,6 +17,7 @@ export const RULES: Rule[] = [
   testSkippedAdded,
   assertionWeakened,
   assertionNarrowed,
+  predicateNarrowed,
   assertionRemoved,
   expectedValueChanged,
   coverageThresholdLowered,

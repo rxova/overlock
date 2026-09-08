@@ -80,24 +80,37 @@ actually be stopped.
 
 ## What it looks for
 
-Ten rules, all scoped strictly to the patch.
+Eleven rules, all scoped strictly to the patch.
 
-| Rule                         | Severity      | Fires when                                                                                                                         |
-| ---------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `TEST_REMOVED`               | high / medium | A test file is deleted or renamed out of the runner's glob; a case disappears from a surviving file                                |
-| `TEST_SKIPPED_ADDED`         | high          | `it.skip`, `xit`, `.todo`, `@pytest.mark.skip`, `t.Skip()`, `#[ignore]`, `@Disabled` — and `.only`, which silences everything else |
-| `ASSERTION_WEAKENED`         | high          | An assertion stops naming a value: `toBe(3)` becomes `toBeDefined()`, `toBeTruthy()` or `not.toBeNull()`                           |
-| `ASSERTION_NARROWED`         | high          | An assertion keeps naming a value but covers less of it: a whole object becomes one field                                          |
-| `COVERAGE_THRESHOLD_LOWERED` | high          | A coverage or mutation threshold drops, or disappears                                                                              |
-| `ASSERTION_REMOVED`          | medium        | A test file ends the patch with fewer assertions than it started with                                                              |
-| `EXPECTED_VALUE_CHANGED`     | medium        | An assertion keeps its shape but its expected literal was edited                                                                   |
-| `SNAPSHOT_UPDATED_WITH_CODE` | medium        | A snapshot was regenerated in the same patch as the code it snapshots                                                              |
-| `TEST_TIMEOUT_RAISED`        | low           | A timeout or retry count went up, or appeared                                                                                      |
-| `TEST_AND_IMPL_TOGETHER`     | low           | A test changed alongside the implementation it is named after                                                                      |
+| Rule                         | Severity      | Fires when                                                                                                                                                             |
+| ---------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TEST_REMOVED`               | high / medium | A test file is deleted or renamed out of the runner's glob; a case disappears from a surviving file                                                                    |
+| `TEST_SKIPPED_ADDED`         | high          | `it.skip`, `xit`, `.todo`, `@pytest.mark.skip`, `t.Skip()`, `#[ignore]`, `@Disabled` — and `.only`, which silences everything else                                     |
+| `ASSERTION_WEAKENED`         | high          | An assertion stops naming a value: `toBe(3)` becomes `toBeDefined()`, `toBeTruthy()` or `not.toBeNull()`                                                               |
+| `ASSERTION_NARROWED`         | high          | An assertion keeps naming a value but covers less of it: a whole object becomes one field                                                                              |
+| `PREDICATE_NARROWED`         | high / medium | The set an assertion ranges over shrinks: a filter gains a condition, an iterated source gains a `.filter(...)`, a case table loses rows, a named exclusion list grows |
+| `COVERAGE_THRESHOLD_LOWERED` | high          | A coverage or mutation threshold drops, or disappears                                                                                                                  |
+| `ASSERTION_REMOVED`          | medium        | A test file ends the patch with fewer assertions than it started with                                                                                                  |
+| `EXPECTED_VALUE_CHANGED`     | medium        | An assertion keeps its shape but its expected literal was edited                                                                                                       |
+| `SNAPSHOT_UPDATED_WITH_CODE` | medium        | A snapshot was regenerated in the same patch as the code it snapshots                                                                                                  |
+| `TEST_TIMEOUT_RAISED`        | low           | A timeout or retry count went up, or appeared                                                                                                                          |
+| `TEST_AND_IMPL_TOGETHER`     | low           | A test changed alongside the implementation it is named after                                                                                                          |
 
 Only **high** blocks by default. The `low` tier exists because it is true often
 enough that blocking on it would train you to uninstall the tool; it earns its
 place by telling you which implementation change the other findings are about.
+
+`PREDICATE_NARROWED` is the one rule that fires on a patch where every `expect`
+is byte for byte unchanged. It watches the set the assertions are applied to:
+a `.filter(...)` predicate that gained a conjunct, an iterated source that
+gained a `.filter(...)` or a `.slice(...)`, an `it.each([...])` table that lost
+rows, or a list whose name says it holds exemptions growing by one. It is
+`high` when the narrowed set is one a loop or an `it.each` consumes — that set
+decides how many times the assertions below it run, so shrinking it is the same
+event as deleting them — and `medium` when the set is only assigned to a
+variable, because a diff cannot see whether that variable reaches an assertion.
+`--severity PREDICATE_NARROWED=high` collapses the two if you would rather it
+always blocked.
 
 `--severity TEST_REMOVED=medium` regrades one rule without touching the rest. It
 exists because the alternative — dropping `--fail-on` to `medium` to unblock one

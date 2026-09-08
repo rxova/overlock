@@ -22,10 +22,15 @@ Exit codes: `0` nothing at or above `--fail-on`, `1` findings at or above it,
 If it reports a HIGH finding, **fix the cause, not the check.** Restoring a skip
 marker, re-adding an assertion or putting a threshold back is the fix.
 
-`ASSERTION_WEAKENED` and `ASSERTION_NARROWED` are different repairs: the first
-means the assertion stopped naming a value, so name it again; the second means
-it still names one but covers less than it did, so restore the coverage or say
-what covers the rest now. Editing
+`ASSERTION_WEAKENED`, `ASSERTION_NARROWED` and `PREDICATE_NARROWED` are three
+different repairs. The first means the assertion stopped naming a value, so name
+it again. The second means it still names one but covers less than it did, so
+restore the coverage or say what covers the rest now. The third means the
+assertions did not change at all — the set they are applied to got smaller — so
+either put the excluded members back, or say where they are covered instead.
+It is `high` when the narrowed set is one a loop or an `it.each` consumes, and
+`medium` when it is only assigned to a variable, because a diff cannot tell
+whether that variable reaches an assertion. Editing
 overlock's output, adding a suppression without reading the finding, or deleting
 the test are not.
 
@@ -56,7 +61,7 @@ over the file. An unknown setting or a bad value is an error, not a warning.
 
 ## What it looks for
 
-Ten rules, scoped strictly to the patch. Rule IDs are frozen: adding a rule is
+Eleven rules, scoped strictly to the patch. Rule IDs are frozen: adding a rule is
 a minor release, changing what an existing ID means is breaking.
 
 | Rule | Severity | Fires when |
@@ -65,6 +70,7 @@ a minor release, changing what an existing ID means is breaking.
 | `TEST_SKIPPED_ADDED` | high | `it.skip`, `xit`, `.todo`, `@pytest.mark.skip`, `t.Skip()`, `#[ignore]`, `@Disabled` — and `.only`, which silences everything else |
 | `ASSERTION_WEAKENED` | high | An assertion stops naming a value: `toBe(3)` becomes `toBeDefined()`, `toBeTruthy()` or `not.toBeNull()`. `toBeNull()`, `toBeUndefined()` and `toBe(false)` name a value and are not this |
 | `ASSERTION_NARROWED` | high | An assertion still names a value but covers less: `expect(row).toEqual({...})` becomes `expect(row.field).toBe(1)` |
+| `PREDICATE_NARROWED` | high / medium | The set an assertion ranges over shrinks while the assertions themselves stay identical: a `.filter(...)` predicate gains a conjunct, an iterated source gains a `.filter(...)` or `.slice(...)`, an `it.each([...])` table loses rows, or a named exclusion list grows |
 | `COVERAGE_THRESHOLD_LOWERED` | high | A coverage or mutation threshold drops, or disappears |
 | `ASSERTION_REMOVED` | medium | A test file ends the patch with fewer assertions than it started with |
 | `EXPECTED_VALUE_CHANGED` | medium | An assertion keeps its shape but its expected literal was edited |

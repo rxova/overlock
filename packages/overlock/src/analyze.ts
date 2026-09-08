@@ -152,13 +152,15 @@ function regrade(f: Finding, severities: Partial<Record<RuleId, Severity>>): Fin
  * Two passes, both narrow on purpose.
  *
  * Identical `id`s collapse — the same rule cannot report the same line twice.
- * And EXPECTED_VALUE_CHANGED is suppressed where ASSERTION_WEAKENED or
- * ASSERTION_NARROWED already fired on the same line, because they are the same
- * edit seen twice: replacing `toBe(3)` with `toBeDefined()` changes both the
- * matcher and the literal, and narrowing a whole-object assertion to one field
- * changes the literals along with the scope. Nothing else is merged; findings
- * from different rules are different facts and silently dropping one to shorten
- * the report is how a tool stops being trustworthy.
+ * And EXPECTED_VALUE_CHANGED and PREDICATE_NARROWED are suppressed where
+ * ASSERTION_WEAKENED or ASSERTION_NARROWED already fired on the same line,
+ * because they are the same edit seen twice: replacing `toBe(3)` with
+ * `toBeDefined()` changes both the matcher and the literal, narrowing a
+ * whole-object assertion to one field changes the literals along with the
+ * scope, and tightening a filter inside an `expect(...)` narrows the assertion
+ * and its input in one stroke. Nothing else is merged; findings from different
+ * rules are different facts and silently dropping one to shorten the report is
+ * how a tool stops being trustworthy.
  */
 function dedupe(findings: Finding[]): Finding[] {
   const byId = new Map<string, Finding>();
@@ -170,8 +172,10 @@ function dedupe(findings: Finding[]): Finding[] {
       .map((f) => `${f.file}:${f.line}`),
   );
 
+  const alsoSaidByLoosening = new Set<RuleId>(['EXPECTED_VALUE_CHANGED', 'PREDICATE_NARROWED']);
+
   return [...byId.values()].filter(
-    (f) => !(f.rule === 'EXPECTED_VALUE_CHANGED' && loosened.has(`${f.file}:${f.line}`)),
+    (f) => !(alsoSaidByLoosening.has(f.rule) && loosened.has(`${f.file}:${f.line}`)),
   );
 }
 

@@ -1,6 +1,14 @@
 import { execFileSync } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { check, gitDiff, hasChangeset, main, touchesPackage } from './check-changeset.js';
+import {
+  check,
+  gitDiff,
+  hasChangeset,
+  labelsOf,
+  main,
+  SKIP_LABEL,
+  touchesPackage,
+} from './check-changeset.js';
 
 describe('touchesPackage', () => {
   it('sees a source change', () => {
@@ -58,6 +66,34 @@ describe('check', () => {
     expect(verdict.exitCode).toBe(1);
     expect(verdict.message).toContain('adds no changeset');
     expect(verdict.message).toContain('pnpm changeset');
+    expect(verdict.message).toContain(SKIP_LABEL);
+  });
+
+  /**
+   * A dependency bump changes what the repository builds with and nothing about
+   * what it publishes. Demanding a changelog entry for it every week is how a
+   * gate ends up answered with an empty changeset.
+   */
+  it('asks for nothing when the pull request carries the label', () => {
+    const verdict = check(['packages/overlock/package.json'], ['dependencies', SKIP_LABEL]);
+    expect(verdict.exitCode).toBe(0);
+    expect(verdict.message).toContain(SKIP_LABEL);
+  });
+
+  it('is not satisfied by some other label', () => {
+    expect(check(['packages/overlock/src/run.ts'], ['dependencies']).exitCode).toBe(1);
+  });
+});
+
+describe('labelsOf', () => {
+  it('reads the comma-separated list the workflow hands over', () => {
+    expect(labelsOf('dependencies,skip-changeset')).toEqual(['dependencies', 'skip-changeset']);
+  });
+
+  it('tolerates spacing, and an unlabelled pull request', () => {
+    expect(labelsOf(' dependencies , skip-changeset ')).toEqual(['dependencies', 'skip-changeset']);
+    expect(labelsOf('')).toEqual([]);
+    expect(labelsOf(undefined)).toEqual([]);
   });
 });
 
@@ -87,6 +123,13 @@ describe('main', () => {
     const diff = () => ['packages/overlock/src/run.ts'];
     expect(main({ BASE_SHA: 'aaa', HEAD_SHA: 'bbb' }, { diff })).toBe(1);
     expect(error).toHaveBeenCalledWith(expect.stringContaining('adds no changeset'));
+  });
+
+  it('reads the label from the environment the workflow sets', () => {
+    const diff = () => ['packages/overlock/package.json'];
+    const env = { BASE_SHA: 'aaa', HEAD_SHA: 'bbb', PR_LABELS: `dependencies,${SKIP_LABEL}` };
+    expect(main(env, { diff })).toBe(0);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining(SKIP_LABEL));
   });
 });
 

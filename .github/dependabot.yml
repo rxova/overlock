@@ -5,6 +5,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # `skip-changeset` is what the changeset gate reads. A bump changes what the
+    # repository builds with, never what it publishes, so there is no changelog
+    # entry to write — and a gate that demanded one anyway would be answered with
+    # an empty changeset every week, which is how a gate stops meaning anything.
+    labels: ['dependencies', 'skip-changeset']
     groups:
       # One PR per ecosystem cluster rather than one per package: this repo has
       # no runtime dependencies, so every bump here is dev tooling and reviewing
@@ -15,3 +20,4 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    labels: ['dependencies', 'skip-changeset']

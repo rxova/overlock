@@ -16,6 +16,29 @@ updates:
       # them individually is noise.
       dev-tooling:
         patterns: ['*']
+    ignore:
+      # TypeScript 7 is held, not skipped. Two parts of the toolchain refuse it,
+      # and neither is this repository's code — `tsc --noEmit` passes clean under
+      # it today:
+      #
+      #   - typescript-eslint declares its peer as `>=4.8.4 <6.1.0` and errors on
+      #     sight of TS 7. That is the whole `lint` job.
+      #     https://github.com/typescript-eslint/typescript-eslint/issues/10940
+      #   - tsup's declaration build crashes on it: `rollup-plugin-dts` is bundled
+      #     against TS 5.7 and dies with `Cannot read properties of undefined
+      #     (reading 'useCaseSensitiveFileNames')`. That is `build`, and it takes
+      #     `package contract`, `published package on node 20`, `overlock on
+      #     itself` and all three `e2e` jobs down with it.
+      #
+      # Without this, Dependabot offers the same unmergeable bump every week and
+      # the group it belongs to goes red with it, which is how a weekly red pull
+      # request stops being read at all.
+      #
+      # Lift it — delete this entry — once both are true. Check by bumping
+      # typescript by hand and running `pnpm run verify`; nothing else here needs
+      # to change, because the code is already ready for it.
+      - dependency-name: typescript
+        versions: ['>=7.0.0']
   - package-ecosystem: github-actions
     directory: /
     schedule:

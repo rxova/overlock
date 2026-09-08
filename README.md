@@ -80,13 +80,14 @@ actually be stopped.
 
 ## What it looks for
 
-Nine rules, all scoped strictly to the patch.
+Ten rules, all scoped strictly to the patch.
 
 | Rule                         | Severity      | Fires when                                                                                                                         |
 | ---------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `TEST_REMOVED`               | high / medium | A test file is deleted or renamed out of the runner's glob; a case disappears from a surviving file                                |
 | `TEST_SKIPPED_ADDED`         | high          | `it.skip`, `xit`, `.todo`, `@pytest.mark.skip`, `t.Skip()`, `#[ignore]`, `@Disabled` — and `.only`, which silences everything else |
-| `ASSERTION_WEAKENED`         | high          | An exact matcher on a subject becomes an existence check on the same subject                                                       |
+| `ASSERTION_WEAKENED`         | high          | An assertion stops naming a value: `toBe(3)` becomes `toBeDefined()`, `toBeTruthy()` or `not.toBeNull()`                           |
+| `ASSERTION_NARROWED`         | high          | An assertion keeps naming a value but covers less of it: a whole object becomes one field                                          |
 | `COVERAGE_THRESHOLD_LOWERED` | high          | A coverage or mutation threshold drops, or disappears                                                                              |
 | `ASSERTION_REMOVED`          | medium        | A test file ends the patch with fewer assertions than it started with                                                              |
 | `EXPECTED_VALUE_CHANGED`     | medium        | An assertion keeps its shape but its expected literal was edited                                                                   |
@@ -102,6 +103,34 @@ place by telling you which implementation change the other findings are about.
 exists because the alternative — dropping `--fail-on` to `medium` to unblock one
 rule — also unblocks `TEST_SKIPPED_ADDED`, `ASSERTION_WEAKENED` and
 `COVERAGE_THRESHOLD_LOWERED`. An escape from one rule should not disarm four.
+
+### Weakened, narrowed, and what is neither
+
+Two different things happen to an assertion, and being told the wrong one costs
+you the time it takes to work out the right one for yourself.
+
+`ASSERTION_WEAKENED` is the assertion giving up the value: `toBe('admin')`
+becoming `toBeDefined()`, `toBeTruthy()`, `toBeFalsy()`, `toBeInstanceOf(...)`,
+a bare `toHaveBeenCalled()`, an `expect.any(...)` where a literal was — or
+`not.toBeNull()`, which says a value is there and nothing about what it is.
+
+`toBeNull()`, `toBeUndefined()` and `toBe(false)` are **not** in that family.
+Each names exactly one value, as precisely as `toBe(3)` does, and reading them
+as existence checks is how two of three findings on one real patch came back
+wrong.
+
+`ASSERTION_NARROWED` is the assertion keeping the value and covering less of it:
+`expect(row).toEqual({ id, state, lapsedAt })` becoming
+`expect(row.lapsedAt).toBeNull()`, or `toHaveBeenCalledWith('row', 42)` becoming
+`toHaveBeenCalledWith('row')`. Same severity, different sentence, and the
+sentence is the part you act on.
+
+Both are read at the scale of the test rather than the line. A case that gives
+up specificity on one line while gaining assertions elsewhere is graded `medium`
+and says how many it gained; a case that only lost stays `high`. And a removal
+is paired only with an addition in the same edit — never one three context lines
+away in the next test — and never at all when the assertion it removed is still
+standing further down the file.
 
 ### What a deleted test file is graded on
 
@@ -123,9 +152,27 @@ them. Deleting the module the file is named after — `api.test.ts` alongside
 tests. A module that was merely _modified_ does not: a test file deleted while
 the code it covered lives on is the case worth stopping for.
 
-Name matching is a heuristic and is meant as one: a renamed case reads as
-vanished, and a same-named case that now asserts nothing reads as re-homed. It
-grades the finding and tells you where to look. It does not replace you.
+A case is matched by its title, by its title with the patch's own rename applied
+— `lists ledger entries` becoming `lists admin entries` is not a deletion — and
+failing both, by its body. The body is the one that matters in practice: a
+retitled test is the commonest thing a deleted-case finding gets wrong, and a
+case is what it asserts rather than what it is called.
+
+When every case in a deleted file lands in one other file, that is a move, and
+several moves are reported as one finding:
+
+```
+!  MED  src/old/ledger.test.ts  TEST_REMOVED
+     8 test files deleted — all 63 of their cases reappear elsewhere in this
+     patch: src/old/ledger.test.ts -> src/admin/api.test.ts, ...
+```
+
+One decision, one finding, one acknowledgement. Reported per file it was eight
+of each, and a reviewer who has waved through six is not reading the seventh.
+
+Matching is a heuristic and is meant as one: a case found again by name is not a
+promise that it still asserts what it did. It grades the finding and tells you
+where to look. It does not replace you.
 
 Languages: TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, Ruby and C#
 conventions are recognised out of the box. `--test-glob` adds your own.
@@ -215,6 +262,21 @@ anything else is an explicit claim rather than something you verify by reading
 a table. Whatever the substitution does _not_ account for is printed in full,
 above the fold.
 
+A name that became two names is read as one thing too. `cloud_sync` splitting
+into `cloud_backup` and `multi_device` is an ordinary refactor, and a tool that
+insists a rename has exactly one target reports it as a wall of unrelated
+findings — one patch came back with twenty-five unexplained, twenty-two of which
+were that split seen twenty-two times. Each branch still has to be attested on
+its own, and a name that became five different things is being edited rather
+than renamed, which nothing explains.
+
+Whatever is left over is clustered by the name most of it mentions:
+
+```
+  22 of 25 unexplained findings mention cloud_sync
+    Read that change once and most of this list goes with it.
+```
+
 The same machinery sees through a formatter: a name that got thirteen
 characters shorter lets prettier re-join an import that no longer needs
 wrapping, and a file whose only delta is whitespace is not a change in any
@@ -242,9 +304,36 @@ Overlock-Allow: TEST_AND_IMPL_TOGETHER -- rename only, no behaviour changed
 ```
 
 Same ceiling as everywhere else: a named rule and a written reason, never a
-wildcard across rules, and a path may narrow it further. It is reported and
-counted like any other suppression, and the Stop hook quotes it back at you
-once, because a trailer is written by the patch by definition.
+wildcard across rules. It is reported and counted like any other suppression,
+and the Stop hook quotes it back at you once, because a trailer is written by
+the patch by definition.
+
+What it names can be as narrow as the finding, which matters when a file holds
+seventeen of them and fifteen are explained:
+
+```
+Overlock-Allow: TEST_REMOVED src/api.test.ts -- the whole file moved
+Overlock-Allow: TEST_REMOVED src/api.test.ts:42 -- one finding, by line
+Overlock-Allow: TEST_REMOVED "src/api.test.ts::rejects expired tokens" -- ported to tokens.test.ts
+```
+
+The quoted form names the case rather than the line, because a line number moves
+when someone adds a line above it and a test title does not. Fifteen cases
+acknowledged one by one leaves the two nobody has explained still standing,
+which is the point — a directive that names the file silences all seventeen,
+including the one that turns out never to have landed.
+
+And an acknowledgement that covers nothing is reported rather than quietly doing
+nothing:
+
+```
+  ! allowed nothing: TEST_REMOVED src/api.test.ts::rejects expired tokens -- ported to tokens.test.ts
+    The finding it names is not in this patch.
+```
+
+Either the case came back or it never landed where the trailer said it did.
+Both are worth a sentence; neither is worth a clean run that stands silently on
+a claim nobody checked.
 
 At Stop time it covers what the agent committed during the session; work still
 sitting in the tree has no commit message to read — which is why this is an

@@ -9,7 +9,8 @@ runtime dependency costs a network round trip each time. Do not add one.
 
 - `packages/overlock` — the published package.
   - `src/diff.ts` — unified diff parser, hand-written for the same reason.
-  - `src/rules/` — the nine rules. Each is pure: `DiffFile[]` in, `Finding[]` out.
+  - `src/rules/` — the ten rules. Each is pure: `DiffFile[]` in, `Finding[]` out.
+  - `src/rules/cases.ts` — the diff grouped by test case, which three of them read.
   - `src/report.ts` — three views. `compact` is the one that reaches a phone.
   - `src/hook.ts` — the Claude Code Stop protocol.
 - `packages/tooling` — repo scripts (pack smoke test, pre-push gate, changeset gate).

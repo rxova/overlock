@@ -20,7 +20,12 @@ Exit codes: `0` nothing at or above `--fail-on`, `1` findings at or above it,
 `2` overlock could not run.
 
 If it reports a HIGH finding, **fix the cause, not the check.** Restoring a skip
-marker, re-adding an assertion or putting a threshold back is the fix. Editing
+marker, re-adding an assertion or putting a threshold back is the fix.
+
+`ASSERTION_WEAKENED` and `ASSERTION_NARROWED` are different repairs: the first
+means the assertion stopped naming a value, so name it again; the second means
+it still names one but covers less than it did, so restore the coverage or say
+what covers the rest now. Editing
 overlock's output, adding a suppression without reading the finding, or deleting
 the test are not.
 
@@ -51,14 +56,15 @@ over the file. An unknown setting or a bad value is an error, not a warning.
 
 ## What it looks for
 
-Nine rules, scoped strictly to the patch. Rule IDs are frozen: adding a rule is
+Ten rules, scoped strictly to the patch. Rule IDs are frozen: adding a rule is
 a minor release, changing what an existing ID means is breaking.
 
 | Rule | Severity | Fires when |
 | --- | --- | --- |
 | `TEST_REMOVED` | high / medium | Test file deleted or renamed out of the runner's glob; a case disappears from a surviving file |
 | `TEST_SKIPPED_ADDED` | high | `it.skip`, `xit`, `.todo`, `@pytest.mark.skip`, `t.Skip()`, `#[ignore]`, `@Disabled` — and `.only`, which silences everything else |
-| `ASSERTION_WEAKENED` | high | An exact matcher on a subject becomes an existence check on the same subject |
+| `ASSERTION_WEAKENED` | high | An assertion stops naming a value: `toBe(3)` becomes `toBeDefined()`, `toBeTruthy()` or `not.toBeNull()`. `toBeNull()`, `toBeUndefined()` and `toBe(false)` name a value and are not this |
+| `ASSERTION_NARROWED` | high | An assertion still names a value but covers less: `expect(row).toEqual({...})` becomes `expect(row.field).toBe(1)` |
 | `COVERAGE_THRESHOLD_LOWERED` | high | A coverage or mutation threshold drops, or disappears |
 | `ASSERTION_REMOVED` | medium | A test file ends the patch with fewer assertions than it started with |
 | `EXPECTED_VALUE_CHANGED` | medium | An assertion keeps its shape but its expected literal was edited |
@@ -109,8 +115,12 @@ same thing in its first line.
 `line` is `null` when the finding is about the file rather than a line in it — a
 deleted test file has no line 1 — and `id` is then `<rule>:<file>`.
 
+`subject` is present when the finding is about a named thing inside the file —
+a test case title — and is what a `path::case name` acknowledgement matches.
+
 `explained_by` is present when the rest of the patch accounts for the change: a
-substitution the patch applies wholesale, or whitespace alone. Report those
+substitution the patch applies wholesale (including a name that became two
+names), or whitespace alone. Report those
 findings as consistent with the rename and lead with the ones that are not.
 An explained finding is still a finding — it keeps its severity and still
 blocks. The inference never decides anything on its own.
@@ -140,10 +150,18 @@ form is a trailer in a commit message or pull request body:
 
 ```
 Overlock-Allow: TEST_AND_IMPL_TOGETHER -- rename only, no behaviour changed
+Overlock-Allow: TEST_REMOVED src/api.test.ts:42 -- one finding, by line
+Overlock-Allow: TEST_REMOVED "src/api.test.ts::rejects expired tokens" -- ported to tokens.test.ts
 ```
 
-It needs a written reason too. At Stop time it covers what the agent committed
-during the session; work still in the tree has no commit message to read.
+It needs a written reason too. The target may be a path, a `path:line` as the
+report prints it, or a quoted `path::case name` — name the narrowest one that is
+true, because a directive naming the file silences every finding in it including
+the ones nobody has explained. A trailer that matches no finding is reported as
+`allowances_unused`, so a stale acknowledgement is visible rather than silent.
+
+At Stop time it covers what the agent committed during the session; work still
+in the tree has no commit message to read.
 
 **Do not add one to make a check pass.** A directive added by the same patch it
 silences stops the hook once and quotes your reason back to the person, so it

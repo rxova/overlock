@@ -15,10 +15,20 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { RULE_IDS } from '../overlock/src/types.js';
 import { isEntry } from './entry.js';
 
-/** How many rules the published library is expected to export. */
-export const EXPECTED_RULE_COUNT = 9;
+/**
+ * How many rules the published library is expected to export, read from the
+ * source rather than written down here.
+ *
+ * The probe's question is whether the tarball exposes the rule set this
+ * repository has — not the one somebody remembered to retype. A literal made
+ * adding a rule fail the `package contract` job with "rule registry changed
+ * shape", which is exactly what a new rule is and exactly the wrong place to
+ * find out.
+ */
+export const EXPECTED_RULE_COUNT = RULE_IDS.length;
 
 export type Shell = (command: string, args: string[], cwd: string) => string;
 export type Workspace = {

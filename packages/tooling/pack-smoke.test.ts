@@ -6,6 +6,7 @@
  */
 import { existsSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { RULE_IDS } from '../overlock/src/types.js';
 import {
   EXPECTED_RULE_COUNT,
   main,
@@ -51,6 +52,15 @@ describe('probeSource', () => {
 
   it('can be pointed at a different rule count', () => {
     expect(probeSource(12)).toContain('RULE_IDS.length !== 12');
+  });
+
+  /**
+   * Written down, this number goes stale the day a rule is added — and it goes
+   * stale as a red `package contract` job saying "rule registry changed shape",
+   * which is what adding a rule is. It has to come from the registry.
+   */
+  it('counts the rules the source actually declares', () => {
+    expect(EXPECTED_RULE_COUNT).toBe(RULE_IDS.length);
   });
 });
 

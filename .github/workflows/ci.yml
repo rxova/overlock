@@ -16,12 +16,20 @@ permissions:
 # Two lanes per ref. The three metadata-only actions move no file, so they must
 # not cancel a full run already in flight for the same commit and restart the
 # whole graph from zero.
+#
+# On main nothing is cancelled at all. A push there is the last chance to judge
+# that commit: it is already merged, and the release commit that follows skips
+# the matrix precisely because it trusts its parent's verdict. Cancelling a main
+# run means the next push silently erases the only signal the commit under it
+# would ever get, and the first thing to notice is a red Release after the
+# publish window has already been missed. Superseded pull request runs stay
+# cancellable — the branch will be judged again on its next push.
 concurrency:
   group: >-
     ${{ github.workflow }}-${{ github.ref }}-${{
     contains(fromJSON('["edited", "labeled", "unlabeled"]'), github.event.action)
     && 'metadata' || 'code' }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # The root of the graph: everything else declares `needs: [commitlint]`. It

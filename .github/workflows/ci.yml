@@ -354,3 +354,52 @@ jobs:
           # `if:`, so that honouring the label is visible in a log somebody can read.
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: node --import tsx ./packages/tooling/check-changeset.ts
+
+  # The single context branch protection requires, and the only job here that
+  # never skips.
+  #
+  # Requiring the job names directly does not work. Two runs can report on one
+  # commit — a push publishes the real verdicts, then an `edited` or a label
+  # publishes the metadata lane, where every heavy job is skipped by its `if:`
+  # and reports a second check run under the same name. Both instances count as
+  # required, a skipped one never satisfies the requirement, and the pull
+  # request sits blocked behind checks whose rollup reads green. The matrix jobs
+  # hide it further: skipped before expansion, they report under the literal
+  # `unit (node ${{ matrix.node-version }})`, so their names drift with the
+  # event that produced them.
+  #
+  # One always-reported context sidesteps all of it. `skipped` is the answer
+  # this workflow gives deliberately — a metadata event, a release commit — so
+  # the gate accepts it. `cancelled` is not: a run killed mid-flight is the
+  # verdict this repository has already once mistaken for a pass.
+  gate:
+    name: all checks
+    if: always()
+    needs:
+      - commitlint
+      - checks
+      - test
+      - compat
+      - e2e
+      - supply-chain
+      - pack-smoke
+      - dogfood
+      - changeset
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every job to have passed or skipped
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$RESULTS"
+          bad=$(echo "$RESULTS" | jq -r 'to_entries
+            | map(select(.value.result != "success" and .value.result != "skipped"))
+            | .[] | "\(.key): \(.value.result)"')
+          if [ -n "$bad" ]; then
+            echo "::error::a required job did not pass"
+            echo "$bad"
+            exit 1
+          fi
+          echo "every job passed or was deliberately skipped"

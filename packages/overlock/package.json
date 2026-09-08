@@ -1,6 +1,6 @@
 {
   "name": "overlock",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Find out what your coding agent did to your tests. A deterministic, zero-dependency gate on test integrity in a patch.",
   "license": "MIT",
   "author": "Jonatan Kruszewski <jonakrusze@gmail.com>",

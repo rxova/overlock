@@ -116,7 +116,7 @@ The release job then pushes the tags, in two forms:
   its own at 1.0.0.
 - **`v<version>`**, one per release, and a GitHub Release cut from it. This is
   the Marketplace's half: a listing is published from a release, and the tag
-  behind it has to be semver, which `overlock@0.5.1` was not. Unlike the major
+  behind it has to be semver, which `overlock@0.5.1` is not. Unlike the major
   tag this one is never moved — it names one release for good. Its notes are the
   changelog section changesets just wrote for that version.
 
@@ -138,12 +138,11 @@ git ls-remote --tags origin
 ```
 
 `v0` should point at the newest release commit, and there should be a `v<version>`
-and a release for it. The `overlock@*` tags track npm and are one per published
-version — with one hole: `overlock@0.5.1` was deleted by hand while untangling
-the first Marketplace listing, so npm 0.5.1 has no tag behind it. Nothing else
-should be missing. If something is, tag by hand against the `chore: version
-packages` commit for that version rather than leaving the gap, and treat the
-drift as a bug in the release job.
+and a release for it. The `overlock@*` tags track npm: one per published version,
+no gaps. If one is missing, tag by hand against the `chore: version packages`
+commit that carries it — `overlock@0.5.1` was deleted and restored to `ce9ffee`
+that way — rather than leaving the gap, and treat the drift as a bug in the
+release job.
 
 The action's versions and npm's are **not** the same line, and are not expected
 to match.

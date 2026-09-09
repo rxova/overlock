@@ -4,7 +4,7 @@
 
 ### Minor Changes
 
-- [#33](https://github.com/rxova/overlock/pull/33) [`34ad9e3`](https://github.com/rxova/overlock/commit/34ad9e388f751e68ff1cb08ff22d3d9da5a17859) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Add `PREDICATE_NARROWED`, which watches the set an assertion ranges over rather
+- [`63c483b`](https://github.com/rxova/overlock/commit/63c483b941416b8ff0504754e09977055620acbd) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Add `PREDICATE_NARROWED`, which watches the set an assertion ranges over rather
   than the assertion itself.
   
   Every other rule reads the `expect`. None of them read the predicate that decides
@@ -25,7 +25,7 @@
 
 ### Minor Changes
 
-- [#27](https://github.com/rxova/overlock/pull/27) [`bedb16c`](https://github.com/rxova/overlock/commit/bedb16cd621f3e46e2788185a2296239708143c2) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Read assertions and test cases at the scale of the test, not the line.
+- [`4193990`](https://github.com/rxova/overlock/commit/41939908667ebef7236f84ff6f8c1fef16950d3e) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Read assertions and test cases at the scale of the test, not the line.
 
   Four false positives reported from real use, and the four fixes are the same
   idea: a finding is only worth as much as the reason attached to it.
@@ -64,7 +64,7 @@
 
 ### Minor Changes
 
-- [#22](https://github.com/rxova/overlock/pull/22) [`d23bac9`](https://github.com/rxova/overlock/commit/d23bac9e7a150edf440c1df0b80d9274e0f5b72b) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Read `--base <ref>` as a fork point, and say what each run examined
+- [`8a9e31f`](https://github.com/rxova/overlock/commit/8a9e31f8af03cdf438a314803b353b57c07d2fae) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Read `--base <ref>` as a fork point, and say what each run examined
 
   `--base main` ran `git diff main`, which compares main's tip to this working
   tree. The moment main moved ahead, every file main gained read as a deletion
@@ -86,7 +86,7 @@
   `Report` gains an optional `scope` field, `{ files, commits }`, set on any run
   against a repository.
 
-- [#23](https://github.com/rxova/overlock/pull/23) [`310ec0f`](https://github.com/rxova/overlock/commit/310ec0fb1e0825609a8416cfd8b5bde003353ae2) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Read settings from the repository, so the CLI, the hook and the action agree
+- [`18a19db`](https://github.com/rxova/overlock/commit/18a19dbeb64d3ec5b6d4c99342c9e4aef13ff230) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Read settings from the repository, so the CLI, the hook and the action agree
 
   The CLI, the GitHub action and the Stop hook each arrived at their own base,
   their own fail-on and their own severity grades. The same patch could pass
@@ -116,7 +116,7 @@
   force in a collapsed group, and prints `--explain-base` alongside the readable
   report.
 
-- [#24](https://github.com/rxova/overlock/pull/24) [`35e0496`](https://github.com/rxova/overlock/commit/35e0496d6d0bdb014006deb8fd479db0f5e87478) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Let the Stop hook see what the agent committed
+- [`6956143`](https://github.com/rxova/overlock/commit/6956143b91e07a418e504da81e587af0d4713b77) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Let the Stop hook see what the agent committed
 
   The hook read uncommitted work. Agents commit and then stop, so in the ordinary
   workflow it saw nothing at all — a strange blind spot for a tool whose subject
@@ -140,7 +140,7 @@
 
 ### Minor Changes
 
-- [#13](https://github.com/rxova/overlock/pull/13) [`984f7ff`](https://github.com/rxova/overlock/commit/984f7ffea07f490b9ec572b2f8986e9913373e5c) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Grade a deleted test file on what the patch does with its cases, and give it a
+- [`1cd5c67`](https://github.com/rxova/overlock/commit/1cd5c676b92bed9f2b9c0928928fb8db3a88bd27) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Grade a deleted test file on what the patch does with its cases, and give it a
   way out.
 
   `TEST_REMOVED` now matches the case names a deleted file lost against every name
@@ -161,7 +161,7 @@
   The action's pull request comment now leads with what blocks and folds the rest,
   grouped by rule, into a `<details>`.
 
-- [#13](https://github.com/rxova/overlock/pull/13) [`1c1a469`](https://github.com/rxova/overlock/commit/1c1a469b4e887f3eb7ad92e671a7a449d93cd650) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Answer the question a rename actually raises: what changed that it does not
+- [`80a658f`](https://github.com/rxova/overlock/commit/80a658f47e8dcb3a611472029695072be6157d05) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Answer the question a rename actually raises: what changed that it does not
   explain?
 
   A substitution the patch applies wholesale is now inferred from the patch
@@ -190,7 +190,7 @@
 
 ### Patch Changes
 
-- [#16](https://github.com/rxova/overlock/pull/16) [`ae706ff`](https://github.com/rxova/overlock/commit/ae706ffd28e16dcc278d3dd24e28bd7ab61b1a4d) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - See a weakened assertion the same commit's rename would have hidden.
+- [`6eb6c3d`](https://github.com/rxova/overlock/commit/6eb6c3dafb1a9fa000cda1d3c9c9d2f393ea5c4c) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - See a weakened assertion the same commit's rename would have hidden.
 
   `ASSERTION_WEAKENED` and `EXPECTED_VALUE_CHANGED` pair a removed line with an
   added one by comparing their text, so a rename that lands in the subject broke
@@ -201,7 +201,7 @@
   residual analysis can only mark findings that exist, and there was no finding to
   mark. Evidence still shows the lines as the patch wrote them.
 
-- [#17](https://github.com/rxova/overlock/pull/17) [`b114d45`](https://github.com/rxova/overlock/commit/b114d4529783343b6dbb9e496d09dc13f30e040e) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Move the test toolchain to the workspace root
+- [`1d74600`](https://github.com/rxova/overlock/commit/1d74600c45396d2bc35edf12007f8e167744f19d) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Move the test toolchain to the workspace root
 
   `vitest`, `@vitest/coverage-v8` and `@types/node` are declared once at the root
   instead of per package. Declaring them in both packages had them resolving
@@ -216,7 +216,7 @@
 
 ### Minor Changes
 
-- [`7088671`](https://github.com/rxova/overlock/commit/70886717c7e9c9d83b3c0faa6d916953a82de49b) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - First release.
+- [`0704eb4`](https://github.com/rxova/overlock/commit/0704eb48ac04bc7d94339ca582a8c874db7ecd2b) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - First release.
 
   `overlock` reads the diff a coding agent just made and reports the edits that
   buy a green check rather than earn one: skipped tests, removed or weakened

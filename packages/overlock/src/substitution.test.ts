@@ -10,12 +10,12 @@ function renamedFile(n: number): string {
     `src/mod${n}.test.ts`,
     hunk(
       [
-        "-import { thing } from '@trainmotherfoca/core';",
-        `-  it('trainmotherfoca handles ${n}', () => {`,
-        `-    expect(trainmotherfoca.run(${n})).toBe(${n});`,
-        "+import { thing } from '@trainmf/core';",
-        `+  it('trainmf handles ${n}', () => {`,
-        `+    expect(trainmf.run(${n})).toBe(${n});`,
+        "-import { thing } from '@warehouserouting/core';",
+        `-  it('warehouserouting handles ${n}', () => {`,
+        `-    expect(warehouserouting.run(${n})).toBe(${n});`,
+        "+import { thing } from '@routing/core';",
+        `+  it('routing handles ${n}', () => {`,
+        `+    expect(routing.run(${n})).toBe(${n});`,
       ].join('\n'),
     ),
   );
@@ -36,8 +36,8 @@ const renameWithLiteral =
     'src/mod5.test.ts',
     hunk(
       [
-        "-    expect(label).toBe('trainmotherfoca core');",
-        "+    expect(label).toBe('trainmf core');",
+        "-    expect(label).toBe('warehouserouting core');",
+        "+    expect(label).toBe('routing core');",
       ].join('\n'),
     ),
   );
@@ -47,8 +47,8 @@ describe('explainPatch', () => {
     const { renames, label } = explainPatch(parseDiff(rename));
 
     expect(renames).toHaveLength(1);
-    expect(renames[0]).toMatchObject({ from: 'trainmotherfoca', to: 'trainmf', files: 4 });
-    expect(label).toBe('trainmotherfoca -> trainmf');
+    expect(renames[0]).toMatchObject({ from: 'warehouserouting', to: 'routing', files: 4 });
+    expect(label).toBe('warehouserouting -> routing');
   });
 
   it('folds casing variants into one rename', () => {
@@ -58,10 +58,10 @@ describe('explainPatch', () => {
           `src/cased${n}.ts`,
           hunk(
             [
-              '-import { trainmotherfoca } from "./a";',
-              '-const x = TrainMotherFoca.of(1);',
-              '+import { trainmf } from "./a";',
-              '+const x = TrainMf.of(1);',
+              '-import { warehouserouting } from "./a";',
+              '-const x = WarehouseRouting.of(1);',
+              '+import { routing } from "./a";',
+              '+const x = Routing.of(1);',
             ].join('\n'),
           ),
         ),
@@ -112,13 +112,13 @@ describe('explainPatch', () => {
       rename +
       diffOf(
         'src/other.ts',
-        hunk(['-const a = trainmotherfoca;', '+const a = somethingElse;'].join('\n')),
+        hunk(['-const a = warehouserouting;', '+const a = somethingElse;'].join('\n')),
       );
 
     const { renames, explainsEdit } = explainPatch(parseDiff(inconsistent));
 
-    expect(renames.map((r) => r.to)).toEqual(['trainmf']);
-    expect(explainsEdit('const a = trainmotherfoca;', 'const a = somethingElse;')).toBeNull();
+    expect(renames.map((r) => r.to)).toEqual(['routing']);
+    expect(explainsEdit('const a = warehouserouting;', 'const a = somethingElse;')).toBeNull();
   });
 
   /**
@@ -229,7 +229,7 @@ describe('a patch that is mostly a rename', () => {
     expect(report.findings.length).toBeGreaterThan(0);
     expect(report.renames).toHaveLength(1);
     expect(report.explained).toBe(report.findings.length);
-    expect(report.findings.every((f) => f.explained_by === 'trainmotherfoca -> trainmf')).toBe(
+    expect(report.findings.every((f) => f.explained_by === 'warehouserouting -> routing')).toBe(
       true,
     );
   });
@@ -246,9 +246,9 @@ describe('a patch that is mostly a rename', () => {
         'src/mod9.test.ts',
         hunk(
           [
-            "-import { thing } from '@trainmotherfoca/core';",
+            "-import { thing } from '@warehouserouting/core';",
             '-    expect(total()).toBe(42);',
-            "+import { thing } from '@trainmf/core';",
+            "+import { thing } from '@routing/core';",
             '+    expect(total()).toBeDefined();',
           ].join('\n'),
         ),
@@ -277,8 +277,8 @@ describe('a patch that is mostly a rename', () => {
         'src/mod9.test.ts',
         hunk(
           [
-            '-    expect(trainmotherfoca.total()).toBe(42);',
-            '+    expect(trainmf.total()).toBeDefined();',
+            '-    expect(warehouserouting.total()).toBe(42);',
+            '+    expect(routing.total()).toBeDefined();',
           ].join('\n'),
         ),
       );
@@ -289,8 +289,8 @@ describe('a patch that is mostly a rename', () => {
     expect(unexplained).toHaveLength(1);
     expect(unexplained[0]?.rule).toBe('ASSERTION_WEAKENED');
     // Evidence is the patch as written, not the pre-image the pairing used.
-    expect(unexplained[0]?.evidence.before).toContain('trainmotherfoca.total()');
-    expect(unexplained[0]?.evidence.after).toContain('trainmf.total()');
+    expect(unexplained[0]?.evidence.before).toContain('warehouserouting.total()');
+    expect(unexplained[0]?.evidence.after).toContain('routing.total()');
     expect(report.ok).toBe(false);
   });
 
@@ -301,8 +301,8 @@ describe('a patch that is mostly a rename', () => {
         'src/mod9.test.ts',
         hunk(
           [
-            '-    expect(trainmotherfoca.total()).toBe(42);',
-            '+    expect(trainmf.total()).toBe(7);',
+            '-    expect(warehouserouting.total()).toBe(42);',
+            '+    expect(routing.total()).toBe(7);',
           ].join('\n'),
         ),
       );

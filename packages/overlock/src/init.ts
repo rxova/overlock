@@ -155,7 +155,7 @@ export function initInstructions(repoRoot: string, agent: Exclude<Agent, 'claude
     unchanged: false,
     notes: [
       `Appended the instruction to ${relative}.`,
-      'This is an instruction, not a gate — the agent can forget it. Claude Code is the one that can be blocked.',
+      'This is an instruction, not a gate — the agent can forget it. The Claude Code Stop hook is the form that can block a turn.',
     ],
   };
 }

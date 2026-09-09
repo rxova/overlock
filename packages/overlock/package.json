@@ -1,7 +1,7 @@
 {
   "name": "overlock",
   "version": "0.5.0",
-  "description": "Find out what your coding agent did to your tests. A deterministic, zero-dependency gate on test integrity in a patch.",
+  "description": "Deterministic, zero-dependency gate on test integrity in a git patch: reports skipped tests, removed or weakened assertions, and lowered coverage thresholds.",
   "license": "MIT",
   "author": "Jonatan Kruszewski <jonakrusze@gmail.com>",
   "repository": {
@@ -9,6 +9,7 @@
     "url": "git+https://github.com/rxova/overlock.git",
     "directory": "packages/overlock"
   },
+  "homepage": "https://github.com/rxova/overlock#readme",
   "bugs": "https://github.com/rxova/overlock/issues",
   "keywords": [
     "ai",

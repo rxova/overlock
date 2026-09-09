@@ -2,19 +2,20 @@
  * The wire contract.
  *
  * These field names are snake_case where the published JSON is snake_case, on
- * purpose: this schema is the product's real API — hooks, CI jobs, the MCP
- * server and any dashboard built later all read it — and a camelCase interface
- * mapped to a snake_case payload is exactly the seam where the two drift. One
- * shape, one name per field, no mapping layer.
+ * purpose: this schema is the public API — hooks, CI jobs, the MCP server and
+ * anything reading the reports later all consume it — and a camelCase interface
+ * mapped to a snake_case payload is the seam where the two drift. One shape,
+ * one name per field, no mapping layer.
  *
  * Rule IDs are frozen. Adding a rule is a minor release; changing what an
  * existing ID means is a breaking one.
  */
 
 /**
- * `high` is "I would not have merged this had I seen it" — the tier that blocks
- * by default. `medium` is "worth a look, plausibly deliberate". `low` is
- * context: true often enough that blocking on it would train you to uninstall.
+ * `high` means a reviewer who saw it would not have merged the change, and is
+ * the tier that fails a run by default. `medium` means worth a look, plausibly
+ * deliberate. `low` is context: true often enough on ordinary work that
+ * blocking on it would be noise.
  */
 export type Severity = 'high' | 'medium' | 'low';
 

@@ -5,10 +5,9 @@ import type { RuleId, Severity } from './types.js';
 /**
  * Reading back what the ledger has been collecting.
  *
- * The ledger exists to answer one question after a month of use — *how many
- * times did my agent weaken a test that I would have merged without noticing?*
- * Until something read it back, that question had no answer and the file was
- * just accumulating.
+ * The ledger exists to answer one question over a period of use: how often did
+ * an agent weaken a test in a change that would otherwise have been merged
+ * without notice? Until something read it back, the file only accumulated.
  */
 
 export interface Window {

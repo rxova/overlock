@@ -1,5 +1,5 @@
 name: overlock
-description: Find out what a coding agent did to your tests — a deterministic gate on test integrity in a patch.
+description: Deterministic gate on test integrity in a patch — reports skipped tests, weakened assertions and lowered coverage thresholds.
 author: Jonatan Kruszewski
 
 branding:

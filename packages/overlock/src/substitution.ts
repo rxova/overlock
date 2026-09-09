@@ -67,7 +67,7 @@ export interface PatchExplanation {
    * compare it against the post-image on equal terms.
    */
   applyRenames: (text: string) => string;
-  /** `trainmotherfoca -> trainmf`, or null when no rename was inferred. */
+  /** `warehouserouting -> routing`, or null when no rename was inferred. */
   label: string | null;
 }
 
@@ -93,8 +93,8 @@ interface Run {
  * Consecutive removals paired with the additions that replaced them.
  *
  * Joined into one string per side rather than compared line for line, because
- * a rename changes line lengths and a formatter then re-wraps: `@trainmotherfoca`
- * becoming `@tmf` is thirteen characters shorter, and an import that did not
+ * a rename changes line lengths and a formatter then re-wraps: `@warehouserouting`
+ * becoming `@routing` is nine characters shorter, and an import that did not
  * fit on one line now does. Three removed lines against one added line is the
  * same edit, and only survives comparison as a blob.
  */
@@ -262,7 +262,7 @@ export function explainPatch(files: DiffFile[]): PatchExplanation {
     accepted.push(entry);
   }
 
-  // `trainmotherfoca`, `TrainMotherFoca` and `TRAINMOTHERFOCA` are one rename
+  // `warehouserouting`, `WarehouseRouting` and `WAREHOUSEROUTING` are one rename
   // done three ways, and reporting them as three is the same noise one level up.
   const groups = new Map<string, Candidate[]>();
   for (const entry of accepted) {

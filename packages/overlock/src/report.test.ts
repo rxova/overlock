@@ -168,10 +168,10 @@ describe('a patch the rest of the patch explains', () => {
         `src/mod${n}.test.ts`,
         hunk(
           [
-            `-  it('trainmotherfoca handles ${n}', () => {`,
-            `-    expect(trainmotherfoca.run(${n})).toBe(${n});`,
-            `+  it('trainmf handles ${n}', () => {`,
-            `+    expect(trainmf.run(${n})).toBe(${n});`,
+            `-  it('warehouserouting handles ${n}', () => {`,
+            `-    expect(warehouserouting.run(${n})).toBe(${n});`,
+            `+  it('routing handles ${n}', () => {`,
+            `+    expect(routing.run(${n})).toBe(${n});`,
           ].join('\n'),
         ),
       ),
@@ -186,8 +186,8 @@ describe('a patch the rest of the patch explains', () => {
     'src/mod5.test.ts',
     hunk(
       [
-        "-    expect(label).toBe('trainmotherfoca core');",
-        "+    expect(label).toBe('trainmf core');",
+        "-    expect(label).toBe('warehouserouting core');",
+        "+    expect(label).toBe('routing core');",
       ].join('\n'),
     ),
   );
@@ -196,7 +196,7 @@ describe('a patch the rest of the patch explains', () => {
 
   it('leads with the rename and the residual', () => {
     const text = human(report, false);
-    expect(text).toContain('rename detected  trainmotherfoca -> trainmf');
+    expect(text).toContain('rename detected  warehouserouting -> routing');
     expect(text).toContain('0 unexplained');
   });
 
@@ -205,7 +205,7 @@ describe('a patch the rest of the patch explains', () => {
   });
 
   it('says the same thing in the form a phone can read', () => {
-    expect(compact(report)).toContain('trainmotherfoca -> trainmf explains');
+    expect(compact(report)).toContain('warehouserouting -> routing explains');
   });
 });
 

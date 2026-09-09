@@ -332,8 +332,8 @@ function looseningFindings(ctx: RuleContext): Finding[] {
           if (del.kind !== 'del') continue;
 
           // The subject is taken from the renamed pre-image, because the
-          // subject is where a rename lands: `expect(trainmotherfoca.total())`
-          // becoming `expect(trainmf.total()).toBeDefined()` is a weakening
+          // subject is where a rename lands: `expect(warehouserouting.total())`
+          // becoming `expect(routing.total()).toBeDefined()` is a weakening
           // whose two halves would otherwise never be seen as a pair.
           const before = ctx.renamed(del.text);
           if (!isExact(before)) continue;

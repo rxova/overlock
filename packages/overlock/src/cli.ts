@@ -20,7 +20,7 @@ import { RULE_IDS, type RuleId, type Severity } from './types.js';
 
 const VERSION = typeof __OVERLOCK_VERSION__ === 'string' ? __OVERLOCK_VERSION__ : '0.0.0';
 
-const USAGE = `overlock ${VERSION} — find out what your coding agent did to your tests.
+const USAGE = `overlock ${VERSION} — report test-integrity findings in a git patch.
 
 USAGE
   overlock [check] [options]     Check the current patch (default command)
@@ -40,7 +40,7 @@ CHECK OPTIONS
   --fail-on-empty    Exit 1 when the resolved patch turns out to be empty
   --staged           Check only what is staged
   --json             Machine-readable report on stdout
-  --compact          The short form a phone can read
+  --compact          The short form, for small screens and hook output
   --fail-on <level>  high | medium | low | none. Default: high
   --severity <r>=<l> Grade one rule differently, e.g. TEST_REMOVED=medium
                      (repeatable; a rule graded low never blocks)

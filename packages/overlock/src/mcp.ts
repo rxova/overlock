@@ -13,9 +13,9 @@ import { summaryText } from './report.js';
  * than the argument for adding the SDK would be.
  *
  * Version strings are taken from the official SDK's own constants rather than
- * guessed. Negotiation echoes the client's version when it is one we know, and
- * otherwise answers with ours — which is what lets an older client keep working
- * when this list grows.
+ * guessed. Negotiation echoes the client's version when it is a recognised one
+ * and otherwise answers with this server's, which is what lets an older client
+ * keep working as the list grows.
  */
 export const LATEST_PROTOCOL_VERSION = '2025-11-25';
 

@@ -39,7 +39,7 @@ const SKIP_PATTERNS: SkipPattern[] = [
 
 /**
  * A comment is not a skip. Without this, adding the line
- * `// we used to it.skip this` reads as tampering.
+ * `// this used to be it.skip` reads as tampering.
  *
  * `#` opens a comment in Python, Ruby and YAML but opens an *attribute* in
  * Rust, so `#[ignore]` and `#![ignore]` are excluded from the comment test —

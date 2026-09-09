@@ -18,6 +18,6 @@ export default defineConfig({
   // disagree with what npm installed.
   define: { __OVERLOCK_VERSION__: JSON.stringify(pkg.version) },
   // ESM-only, and nothing to externalise: there are no runtime dependencies.
-  // That is a product decision, not an oversight — `npx overlock` on a cold
-  // cache is one small download, and an agent runs it on every turn.
+  // That is deliberate — `npx overlock` on a cold cache is one small download,
+  // and an agent runs it on every turn.
 });

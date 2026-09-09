@@ -48,7 +48,7 @@ function severityColor(severity: Severity): string {
  *
  * Keyed on the rule and the evidence rather than the message, because the
  * message names the file and the whole point is that the file is not the
- * interesting part. Twenty rows saying `trainmotherfoca` became `trainmf` are
+ * interesting part. Twenty rows saying `warehouserouting` became `routing` are
  * one fact; printing them twenty times is how a patch of any size stops being
  * readable.
  */
@@ -323,14 +323,14 @@ export function human(report: Report, color: boolean): string {
 }
 
 /**
- * The phone view, and the one that matters most.
+ * The compact view, written for a small screen.
  *
  * This string is what a Claude Code Stop hook hands back as `blockStopReason`,
- * which means it reaches the person through the agent's own message on a
- * six-inch screen. So: a verdict line, then at most three findings, each one
- * line of location and one line of evidence. Everything else is a pointer back
- * to the full run. Long evidence is clipped here and only here — the JSON keeps
- * the untruncated text.
+ * so it reaches the reader through the agent's own message rather than through
+ * a terminal. Hence: a verdict line, then at most three findings, each with one
+ * line of location and one line of evidence, and a pointer back to the full
+ * run. Long evidence is clipped here and only here — the JSON keeps the
+ * untruncated text.
  */
 export function compact(report: Report, limit = 3): string {
   if (isEmptyPatch(report)) {
@@ -410,8 +410,8 @@ function describeBase(base: string): string {
 }
 
 /**
- * The phone form of the same warning. Two words, because the alternative is a
- * clean line that quietly stands on a claim nobody checked.
+ * The compact form of the same warning. Two words, because the alternative is
+ * a clean line standing on a claim nothing checked.
  */
 function staleNote(report: Report): string {
   const stale = report.allowances_unused.length;

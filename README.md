@@ -580,7 +580,8 @@ to judge intent. A finding is a statement about the diff and nothing more.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, the commit
 conventions and the release process, and [AGENTS.md](AGENTS.md) for the
-repository's invariants.
+repository's invariants. [SUPPORT.md](SUPPORT.md) covers where to file a bug and
+what a report needs to carry.
 
 ```bash
 pnpm install

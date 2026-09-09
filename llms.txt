@@ -1,0 +1,46 @@
+# overlock
+
+> Deterministic gate on test integrity in a git patch. Reads the diff and reports
+> the edits that make a test suite ask less than it did — skipped tests, removed
+> or weakened assertions, lowered coverage thresholds, narrowed test data. It
+> answers one question about a change: did this make the tests pass by weakening
+> the tests? No LLM calls, no network calls, no telemetry, and zero runtime
+> dependencies. Node >= 20.11. MIT. Ships ESM.
+
+This file is the map, not the manual. It exists because an agent that reaches
+this project through the repository tree — rather than through an install or the
+README — lands on `AGENTS.md`, which is written for someone editing overlock and
+answers almost nothing about using it.
+
+Deliberately pointer-only. Every fact about a rule, a flag or a config key
+belongs to exactly one of the files below; restating any of it here would create
+a copy that nothing checks and that drifts on the first rename.
+
+## Packages
+
+- [overlock](packages/overlock/llms.txt): the CLI, the library, the agent
+  integrations and the MCP server — the whole tool is one package. It ships that
+  `llms.txt` inside its npm tarball, so after an install it is readable straight
+  out of `node_modules` with no network. That is the file to read when you are
+  deciding how to run overlock, or what a finding is asking you to do.
+
+## Also published
+
+- [action.yml](action.yml): the GitHub Action, used as `rxova/overlock@v0`. The
+  same analysis run on a pull request, posting the findings as one comment it
+  edits in place. Its inputs and outputs are documented in the file itself.
+
+## Docs
+
+- [README.md](README.md): the manual — install, agent integration, every rule and
+  how it is graded, renames, suppression, the CLI reference, the config file, the
+  JSON contract, the MCP server, the Action, and the ledger.
+- [SUPPORT.md](SUPPORT.md): where to file what, and what a report needs to carry.
+- [SECURITY.md](SECURITY.md): the threat model, and how to report privately.
+
+## Contributing
+
+- [AGENTS.md](AGENTS.md): the repository's invariants, and what an agent editing
+  it gets wrong.
+- [CONTRIBUTING.md](CONTRIBUTING.md): architecture, setup, quality gates,
+  releases.

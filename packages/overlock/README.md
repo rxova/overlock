@@ -1,22 +1,21 @@
 # overlock
 
-**Find out what your coding agent did to your tests.**
+[![npm](https://img.shields.io/npm/v/overlock.svg)](https://www.npmjs.com/package/overlock)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/rxova/overlock/blob/main/LICENSE)
 
-> An overlock stitch binds a raw seam edge so it cannot fray.
-> This does the same to a test suite.
+A deterministic CLI that reads a git patch and reports edits that make a test
+suite ask less than it did: skipped tests, removed or loosened assertions,
+lowered coverage thresholds, narrowed test data.
 
-An agent that cannot make a test pass has a second option: make the test stop
-asking. It adds `it.skip`, it swaps `toBe(3)` for `toBeDefined()`, it edits the
-expected value to whatever the code now returns, it lowers a coverage threshold.
-Then it reports success, truthfully as far as its summary goes.
-
-`overlock` reads the diff the agent just made and answers one question:
+It answers one question about a change:
 
 > Did this change make the tests pass by weakening the tests?
 
-Deterministic. No LLM calls, no network, no telemetry. Zero runtime
-dependencies, so `npx overlock` on a cold cache is one small download — which
-matters when something runs it on every turn.
+There are no LLM calls, no network calls and no telemetry, and the package has
+zero runtime dependencies, so `npx overlock` on a cold cache is a single small
+download.
+
+Source and issue tracker: <https://github.com/rxova/overlock>.
 
 ```console
 $ npx overlock
@@ -34,49 +33,51 @@ overlock — 2 findings (2 high)  (HEAD)
      -> Raise the number back and make the code meet it.
 ```
 
-## Why it exists, and why it works from a phone
-
-You can start agent work from anywhere now. You cannot _verify_ it from
-anywhere: a 400-line diff is unreadable on a six-inch screen, so you either
-merge on trust or park everything until you are back at a laptop. The agent's
-summary is the one artifact you can actually read on a phone, and it is exactly
-the artifact that will not mention a weakened assertion.
-
-Installed as a Claude Code Stop hook, `overlock` makes that self-report
-falsifiable. The agent cannot end its turn claiming success while a HIGH finding
-stands, and the reason it gets back is written to be read one-handed.
-
-At Stop time the patch is the session: everything the agent committed since the
-session began, plus whatever it left in the working tree. Agents commit and then
-stop, so a hook that read only uncommitted work saw nothing in the ordinary
-case — which is a strange blind spot for a tool whose whole subject is what your
-coding agent did to your tests.
-
 ## Install
 
-```bash
-# Run it once, right now, against your working tree
-npx overlock
+Run it against the current working tree without installing anything:
 
-# Or wire it into your agent
+```bash
+npx overlock
+```
+
+Or install it as a dev dependency:
+
+```bash
+npm install --save-dev overlock
+pnpm add -D overlock
+```
+
+Requires Node.js 20.11 or newer.
+
+## Agent integration
+
+```bash
 npx overlock init claude
 ```
 
-`init claude` writes a **committed** `.claude/settings.json`. That is
-deliberate, and it is the detail everything else depends on: Claude Code cloud
-sessions — the ones you start from a phone — do not read `~/.claude/settings.json`.
-Hooks there come from the repository, from organisation-managed settings, or
-from a plugin. A hook installed into your home directory works perfectly at your
-desk and does nothing in the one place you most need it.
+`init claude` writes a committed `.claude/settings.json` containing a `Stop`
+hook. The hook runs overlock when the agent tries to end its turn and blocks the
+turn while a finding at or above the configured threshold stands.
 
-`init codex`, `init cursor` and `init copilot` append an instruction to the file
-each agent reads. That is weaker than a hook and it says so: an instruction can
-be forgotten once the context window fills. Claude Code is the one that can
-actually be stopped.
+The file is committed rather than written to `~/.claude/settings.json` because
+Claude Code cloud sessions do not read the home directory: hooks there come from
+the repository, from organisation-managed settings, or from a plugin. Committing
+it also means collaborators inherit the same hook.
 
-## What it looks for
+At `Stop` time the patch covers everything the agent committed since the session
+began plus whatever it left in the working tree, because agents commonly commit
+before stopping.
 
-Eleven rules, all scoped strictly to the patch.
+`init codex`, `init cursor` and `init copilot` append an instruction to the
+instruction file each of those agents reads. An instruction is advisory — unlike
+the Claude Code hook, it cannot stop a turn.
+
+`init` also prints the [MCP server](#mcp-server) snippet.
+
+## Rules
+
+Eleven rules, all scoped to the patch.
 
 | Rule                         | Severity      | Fires when                                                                                                                                                             |
 | ---------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -92,82 +93,170 @@ Eleven rules, all scoped strictly to the patch.
 | `TEST_TIMEOUT_RAISED`        | low           | A timeout or retry count went up, or appeared                                                                                                                          |
 | `TEST_AND_IMPL_TOGETHER`     | low           | A test changed alongside the implementation it is named after                                                                                                          |
 
-Only **high** blocks by default. The `low` tier exists because it is true often
-enough that blocking on it would train you to uninstall the tool; it earns its
-place by telling you which implementation change the other findings are about.
+Only `high` fails a run by default. `medium` findings are reported for review.
+`low` findings are context: `TEST_AND_IMPL_TOGETHER` in particular fires on
+ordinary test-driven work, and is useful mainly for identifying which
+implementation change the other findings relate to.
 
-Languages: TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, Ruby and C#
-conventions are recognised out of the box. `--test-glob` adds your own.
+Test files are recognised by the conventions of TypeScript, JavaScript, Python,
+Go, Rust, Java, Kotlin, Ruby and C#. `--test-glob <regex>` adds more.
 
-## As an MCP tool
+### Regrading a single rule
+
+`--severity TEST_REMOVED=medium` changes the grade of one rule and leaves the
+rest alone. This is separate from `--fail-on` on purpose: lowering `--fail-on`
+to `medium` to unblock one rule also unblocks every other `high` rule.
+
+`--severity PREDICATE_NARROWED=high` collapses that rule's two grades into one
+if the `medium` case should also block.
+
+## How findings are graded
+
+### Weakened, narrowed, and neither
+
+`ASSERTION_WEAKENED` covers an assertion that stops naming a value:
+`toBe('admin')` becoming `toBeDefined()`, `toBeTruthy()`, `toBeFalsy()`,
+`toBeInstanceOf(...)`, a bare `toHaveBeenCalled()`, an `expect.any(...)` where a
+literal was, or `not.toBeNull()`, which asserts presence and nothing about the
+value.
+
+`toBeNull()`, `toBeUndefined()` and `toBe(false)` are not treated as weakenings.
+Each names exactly one value, as precisely as `toBe(3)` does.
+
+`ASSERTION_NARROWED` covers an assertion that keeps naming a value but covers
+less of it: `expect(row).toEqual({ id, state, lapsedAt })` becoming
+`expect(row.lapsedAt).toBeNull()`, or `toHaveBeenCalledWith('row', 42)` becoming
+`toHaveBeenCalledWith('row')`.
+
+Both are evaluated per test case rather than per line. A case that loses
+specificity on one line while gaining assertions elsewhere is graded `medium`
+and the finding says how many it gained; a case that only lost stays `high`. A
+removal is paired only with an addition in the same edit — not one three context
+lines away in the next case — and is not paired at all when the assertion it
+removed still appears further down the file.
+
+### Deleted test files
+
+`TEST_REMOVED` on a deleted file is graded on whether the cases it held reappear
+anywhere else in the same patch:
+
+```
+✗ HIGH  apps/web/app.test.tsx  TEST_REMOVED
+     Test file deleted — 33 of 37 cases reappear elsewhere in this patch.
+     4 did not: refuses a PDF larger than the store will take, cannot be given
+     an amount that is not a number, formats the amount as US dollars while it
+     is typed, keeps the row open when the period has been emptied
+```
+
+Every case re-homed grades the finding `medium`; any case missing keeps it
+`high` and names the missing ones. Deleting the module a file is named after —
+`api.test.ts` alongside `api.ts` — also grades it `medium`. A module that was
+only modified does not.
+
+A case is matched by its title, by its title with the patch's own rename applied
+(`lists ledger entries` becoming `lists admin entries` is not a deletion), and
+failing both, by its body.
+
+When every case in a deleted file lands in one other file, that is treated as a
+move, and several moves are reported as a single finding:
+
+```
+!  MED  src/old/ledger.test.ts  TEST_REMOVED
+     8 test files deleted — all 63 of their cases reappear elsewhere in this
+     patch: src/old/ledger.test.ts -> src/admin/api.test.ts, ...
+```
+
+Matching is a heuristic. A case found again by name is not a guarantee that it
+still asserts what it did; it grades the finding and points at where to look.
+
+### `PREDICATE_NARROWED`
+
+This is the one rule that can fire on a patch where every `expect` is byte for
+byte unchanged. It watches the set the assertions are applied to: a
+`.filter(...)` predicate that gained a conjunct, an iterated source that gained
+a `.filter(...)` or a `.slice(...)`, an `it.each([...])` table that lost rows,
+or a list whose name indicates it holds exemptions growing by one.
+
+It is `high` when the narrowed set is consumed by a `for...of`, a `.forEach` or
+an `it.each`, because that set decides how many times the assertions below it
+run. It is `medium` when the set is only assigned to a variable, because a diff
+cannot establish whether that variable reaches an assertion.
+
+## Renames and reformatting
+
+A large rename makes every line it touches look edited, producing one true but
+uninformative finding per line. overlock infers the substitution from the patch
+itself and reports what the substitution does not account for:
+
+```
+overlock — 293 findings (293 low)  (origin/main)
+
+  rename detected  warehouserouting -> routing  (607 files, 6 casings)
+    293 findings consistent with it
+    0 unexplained
+
+293 findings the patch itself accounts for, not listed. `--json` has all of them.
+```
+
+A name that became two names is read as one rename with two targets, since
+splitting one concept in two is a common refactor. Each target has to clear the
+recurrence bar on its own. A name that became more than two things is treated as
+edited rather than renamed.
+
+Whatever is left unexplained is printed in full and clustered by the name most
+of it mentions:
+
+```
+  22 of 25 unexplained findings mention cloud_sync
+    Read that change once and most of this list goes with it.
+```
+
+The same machinery recognises pure reformatting: a file whose only delta is
+whitespace produces no findings, and a shortened name that let a formatter
+re-join a wrapped import is still read as one substitution.
+
+Inference never changes a verdict. An explained finding keeps its severity,
+still counts, and still fails the run if it was going to; the inference only
+changes the order things are presented in. Repeated findings are collapsed
+wherever they are printed — the same edit in twenty files is one row with a
+count.
+
+## Suppressing findings
+
+Both forms require a named rule and a written reason. There is no wildcard, and
+every suppression is counted and reported, including on otherwise clean runs:
 
 ```console
-$ overlock init claude     # also prints the MCP snippet
+$ overlock
+✓ overlock: nothing weakened in this patch. (1 suppressed)
 ```
 
-Or add it to `.mcp.json` yourself:
+### Inline directive
 
-```json
-{
-  "mcpServers": {
-    "overlock": { "command": "npx", "args": ["-y", "overlock", "mcp"] }
-  }
-}
-```
-
-Two tools: `overlock_check` and `overlock_report`. The check tool returns the
-compact report, plus the full JSON only when there is something to act on — a
-clean run costs one line rather than a serialised empty report.
-
-The server is spoken by hand rather than through
-`@modelcontextprotocol/sdk`. MCP over stdio is newline-delimited JSON-RPC 2.0
-with five methods, which is less code than the argument for adding a runtime
-dependency to a package an agent runs on every turn. Protocol versions are taken
-from the official SDK's own constants, and negotiation echoes the client's
-version when it is one overlock knows.
-
-## In CI
-
-```yaml
-permissions:
-  contents: read
-  pull-requests: write
-
-steps:
-  - uses: actions/checkout@v5
-    with: { fetch-depth: 0 }
-  - uses: rxova/overlock@v0
-```
-
-On a pull request it diffs against the base commit — not `github.sha`, which on
-a PR is the merge commit and would report nothing — and posts a single findings
-comment, edited in place on later pushes rather than appended to. A bot that
-comments again on every push buries the review it is meant to support.
-
-`fail-on`, `base`, `working-directory`, `version` and `comment` are all inputs;
-`ok`, `findings` and `report` are outputs. The action never writes a ledger: that
-file is a record of what your agents did on your machine, and a CI runner is
-neither.
-
-## Silencing a finding
-
-Sometimes a skip is deliberate — a test quarantined behind a real bug, waiting
-on a fix you have already written down somewhere. Put a comment on the offending
-line, or the line directly above it:
+Put a comment on the offending line, or on the line directly above it:
 
 ```ts
 // overlock-ignore TEST_SKIPPED_ADDED -- quarantined pending #412
 it.skip('rejects expired tokens', () => {
 ```
 
-The rule ID and the reason are **both required**. A directive with no written
-reason silences nothing, an unknown rule ID silences nothing, there is no
-wildcard, and one quoted inside a string literal is documentation rather than
-permission. A suppression covers one rule on one line in one file.
+A directive with no reason silences nothing, an unknown rule ID silences
+nothing, and a directive appearing inside a string literal is ignored. One
+directive covers one rule on one line in one file.
 
-**A directive the patch itself added stops the Stop hook once.** It still
-silences the finding, but the agent cannot reach a silent exit 0 by writing its
-own permission slip — the hook stops and quotes the claim back to you:
+Some findings have no line to sit on — a deleted test file is reported against a
+path that no longer has a line 1. Name the path instead, from any line the patch
+still has:
+
+```ts
+// overlock-ignore TEST_REMOVED src/api.test.ts -- module deleted; cases re-homed here
+```
+
+A directive naming a path covers only the findings in that path that carry no
+line of their own, so it cannot blanket-silence a rule across a file.
+
+**A directive added by the patch itself stops the Stop hook once.** It still
+silences the finding, but the hook stops and quotes the claim back:
 
 ```
 overlock: this patch silenced 1 of its own findings.
@@ -178,87 +267,104 @@ overlock: this patch silenced 1 of its own findings.
 If that is right, say so and finish. If not, fix the cause.
 ```
 
-Accept it and the next turn continues; the hook never stops twice. A directive
-that was already in the tree records a decision somebody made and reviewed, so
-it passes in silence.
+The hook never stops twice for the same directive, so the next turn continues. A
+directive that was already in the tree passes without comment.
 
-That friction is the design. A gate with no escape hatch gets uninstalled the
-first time it is wrong; a gate with a frictionless one gets suppressed everywhere
-and stops meaning anything — which is why `eslint-disable` eventually needed a
-lint rule of its own to police it. Requiring a named rule and a sentence of
-justification keeps the hatch usable by a person explaining themselves and
-useless to an agent looking for the shortest path to green.
+### Commit or pull request trailer
 
-Every run reports how many findings were suppressed, including clean ones:
+For a change too broad to annotate line by line, put a trailer in the commit
+message or the pull request body:
 
-```console
-$ overlock
-✓ overlock: nothing weakened in this patch. (1 suppressed)
+```
+Overlock-Allow: TEST_AND_IMPL_TOGETHER -- rename only, no behaviour changed
 ```
 
-The count goes into the ledger too. An escape hatch nobody can count is one that
-quietly empties the gate.
+What it names can be as narrow as a single finding:
+
+```
+Overlock-Allow: TEST_REMOVED src/api.test.ts -- the whole file moved
+Overlock-Allow: TEST_REMOVED src/api.test.ts:42 -- one finding, by line
+Overlock-Allow: TEST_REMOVED "src/api.test.ts::rejects expired tokens" -- ported to tokens.test.ts
+```
+
+The quoted form names a case rather than a line, which survives lines being
+added above it.
+
+A trailer that matches nothing is reported rather than ignored:
+
+```
+  ! allowed nothing: TEST_REMOVED src/api.test.ts::rejects expired tokens -- ported to tokens.test.ts
+    The finding it names is not in this patch.
+```
+
+At `Stop` time a trailer covers what the agent committed during the session.
+Work still in the working tree has no commit message to read, which is why
+trailers complement the inline directive rather than replacing it.
 
 ## Untracked files
 
-Files git has not seen yet are included by default, rendered as additions.
+Files git has not seen yet are included by default and rendered as additions.
+`git diff HEAD` reports nothing about an untracked file, so without this a new
+test file that arrives already skipped would produce no findings.
 
-This matters more than it sounds: `git diff HEAD` reports nothing whatsoever
-about an untracked file, so before this existed a brand-new test file arriving
-already skipped passed completely clean — and creating a test file is the most
-ordinary thing an agent does. `--no-untracked` opts out; `--staged` never
-includes them, because the question it asks is specifically what the index holds.
+`--no-untracked` opts out. `--staged` never includes them, since that mode asks
+what the index holds. overlock reads untracked files but never stages them, and
+never writes to the git index.
 
-overlock reads those files, it never stages them. `git add -N` would have been
-the shorter fix and it writes to the index of a repository this tool promised
-only to read.
-
-## Usage
+## CLI reference
 
 ```bash
-overlock [check]                 # the current patch
-overlock --staged                # only what is staged
-overlock --base main             # against where this branch left main
+overlock [check]                          # the current patch
+overlock --staged                         # only what is staged
+overlock --base main                      # against where this branch left main
 overlock --base main --base-mode direct   # against main's tip itself
-overlock --explain-base          # say how the base was chosen, then run
-overlock --fail-on-empty         # exit 1 if the resolved patch holds nothing
-overlock --json                  # the full report, for a script or an agent
-overlock --compact               # the short form a phone can read
-overlock --fail-on medium        # high | medium | low | none
-overlock --test-glob '\.check\.ts$'
-overlock --no-untracked             # ignore files git does not track yet
-overlock config                  # the settings in force, and where from
+overlock --explain-base                   # say how the base was chosen, then run
+overlock --fail-on-empty                  # exit 1 if the resolved patch is empty
+overlock --json                           # the full report
+overlock --compact                        # the short form
+overlock --fail-on medium                 # high | medium | low | none
+overlock --severity TEST_REMOVED=medium   # regrade one rule, repeatable
+overlock --allow-file pr-body.txt         # read Overlock-Allow trailers from a file
+overlock --test-glob '\.check\.ts$'       # extra test-file pattern, repeatable
+overlock --limit 5                        # findings shown in --compact
+overlock --cwd path/to/pkg                # run against another directory
+overlock --no-untracked                   # ignore files git does not track yet
+overlock --no-ledger                      # do not record this run
+overlock --config <file>                  # read settings from this file
+overlock --no-config                      # ignore overlock.config.json entirely
+overlock config                           # the settings in force, and where from
+overlock report [--days N]                # what the ledger has recorded
+overlock init <agent>                     # claude | codex | cursor | copilot
+overlock mcp                              # run as an MCP server on stdio
 ```
 
-Exit codes: `0` clean, `1` findings at or above `--fail-on`, `2` overlock
-could not run.
+Exit codes: `0` nothing at or above `--fail-on`, `1` findings at or above it,
+`2` overlock could not run.
 
-`--base auto` — the default — works out what "this patch" means: your
-uncommitted work if there is any, otherwise this branch's commits since it left
-the default branch, otherwise the last commit. It is the default for the check,
-the hook and the MCP tool alike, because a gate that runs right after the agent
-committed is exactly the moment the working tree is empty and the commits are
-the whole patch.
+### How the base is chosen
+
+`--base auto`, the default, resolves in order: uncommitted work if there is any,
+otherwise this branch's commits since it left the default branch, otherwise the
+last commit. It is the default for the CLI, the Stop hook and the MCP tool
+alike, so that a run immediately after the agent committed still sees those
+commits.
 
 `--base <ref>` means the fork point — `<ref>...HEAD`, what this branch did since
-it left `<ref>`. It is not `git diff <ref>`, which compares that ref's tip to
-your working tree: the moment the ref moves ahead, every file it gained reads as
-a deletion here, and a test file among them is reported as `TEST_REMOVED` at
-HIGH on a branch that never touched it. `--base-mode direct` asks for the
-literal comparison, for the callers that want it.
+it left `<ref>`. It is deliberately not `git diff <ref>`, which compares that
+ref's tip against the working tree: once the ref moves ahead, every file it
+gained reads as a deletion. `--base-mode direct` requests the literal
+comparison.
 
-Every verdict says what it examined — `83 files, 3 commits, against 492b7ad` —
-and a range that turned out to hold nothing is reported as such rather than as a
-pass. `--fail-on-empty` turns that into exit 1; `--explain-base` prints how the
-base was chosen, which is the quickest way to find out why a run saw less than
-you expected.
+Every verdict states what it examined — `83 files, 3 commits, against 492b7ad`.
+A range that turned out to hold nothing is reported as empty rather than as a
+pass; `--fail-on-empty` turns that into exit 1. `--explain-base` prints how the
+base was chosen.
 
-## Repository settings
+## Configuration file
 
-One repository, one answer. `overlock.config.json` beside your `package.json` —
-or an `overlock` key inside it — is read by the CLI, the Stop hook and the
-GitHub action alike, so the same patch cannot pass locally and block in CI with
-nothing to point at:
+`overlock.config.json` beside `package.json` — or an `overlock` key inside
+`package.json` — is read by the CLI, the Stop hook and the GitHub Action alike,
+so the same patch resolves the same way locally and in CI:
 
 ```json
 {
@@ -272,15 +378,12 @@ nothing to point at:
 }
 ```
 
-A flag always wins over the file — the file is the default, not a cage. The
-nearest declaration at or above the working directory is the one that applies,
-so a package in a monorepo can have its own answer. `--config <file>` points at
-one directly; `--no-config` ignores the search entirely.
+A flag overrides the file. The nearest declaration at or above the working
+directory applies, so a package in a monorepo can carry its own settings.
+`--config <file>` points at one directly; `--no-config` skips the search.
 
-An unknown setting or a bad value stops the run with exit 2. A `failon` typo
-that silently did nothing would leave you certain a rule was graded down and
-finding out otherwise from a blocked merge, which is the failure this file
-exists to remove.
+An unknown setting or an invalid value stops the run with exit 2 rather than
+being ignored.
 
 `overlock config` prints what is in force and where each value came from:
 
@@ -291,10 +394,10 @@ overlock: /repo/overlock.config.json
   failOn = "low"  (flag)
 ```
 
-## The JSON contract
+## JSON output
 
-The schema is the API. Rule IDs are frozen — adding a rule is a minor release,
-changing what an existing ID means is a breaking one.
+The JSON schema is the API. Rule IDs are frozen: adding a rule is a minor
+release, changing what an existing ID means is a breaking one.
 
 ```json
 {
@@ -317,6 +420,13 @@ changing what an existing ID means is a breaking one.
 }
 ```
 
+`line` is `null` when a finding is about a file rather than a line in it, and
+`id` is then `<rule>:<file>` with no line suffix.
+
+`explained_by` is present when the rest of the patch accounts for the change —
+for example `"warehouserouting -> routing"` or `"reformatting only"`. The report
+also carries `renames`, `explained` and `allowed` alongside `findings`.
+
 ## Programmatic use
 
 ```ts
@@ -325,20 +435,71 @@ import { analyze } from 'overlock';
 const report = analyze({ diff: myUnifiedDiff, failOn: 'medium' });
 ```
 
+`analyze` takes a unified diff and returns the same report the CLI serialises.
+`RULE_IDS` is exported alongside it.
+
+## MCP server
+
+```json
+{
+  "mcpServers": {
+    "overlock": { "command": "npx", "args": ["-y", "overlock", "mcp"] }
+  }
+}
+```
+
+Two tools: `overlock_check` and `overlock_report`. `overlock_check` returns the
+compact report, and the full JSON only when there is something to act on, so a
+clean run costs one line rather than a serialised empty report.
+
+The server implements MCP over stdio directly rather than through
+`@modelcontextprotocol/sdk`, to keep the package free of runtime dependencies.
+Protocol version strings are taken from the official SDK's constants, and
+negotiation echoes the client's version when it is one overlock recognises.
+
+## GitHub Action
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+
+steps:
+  - uses: actions/checkout@v5
+    with: { fetch-depth: 0 }
+  - uses: rxova/overlock@v0
+```
+
+On a pull request the action diffs against the base commit rather than
+`github.sha`, which on a pull request is the merge commit and would report
+nothing. It posts a single findings comment and edits it in place on later
+pushes.
+
+The comment leads with what fails the run, and with the inferred rename when
+there is one; everything else is grouped by rule inside a `<details>` block.
+
+Inputs: `base`, `fail-on`, `severity`, `comment`, `working-directory`,
+`version`, `cli-path`, `github-token`. Outputs: `ok`, `findings`, `report`,
+`fail-on`.
+
+The action never writes a ledger, since that file records what agents did on a
+developer's machine.
+
+The CLI is installed once per job and then invoked as a local file. The analysis
+itself takes seconds; most of a slow run is npm, so pinning `version` to an
+exact release lets the runner's npm cache hit, where `latest` has to resolve
+against the registry every time.
+
 ## The ledger
 
-Every run appends one line to `~/.overlock/ledger.jsonl`: timestamp, repo,
-branch, which rules fired, and whether the run actually blocked. It exists to
-answer one question after a month of use — _how many times did my agent weaken a
-test that I would have merged without noticing?_
+Every run appends one line to `~/.overlock/ledger.jsonl`: timestamp, repository,
+branch, which rules fired, and whether the run failed. It records rule, severity
+and location only — never file contents, since the evidence lines in a finding
+are source code.
 
-It records rule, severity and location. It never records file contents: the
-evidence lines in a finding are your source code, and a ledger that accumulated
-them would be a copy of your repository sitting in your home directory.
+`--no-ledger` turns it off; the `OVERLOCK_LEDGER` environment variable moves it.
 
-`--no-ledger` turns it off; `OVERLOCK_LEDGER` moves it.
-
-## Reading the ledger back
+`overlock report` reads it back:
 
 ```console
 $ overlock report
@@ -356,67 +517,48 @@ By rule
 
 Context only
   TEST_AND_IMPL_TOGETHER         6
-
-Bar: 4+ catches in 30 days. 10 caught — met.
 ```
 
-`--days <n>` moves the window, `--json` gives you the aggregate as data, and it
-always exits 0 — this reports history, it does not gate anything.
+`--days <n>` moves the window and `--json` returns the aggregate as data.
+`report` always exits 0 — it reports history and gates nothing.
 
-**Low findings are not catches.** `TEST_AND_IMPL_TOGETHER` fires on ordinary
-test-driven work and would otherwise be the most common finding every month,
-which would let the tool clear its own bar on noise. Catches count high and
-medium only; low findings are listed separately as context.
+Low findings are counted separately from catches. `TEST_AND_IMPL_TOGETHER` fires
+on ordinary test-driven work and would otherwise dominate the totals, so catches
+count `high` and `medium` only.
 
-The bar itself was written down before any of this was built, so the result
-could not be read the way it was wanted: **four real catches in thirty days, and
-zero false blocks annoying enough to switch it off.** Only the first half is
-measurable from a log. The second half is reported as a question rather than a
-score, because a tool that graded itself on both halves would be marking its own
-homework.
+## Handling of untrusted input
 
-## Notes on trust
-
-overlock reads a patch and hands what it finds to a terminal, an agent and a
-pull request comment. Everything it quotes is written by whoever wrote the
+overlock reads a patch and passes what it finds to a terminal, an agent and a
+pull request comment. Everything it quotes was written by whoever wrote the
 patch, so:
 
-- **Refs are refs.** A `--base` that starts with a dash is refused. `git diff
---output=FILE` writes wherever it is pointed, and `base` is reachable from the
-  MCP tool argument — so without that check, anything able to call the tool
-  could overwrite a file as you.
-- **An unknown `--fail-on` fails closed**, at `high`, rather than making every
-  comparison false and passing everything.
-- **Evidence, messages and paths are stripped of control characters and capped.**
-  A test name carrying an erase-line sequence would otherwise rewrite the verdict
-  printed above it; a backtick or newline in a path would break out of the code
-  span in a pull request comment.
-- **Evidence is labelled as quoted content** where it reaches an agent, because
-  a test name is attacker-controlled text arriving in a context window.
-- **Symlinks are never followed** out of the repository, and nothing is ever
-  written to the git index.
+- A `--base` value beginning with a dash is refused. `git diff --output=FILE`
+  writes wherever it is pointed, and `base` is reachable from the MCP tool
+  argument.
+- An unrecognised `--fail-on` value fails closed at `high` rather than making
+  every comparison false.
+- Evidence, messages and paths are stripped of control characters and capped in
+  length, so a terminal escape sequence in a test name cannot rewrite the
+  verdict printed above it and a backtick or newline in a path cannot break out
+  of a code span in a pull request comment.
+- Evidence is labelled as quoted content wherever it reaches an agent.
+- Symlinks are never followed out of the repository, and nothing is ever written
+  to the git index.
 
-## What it is not
+## Scope
 
-Not a linter — ESLint already reviews your code, and
-[`eslint-plugin-vibe-proof`](https://www.npmjs.com/package/eslint-plugin-vibe-proof)
-does it with agents in mind. Not a code reviewer — CodeRabbit and Greptile own
-the human review moment on the PR page. Not a scope gate —
-[`agent-guardrails`](https://www.npmjs.com/package/agent-guardrails) checks a
-change against a declared plan.
+overlock reads a patch for a specific class of edit — the ones that make a test
+suite ask less — and reports them deterministically, so the result can be used
+as a gate.
 
-`overlock` does one thing those do not: it reads the patch for the specific
-edits that buy a green check, and it is deterministic enough to sit in a hook
-and block on the result.
+It is not a linter, a code reviewer, or a scope or plan checker. It does not
+run your tests, evaluate whether the implementation is correct, or use a model
+to judge intent. A finding is a statement about the diff and nothing more.
+
+## Contributing
+
+See [CONTRIBUTING.md](https://github.com/rxova/overlock/blob/main/CONTRIBUTING.md).
 
 ## License
 
-MIT
-
-<!--
-`check:exports` runs attw with `--profile esm-only`. The package is ESM-only by
-design — it is a CLI plus a small library for other Node tooling, and shipping a
-CJS build would double the tarball an agent downloads on every `npx` for a
-consumer shape nobody has asked for. The profile tells attw that a `require()`
-resolving to ESM is the intended answer here, not a packaging mistake.
--->
+[MIT](https://github.com/rxova/overlock/blob/main/LICENSE)

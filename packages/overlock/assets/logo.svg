@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" color="#0f9aa8" role="img" aria-labelledby="title desc">
+  <title id="title">overlock logo</title>
+  <desc id="desc">A right-facing sewing machine stitching code brackets, keeping code from unraveling.</desc>
+  <g transform="translate(64 0) scale(-1 1)" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M34 6v6" />
+    <path d="M14 12h30a8 8 0 0 1 8 8v32H42V28H26v2H10V16a4 4 0 0 1 4-4Z" />
+    <path d="M18 30v8" />
+    <path d="m25 37-5 5 5 5m7-10 5 5-5 5" stroke-width="3" />
+    <rect x="6" y="52" width="52" height="6" rx="3" />
+  </g>
+</svg>

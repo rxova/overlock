@@ -1,7 +1,30 @@
-# overlock
+<p align="center">
+  <img src="./assets/logo.svg" alt="overlock logo" width="180" />
+</p>
 
-[![npm](https://img.shields.io/npm/v/overlock.svg)](https://www.npmjs.com/package/overlock)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/rxova/overlock/blob/main/LICENSE)
+<h1 align="center">overlock</h1>
+
+<p align="center">Keep green tests honest.</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/overlock"><img src="https://img.shields.io/npm/v/overlock?color=cb3837&logo=npm&logoColor=white" alt="npm version" /></a>
+  <a href="https://github.com/rxova/overlock/actions/workflows/ci.yml"><img src="https://github.com/rxova/overlock/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status" /></a>
+  <a href="https://github.com/rxova/overlock/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" /></a>
+</p>
+
+<p align="center">
+  <a href="#install"><img src="https://img.shields.io/badge/Node.js-%E2%89%A520.11-5fa04e?logo=nodedotjs&logoColor=white" alt="Node.js 20.11 or newer" /></a>
+  <a href="https://github.com/rxova/overlock/blob/main/tsconfig.base.json"><img src="https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white" alt="TypeScript strict mode" /></a>
+  <a href="https://github.com/rxova/overlock/blob/main/packages/overlock/package.json"><img src="https://img.shields.io/badge/dependencies-0-44cc11" alt="Zero runtime dependencies" /></a>
+  <a href="https://github.com/rxova/overlock/blob/main/packages/overlock/vitest.config.ts"><img src="https://img.shields.io/badge/line%20coverage%20threshold-95%25%20per%20file-44cc11" alt="Line coverage threshold: 95% per file" /></a>
+</p>
+
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#agent-integration">Agent integration</a> ·
+  <a href="#rules">Rules</a> ·
+  <a href="#cli-reference">CLI reference</a>
+</p>
 
 A deterministic CLI that reads a git patch and reports edits that make a test
 suite ask less than it did: skipped tests, removed or loosened assertions,

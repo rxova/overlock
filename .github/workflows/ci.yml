@@ -304,6 +304,46 @@ jobs:
         with:
           cli-path: ${{ github.workspace }}/packages/overlock/dist/cli.js
 
+  published-action:
+    name: the published action
+    needs: [commitlint]
+    if: github.event_name == 'pull_request' && needs.commitlint.outputs.code-changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # `dogfood` runs the action out of the working tree, which is the right
+      # gate for a patch but proves nothing about what a consumer gets: it never
+      # resolves the Marketplace ref, never installs from npm, and never reads an
+      # `action.yml` that anyone has released. Every part of that path has broken
+      # here at least once — a listing published from the wrong tag, a version
+      # tag that named the wrong commit — and each time CI was green.
+      #
+      # So this job consumes overlock exactly as the README tells everyone else
+      # to. Nothing is checked out for it to run against but this repository's
+      # own patch, which is incidental; the question is whether the reference
+      # resolves and the action runs at all.
+      #
+      # Pinned to `@v0`, not `@v0.6.0`. The major tag is the one the README
+      # gives, it follows every release, and it is therefore the one that breaks
+      # if a release moves it wrongly — which is the failure this job exists to
+      # catch. A pinned patch version would freeze this job on a release that
+      # worked and go on passing after the tag it is meant to watch had rotted.
+      - name: Run overlock as a consumer would
+        uses: rxova/overlock@v0
+        with:
+          # No comment and no verdict: `dogfood` owns both. Two jobs writing the
+          # same `<!-- overlock-report -->` comment would race for it, and a
+          # second opinion from the last release — older rules, on the patch that
+          # may be changing them — is a failure nobody could act on.
+          comment: 'false'
+          fail-on: none
+
   changeset:
     name: changeset present
     needs: [commitlint]
@@ -352,6 +392,7 @@ jobs:
       - supply-chain
       - pack-smoke
       - dogfood
+      - published-action
       - changeset
     runs-on: ubuntu-latest
     timeout-minutes: 5

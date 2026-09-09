@@ -114,8 +114,13 @@ The release job then pushes the tags, in two forms:
   it follows releases, so the job force-moves it to each released commit. The
   major is derived from the published version, so `v1` starts being written on
   its own at 1.0.0.
+- **`v<version>`**, one per release, and a GitHub Release cut from it. This is
+  the Marketplace's half: a listing is published from a release, and the tag
+  behind it has to be semver, which `overlock@0.5.1` is not. Unlike the major
+  tag this one is never moved — it names one release for good. Its notes are the
+  changelog section changesets just wrote for that version.
 
-Both steps are gated on `steps.changesets.outputs.published == 'true'`, so a run
+All three steps are gated on `steps.changesets.outputs.published == 'true'`, so a run
 that only opens or updates the version pull request touches no tags.
 
 After a release, check that the tags actually moved:
@@ -128,3 +133,16 @@ The set of `overlock@*` tags should match the versions on npm, and `v0` should
 point at the newest release commit. If they have drifted, tag by hand against
 the `chore: version packages` commit for that version, rather than leaving the
 gap — and treat the drift as a bug in the release job.
+
+## The Marketplace listing
+
+The action is listed as **Overlock — Test Integrity**, not as `overlock`: a
+Marketplace name cannot match an existing action, user or organisation, and
+`github.com/overlock` is a user account. That name lives in `action.yml`'s
+`name:` and is display only — the action is still used as `rxova/overlock@v0`.
+
+The listing is published once by hand, from a release, at
+`https://github.com/rxova/overlock/releases` → _Edit release_ → _Publish this
+Action to the GitHub Marketplace_. GitHub validates `action.yml` at that
+release's tag, so the tag has to contain the name fix. After the first publish,
+each later release updates the listing on its own.

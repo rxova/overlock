@@ -82,3 +82,53 @@ jobs:
           echo "pointing v$major at $GITHUB_SHA"
           git tag -f "v$major" "$GITHUB_SHA"
           git push -f origin "v$major"
+
+      # The Marketplace lists an action from a *release*, and validates the tag
+      # behind it as semver — `overlock@0.5.1`, which is the only tag changesets
+      # writes in a monorepo, is not one, so it can never carry a listing. The
+      # action therefore needs a `vX.Y.Z` tag of its own alongside the package's,
+      # naming the same commit.
+      #
+      # This is also what makes a new version show up on the listing at all:
+      # after the first manual publish, GitHub updates the Marketplace entry from
+      # each subsequent release, and a release is exactly what this repository
+      # was not producing.
+      - name: Tag and release the action
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISHED: ${{ steps.changesets.outputs.publishedPackages }}
+        run: |
+          set -euo pipefail
+          version=$(echo "$PUBLISHED" | jq -r '.[0].version')
+          case "$version" in
+            ''|null)
+              echo "::error::could not read a version from publishedPackages: $PUBLISHED"
+              exit 1
+              ;;
+          esac
+
+          # Idempotent on a re-run: a release that already exists is not an
+          # error worth failing a publish that otherwise succeeded.
+          if gh release view "v$version" > /dev/null 2>&1; then
+            echo "v$version is already released"
+            exit 0
+          fi
+
+          # Not forced, unlike the major tag: a version tag names one release
+          # for good, and quietly moving it is how a consumer who pinned it ends
+          # up running code they never chose.
+          git tag "v$version" "$GITHUB_SHA"
+          git push origin "v$version"
+
+          # The changelog entry changesets just wrote, rather than a generated
+          # list of commit subjects: it is the one written for a reader.
+          notes="$RUNNER_TEMP/notes.md"
+          awk -v v="## $version" '
+            $0 == v { collecting = 1; next }
+            collecting && /^## / { exit }
+            collecting { print }
+          ' packages/overlock/CHANGELOG.md > "$notes"
+          [ -s "$notes" ] || echo "See packages/overlock/CHANGELOG.md." > "$notes"
+
+          gh release create "v$version" --title "v$version" --notes-file "$notes"

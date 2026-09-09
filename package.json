@@ -1,6 +1,12 @@
 {
   "name": "overlock-monorepo",
   "private": true,
+  "description": "Monorepo for overlock, a deterministic gate on test integrity in a git patch.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rxova/overlock.git"
+  },
   "type": "module",
   "packageManager": "pnpm@11.9.0",
   "engines": {

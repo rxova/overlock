@@ -1,0 +1,43 @@
+name: Feature request
+description: A new rule, flag, output or integration
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        New rules are discussed before they are written. A rule that fires
+        wrongly is worse than no rule, so the interesting part of a proposal is
+        the near-misses it must stay quiet on.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What edit slips through today, or what you cannot express with the current flags and config.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: The rule, flag or output you would add, and what it would report.
+    validations:
+      required: true
+
+  - type: textarea
+    id: near-misses
+    attributes:
+      label: What it must not fire on
+      description: >-
+        For a new rule: the changes that look similar and are legitimate. This is
+        what decides whether the rule is `high`, `medium` or not worth shipping.
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

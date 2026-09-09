@@ -1,0 +1,65 @@
+name: Bug report
+description: Something overlock does that it should not, or fails to do
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a security issue, please use private vulnerability reporting instead:
+        https://github.com/rxova/overlock/security/advisories/new
+
+  - type: input
+    id: version
+    attributes:
+      label: overlock version
+      description: Output of `npx overlock --version`.
+      placeholder: '0.5.0'
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Node version, operating system, and how overlock was invoked (CLI, Stop hook, MCP, GitHub Action).
+      placeholder: 'Node 22.14, macOS 15, Claude Code Stop hook'
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What overlock reported, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: patch
+    attributes:
+      label: The patch
+      description: >-
+        The diff that produced the result, reduced as far as you can. This is
+        the single most useful thing in a report — overlock is a pure function
+        of the patch, so a patch that reproduces it reproduces it everywhere.
+      render: diff
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The full output, ideally from `overlock --json`.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: Your `overlock.config.json`, or the `overlock` key in `package.json`, if you have one.
+      render: json
+    validations:
+      required: false

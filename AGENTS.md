@@ -114,9 +114,18 @@ table and in `llms.txt`, and write a minor changeset.
 
 ## The hook on this repository
 
-`.claude/settings.json` runs the **locally built** binary rather than
-`npx -y overlock`, which is what `overlock init claude` writes everywhere else.
-This repository is the package, so it gates itself on the code in the working
-tree rather than on the last published release. Run `pnpm exec turbo run build`
-once and the hook is live; before that it exits non-zero without blocking, which
-is the correct behaviour for a hook that cannot run.
+`.claude/settings.json` runs
+[`.claude/hooks/overlock-stop.sh`](.claude/hooks/overlock-stop.sh), which runs
+the **locally built** binary rather than `npx -y overlock`, which is what
+`overlock init claude` writes everywhere else. This repository is the package,
+so it gates itself on the code in the working tree rather than on the last
+published release.
+
+The wrapper builds before it runs, so there is nothing to do first: a fresh
+clone or worktree gates its first turn, and a rule you changed this turn is the
+rule that gates it. Turbo replays a warm build in under a second.
+
+If the build cannot run at all — no `pnpm install` yet — the hook says on stderr
+that the turn was **not** gated and exits 0 rather than failing every turn over
+an unbuilt tree. That is a hole, and it is loud on purpose: a gate that stops
+gating quietly is worse than one that is visibly off.

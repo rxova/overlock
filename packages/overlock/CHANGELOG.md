@@ -1,5 +1,13 @@
 # overlock
 
+## 0.6.0
+
+Not published to npm. `v0.6.0` was released as the GitHub Action alone — a
+Marketplace listing fix, which touched `action.yml` and nothing under
+`packages/` — and the package version was moved up to meet it so that the two
+stop drifting. The next npm release is 0.6.1, and from there the action and the
+package share one version line.
+
 ## 0.5.1
 
 ### Patch Changes

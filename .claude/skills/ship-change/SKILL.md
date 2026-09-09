@@ -116,9 +116,17 @@ The release job then pushes the tags, in two forms:
   its own at 1.0.0.
 - **`v<version>`**, one per release, and a GitHub Release cut from it. This is
   the Marketplace's half: a listing is published from a release, and the tag
-  behind it has to be semver, which `overlock@0.5.1` is not. Unlike the major
+  behind it has to be semver, which `overlock@0.5.1` was not. Unlike the major
   tag this one is never moved — it names one release for good. Its notes are the
   changelog section changesets just wrote for that version.
+
+  It can also run ahead of npm, because only `packages/` reaches npm: a change
+  to `action.yml` alone is released as the action and nothing else, and takes a
+  `v<version>` npm has not got to yet. `v0.6.0` was cut that way while npm
+  stayed on `0.5.1`. When a later publish finds its own tag already there on a
+  different commit, the job **fails** rather than skipping — a skip would leave
+  the tag naming older code and stop the listing updating, silently. Bump past
+  the taken version with the changeset and re-run.
 
 All three steps are gated on `steps.changesets.outputs.published == 'true'`, so a run
 that only opens or updates the version pull request touches no tags.
@@ -129,10 +137,16 @@ After a release, check that the tags actually moved:
 git ls-remote --tags origin
 ```
 
-The set of `overlock@*` tags should match the versions on npm, and `v0` should
-point at the newest release commit. If they have drifted, tag by hand against
-the `chore: version packages` commit for that version, rather than leaving the
-gap — and treat the drift as a bug in the release job.
+`v0` should point at the newest release commit, and there should be a `v<version>`
+and a release for it. The `overlock@*` tags track npm and are one per published
+version — with one hole: `overlock@0.5.1` was deleted by hand while untangling
+the first Marketplace listing, so npm 0.5.1 has no tag behind it. Nothing else
+should be missing. If something is, tag by hand against the `chore: version
+packages` commit for that version rather than leaving the gap, and treat the
+drift as a bug in the release job.
+
+The action's versions and npm's are **not** the same line, and are not expected
+to match.
 
 ## The Marketplace listing
 
@@ -140,6 +154,11 @@ The action is listed as **Overlock — Test Integrity**, not as `overlock`: a
 Marketplace name cannot match an existing action, user or organisation, and
 `github.com/overlock` is a user account. That name lives in `action.yml`'s
 `name:` and is display only — the action is still used as `rxova/overlock@v0`.
+
+Publish it from the **`v<version>`** release, never from an `overlock@<version>`
+one. The Marketplace writes its usage snippet as `OWNER/REPO@TAG`, so a listing
+published from the package tag renders `uses: rxova/overlock@overlock@0.5.1` —
+which is how the first one went out, and why that release was deleted.
 
 The listing is published once by hand, from a release, at
 `https://github.com/rxova/overlock/releases` → _Edit release_ → _Publish this

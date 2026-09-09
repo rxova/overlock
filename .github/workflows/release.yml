@@ -108,18 +108,42 @@ jobs:
               ;;
           esac
 
-          # Idempotent on a re-run: a release that already exists is not an
-          # error worth failing a publish that otherwise succeeded.
-          if gh release view "v$version" > /dev/null 2>&1; then
-            echo "v$version is already released"
-            exit 0
+          tag="v$version"
+
+          # The two version lines can drift. Only `packages/` reaches npm, so a
+          # change to `action.yml` alone — a Marketplace fix, say — is released
+          # as the action and nothing else, and takes a `v<version>` npm has not
+          # reached yet. `v0.6.0` was cut that way while npm stayed on `0.5.1`.
+          #
+          # Which means this step can find its own tag already present, on a
+          # different commit, and the tempting answer — skip, the release exists
+          # — is the dangerous one: the tag would then name code from before this
+          # publish, the Marketplace listing would quietly stop updating, and
+          # nothing anywhere would say so. Better to fail the release and be
+          # told to pick a version that is free.
+          git fetch --tags --force origin
+          tagged=$(git rev-list -n 1 "$tag" 2>/dev/null || true)
+
+          if [ -n "$tagged" ] && [ "$tagged" != "$GITHUB_SHA" ]; then
+            echo "::error::$tag already names $tagged, but this release is $GITHUB_SHA."
+            echo "::error::The action was released at $version before npm reached it."
+            echo "::error::Bump past it with a changeset, then re-run: a version tag is not moved."
+            exit 1
           fi
 
-          # Not forced, unlike the major tag: a version tag names one release
-          # for good, and quietly moving it is how a consumer who pinned it ends
-          # up running code they never chose.
-          git tag "v$version" "$GITHUB_SHA"
-          git push origin "v$version"
+          # Not forced, and only when it is missing: a version tag names one
+          # release for good, and quietly moving it is how a consumer who pinned
+          # it ends up running code they never chose. An equal `tagged` is this
+          # same publish being re-run, which is allowed to finish.
+          if [ -z "$tagged" ]; then
+            git tag "$tag" "$GITHUB_SHA"
+            git push origin "$tag"
+          fi
+
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "$tag is already released"
+            exit 0
+          fi
 
           # The changelog entry changesets just wrote, rather than a generated
           # list of commit subjects: it is the one written for a reader.
@@ -131,4 +155,4 @@ jobs:
           ' packages/overlock/CHANGELOG.md > "$notes"
           [ -s "$notes" ] || echo "See packages/overlock/CHANGELOG.md." > "$notes"
 
-          gh release create "v$version" --title "v$version" --notes-file "$notes"
+          gh release create "$tag" --title "$tag" --notes-file "$notes"

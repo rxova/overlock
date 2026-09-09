@@ -102,3 +102,29 @@ Automated. Merging to `main` opens or updates a `chore: version packages` pull
 request; merging that one runs `verify` again and publishes to npm through
 Trusted Publishing. There is no manual publish step and no npm token in
 repository secrets.
+
+The release job then pushes the tags, in two forms:
+
+- **`overlock@<version>`**, one per release, written by `changeset publish`.
+  Publishing creates these in the runner's clone but does not push them, so the
+  workflow pushes them explicitly. Without that step a version reaches npm with
+  nothing in the repository pointing at the commit it came from.
+- **`v<major>`** — the moving major tag the GitHub Action is consumed under
+  (`rxova/overlock@v0`). Actions convention is that consumers pin the major and
+  it follows releases, so the job force-moves it to each released commit. The
+  major is derived from the published version, so `v1` starts being written on
+  its own at 1.0.0.
+
+Both steps are gated on `steps.changesets.outputs.published == 'true'`, so a run
+that only opens or updates the version pull request touches no tags.
+
+After a release, check that the tags actually moved:
+
+```bash
+git ls-remote --tags origin
+```
+
+The set of `overlock@*` tags should match the versions on npm, and `v0` should
+point at the newest release commit. If they have drifted, tag by hand against
+the `chore: version packages` commit for that version, rather than leaving the
+gap — and treat the drift as a bug in the release job.

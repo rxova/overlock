@@ -1,6 +1,6 @@
 {
   "name": "overlock",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Deterministic, zero-dependency gate on test integrity in a git patch: reports skipped tests, removed or weakened assertions, and lowered coverage thresholds.",
   "license": "MIT",
   "author": "Jonatan Kruszewski <jonakrusze@gmail.com>",

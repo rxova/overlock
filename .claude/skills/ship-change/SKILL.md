@@ -144,8 +144,13 @@ commit that carries it — `overlock@0.5.1` was deleted and restored to `ce9ffee
 that way — rather than leaving the gap, and treat the drift as a bug in the
 release job.
 
-The action's versions and npm's are **not** the same line, and are not expected
-to match.
+The action's version and the package's are **one line**, and a release moves
+both. They came apart once — `v0.6.0` went out as an action-only release while
+npm was on `0.5.1` — and were rejoined by moving the package version up to
+`0.6.0` without publishing it, so npm has no 0.6.0. Should it happen again, close
+it the same way: raise the package to the action's version in a normal pull
+request, and let the next changeset bump both from there. Never lower the
+action's, and never reuse a `v<version>` that has been released.
 
 ## The Marketplace listing
 

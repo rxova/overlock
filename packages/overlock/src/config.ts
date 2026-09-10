@@ -19,7 +19,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import type { BaseMode } from './git.js';
-import { RULE_IDS, type RuleId, type Severity } from './types.js';
+import { RULE_IDS, type Grade, type RuleId, type Severity } from './types.js';
 
 export class ConfigError extends Error {}
 
@@ -28,7 +28,7 @@ export interface OverlockConfig {
   baseMode?: BaseMode;
   failOn?: Severity | 'none';
   failOnEmpty?: boolean;
-  severity?: Partial<Record<RuleId, Severity>>;
+  severity?: Partial<Record<RuleId, Grade>>;
   testGlob?: string[];
   untracked?: boolean;
 }
@@ -46,6 +46,14 @@ export const CONFIG_KEY = 'overlock';
 
 const KEYS = ['base', 'baseMode', 'failOn', 'failOnEmpty', 'severity', 'testGlob', 'untracked'];
 const LEVELS = ['high', 'medium', 'low'];
+/**
+ * What a rule may be graded, which is one more than a finding may carry.
+ *
+ * `off` belongs here and not in `failOn`: turning a rule off is a judgement
+ * about that rule, while a `failOn` of `none` is a judgement about all of them,
+ * and the second already exists.
+ */
+const GRADES = [...LEVELS, 'off'];
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -109,15 +117,15 @@ export function parseConfig(value: unknown, where: string): OverlockConfig {
     if (!isObject(value.severity)) {
       throw new ConfigError(`${where}: severity must be an object of RULE_ID to level`);
     }
-    const severity: Partial<Record<RuleId, Severity>> = {};
+    const severity: Partial<Record<RuleId, Grade>> = {};
     for (const [rule, level] of Object.entries(value.severity)) {
       if (!(RULE_IDS as readonly string[]).includes(rule)) {
         throw new ConfigError(`${where}: severity names an unknown rule ${JSON.stringify(rule)}`);
       }
-      if (typeof level !== 'string' || !LEVELS.includes(level)) {
-        throw new ConfigError(`${where}: severity.${rule} must be high, medium or low`);
+      if (typeof level !== 'string' || !GRADES.includes(level)) {
+        throw new ConfigError(`${where}: severity.${rule} must be high, medium, low or off`);
       }
-      severity[rule as RuleId] = level as Severity;
+      severity[rule as RuleId] = level as Grade;
     }
     config.severity = severity;
   }

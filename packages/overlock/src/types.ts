@@ -20,6 +20,18 @@
 export type Severity = 'high' | 'medium' | 'low';
 
 /**
+ * What a repository may grade a rule as, which is one more thing than a finding
+ * may carry: `off`.
+ *
+ * A grade is a policy about a rule; a severity is a fact about a finding. They
+ * were the same three words while every rule had a grade worth reporting, and
+ * `off` is what separates them — a rule graded `off` produces no findings, so
+ * no finding can ever carry it. Keeping `Severity` as it was is also what keeps
+ * `counts` a total record of three keys on the wire.
+ */
+export type Grade = Severity | 'off';
+
+/**
  * A substitution the patch applies wholesale, inferred from the patch itself.
  *
  * Part of the wire contract rather than an internal shape, because the number
@@ -48,6 +60,8 @@ export const RULE_IDS = [
   'COVERAGE_THRESHOLD_LOWERED',
   'TEST_TIMEOUT_RAISED',
   'TEST_AND_IMPL_TOGETHER',
+  'TEST_GATE_DISABLED',
+  'SUITE_SCOPE_NARROWED',
 ] as const;
 
 export type RuleId = (typeof RULE_IDS)[number];
@@ -152,6 +166,15 @@ export interface Report {
   renames: Rename[];
   /** Findings a rename or a reformat accounts for. Never subtracted from `ok`. */
   explained: number;
+  /**
+   * Findings dropped because their rule is graded `off`.
+   *
+   * Counted for the same reason suppressions are: a repository that has judged
+   * a rule pure noise is entitled to switch it off, and nobody is entitled to a
+   * gate that empties quietly. This is the number that says how much of the
+   * patch the run declined to look at.
+   */
+  silenced: number;
   /**
    * Patch-level acknowledgements read from the commit messages in the range,
    * and from the pull request body when the caller supplies it.

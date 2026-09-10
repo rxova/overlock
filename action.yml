@@ -29,9 +29,11 @@ inputs:
     default: 'true'
   severity:
     description: >-
-      Per-rule severity overrides, one `RULE_ID=level` per line. Lets a
+      Per-rule grades, one `RULE_ID=high|medium|low|off` per line. Lets a
       repository that deletes test files routinely grade TEST_REMOVED down
-      without dropping fail-on globally and disarming every other rule.
+      without dropping fail-on globally and disarming every other rule, and
+      `off` retires a rule it has judged says nothing here. What an `off` rule
+      drops is still counted and reported.
     required: false
     default: ''
   working-directory:

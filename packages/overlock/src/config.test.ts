@@ -56,6 +56,17 @@ describe('parseConfig', () => {
     });
   });
 
+  it('accepts a rule graded off', () => {
+    const config = parseConfig({ severity: { TEST_AND_IMPL_TOGETHER: 'off' } }, 'test');
+    expect(config.severity).toEqual({ TEST_AND_IMPL_TOGETHER: 'off' });
+  });
+
+  it('says which grades a rule may have', () => {
+    expect(() => parseConfig({ severity: { TEST_REMOVED: 'urgent' } }, 'test')).toThrow(
+      /must be high, medium, low or off/,
+    );
+  });
+
   it('accepts an empty object', () => {
     expect(parseConfig({}, 'test')).toEqual({});
   });
@@ -202,6 +213,18 @@ describe('applyConfig', () => {
     expect(applied.base).toBe('HEAD~3');
     expect(applied.baseMode).toBe('direct');
     expect(applied.failOn).toBe('none');
+  });
+
+  it('accepts a rule graded off on the command line', () => {
+    expect(args(['--severity', 'TEST_AND_IMPL_TOGETHER=off']).severities).toEqual({
+      TEST_AND_IMPL_TOGETHER: 'off',
+    });
+  });
+
+  it('refuses a grade it does not have, rather than ignoring it', () => {
+    expect(() => args(['--severity', 'TEST_REMOVED=none'])).toThrow(
+      /must be high, medium, low or off/,
+    );
   });
 
   it('treats a --no- flag as a decision too', () => {

@@ -420,8 +420,14 @@ function staleNote(report: Report): string {
 }
 
 function suppressedNote(report: Report): string {
-  if (report.suppressed === 0) return '';
-  return ` (${report.suppressed} suppressed)`;
+  const parts: string[] = [];
+  if (report.suppressed > 0) parts.push(`${report.suppressed} suppressed`);
+  // A rule graded `off` is a decision a repository made once, in a file, rather
+  // than a directive per finding — which is the point of it. It is still said
+  // out loud, because the alternative is a green line standing on however many
+  // findings nobody sees.
+  if (report.silenced > 0) parts.push(`${report.silenced} silenced by config`);
+  return parts.length === 0 ? '' : ` (${parts.join(', ')})`;
 }
 
 function clip(text: string, max: number): string {

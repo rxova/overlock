@@ -5,7 +5,7 @@ import { isTestFile } from './paths.js';
 import { RULES } from './rules/index.js';
 import { sanitize } from './rules/shared.js';
 import { applySuppressions, collectSuppressions } from './suppress.js';
-import type { Finding, Report, RuleId, Severity } from './types.js';
+import type { Finding, Grade, Report, RuleId, Severity } from './types.js';
 
 const SEVERITY_RANK: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
 
@@ -26,8 +26,13 @@ export interface AnalyzeOptions {
    * medium`, and pulling it to unblock TEST_REMOVED also unblocks
    * TEST_SKIPPED_ADDED, ASSERTION_WEAKENED and COVERAGE_THRESHOLD_LOWERED. An
    * escape from one rule should not disarm four.
+   *
+   * `off` is the end of that range rather than a fourth severity: a rule a
+   * repository has judged pure noise otherwise costs it an inline directive per
+   * finding or a trailer per pull request, which is a lot of writing to say
+   * "we already decided this one says nothing". What it silences is counted.
    */
-  severities?: Partial<Record<RuleId, Severity>>;
+  severities?: Partial<Record<RuleId, Grade>>;
   /**
    * Commit messages and pull request body for the patch, searched for
    * `Overlock-Allow:` trailers. Empty at Stop time, where uncommitted work has
@@ -59,7 +64,11 @@ export function analyze(options: AnalyzeOptions): Report {
     renamed: explanation.applyRenames,
   };
 
-  const raw = RULES.flatMap((rule) => rule.run(ctx)).map((f) => regrade(f, severities));
+  const produced = RULES.flatMap((rule) => rule.run(ctx));
+  const silenced = produced.filter((f) => severities[f.rule] === 'off');
+  const raw = produced
+    .filter((f) => severities[f.rule] !== 'off')
+    .map((f) => regrade(f, severities));
   const { kept, suppressed, used } = applySuppressions(
     sortFindings(dedupe(raw)),
     collectSuppressions(files),
@@ -92,6 +101,7 @@ export function analyze(options: AnalyzeOptions): Report {
     counts,
     renames: explanation.renames,
     explained: findings.filter((f) => f.explained_by !== undefined).length,
+    silenced: silenced.length,
     allowed: usedAllowances,
     allowances_unused: unusedAllowances,
     // Allowed findings are counted here too: a silenced finding that leaves no
@@ -143,9 +153,12 @@ function annotate(f: Finding, explanation: PatchExplanation): Finding {
  * the order a finding is reported in and whether it blocks, not merely the word
  * printed beside it.
  */
-function regrade(f: Finding, severities: Partial<Record<RuleId, Severity>>): Finding {
+function regrade(f: Finding, severities: Partial<Record<RuleId, Grade>>): Finding {
   const override = severities[f.rule];
-  return override === undefined || override === f.severity ? f : { ...f, severity: override };
+  // `off` never reaches here: those findings are dropped before regrading,
+  // because a severity is a fact about a finding and `off` is not one.
+  if (override === undefined || override === 'off' || override === f.severity) return f;
+  return { ...f, severity: override };
 }
 
 /**

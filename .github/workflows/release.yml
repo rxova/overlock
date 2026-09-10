@@ -35,15 +35,28 @@ jobs:
       - name: Verify
         run: pnpm run verify
 
+      # v2, not v1. v1 predates Changesets v3 and cannot read its publish
+      # output: 0.6.1 went to npm under v1 while `published` came back false, so
+      # every tagging step below skipped and the job still went green. The
+      # release list, the `v0` tag and the Marketplace all stayed on 0.6.0.
+      #
+      # Tags come from the steps below rather than from the action, so that the
+      # `v<version>` the Marketplace needs and the `overlock@<version>` the
+      # package uses are written in one place.
       - name: Create a version PR, or publish one that was merged
         id: changesets
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
-          version: pnpm exec changeset version
-          publish: pnpm run release
-          commit: 'chore: version packages'
-          title: 'chore: version packages'
+          version-script: pnpm exec changeset version
+          publish-script: pnpm run release
+          commit-message: 'chore: version packages'
+          pr-title: 'chore: version packages'
+          create-github-releases: false
+          push-git-tags: false
         env:
+          # Not for the action, which takes its token as an input: for
+          # `@changesets/changelog-github`, which reads this to write the
+          # changelog entries and refuses to run without it.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # `changeset publish` ends at "Created git tags" — it writes them into the
@@ -69,7 +82,7 @@ jobs:
       - name: Move the action's major tag
         if: steps.changesets.outputs.published == 'true'
         env:
-          PUBLISHED: ${{ steps.changesets.outputs.publishedPackages }}
+          PUBLISHED: ${{ steps.changesets.outputs['published-packages'] }}
         run: |
           set -euo pipefail
           major=$(echo "$PUBLISHED" | jq -r '.[0].version' | cut -d. -f1)
@@ -97,7 +110,7 @@ jobs:
         if: steps.changesets.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PUBLISHED: ${{ steps.changesets.outputs.publishedPackages }}
+          PUBLISHED: ${{ steps.changesets.outputs['published-packages'] }}
         run: |
           set -euo pipefail
           version=$(echo "$PUBLISHED" | jq -r '.[0].version')
@@ -156,3 +169,34 @@ jobs:
           [ -s "$notes" ] || echo "See packages/overlock/CHANGELOG.md." > "$notes"
 
           gh release create "$tag" --title "$tag" --notes-file "$notes"
+
+      # Every step above hangs on one output of a third-party action, and when
+      # that output silently went false the release published to npm and tagged
+      # nothing — green. So the last word belongs to the registry, not to the
+      # output: if the version in the tree is on npm, the tags naming it have to
+      # exist. On a run that published nothing they already do, and this says
+      # nothing.
+      - name: Fail if a published version has no tags
+        if: always() && steps.changesets.outcome == 'success'
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./packages/overlock/package.json').version")
+
+          if ! npm view "overlock@$version" version > /dev/null 2>&1; then
+            echo "overlock@$version is not on npm; nothing to tag."
+            exit 0
+          fi
+
+          git fetch --tags --force origin
+          missing=
+          for tag in "overlock@$version" "v$version"; do
+            git rev-parse -q --verify "refs/tags/$tag" > /dev/null || missing="$missing $tag"
+          done
+
+          if [ -n "$missing" ]; then
+            echo "::error::overlock@$version is published, but these tags are missing:$missing"
+            echo "::error::The release is half done: npm has it and this repository cannot point at it."
+            exit 1
+          fi
+
+          echo "overlock@$version is published and tagged."

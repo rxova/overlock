@@ -487,6 +487,11 @@ export const suiteScopeNarrowed: Rule = {
 
     for (const file of ctx.files) {
       if (file.status === 'deleted') continue;
+      // A file the patch creates has no prior set to shrink. Read line by line
+      // an added config is all gains and no losses, which is exactly the shape
+      // of a narrowed exclude list — so without this every new package reads as
+      // a weakening.
+      if (file.status === 'added') continue;
       const runner = isRunnerConfig(file.path);
       if (!runner && !isCiConfig(file.path)) continue;
 

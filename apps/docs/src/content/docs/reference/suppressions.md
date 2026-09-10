@@ -92,6 +92,20 @@ At `Stop` time a trailer covers what the agent **committed** during the session.
 
 So: trailers for what is committed and broad, inline directives for what is uncommitted and specific. The trailer cannot cover a file the agent has not committed yet, which is why it does not replace the inline form.
 
+## When you keep writing the same reason
+
+A suppression is per finding, on purpose. If you are writing the same rule ID and the same sentence in every patch, the thing you have learned is about the rule, not about any of those findings, and repeating a directive is the wrong place to keep saying it.
+
+Grade the rule off in the [config file](configuration.md#grading-a-rule-off) instead:
+
+```json
+{ "severity": { "TEST_AND_IMPL_TOGETHER": "off" } }
+```
+
+That is one decision, in one commit, reviewable. It is counted separately from suppressions and printed the same way — `(2 suppressed, 9 silenced by config)` — so the two never blur into one number.
+
+Do not reach for it earlier than that. A suppression carries a reason; `off` carries none, and it applies to every future patch.
+
 ## What a good reason looks like
 
 Bad: `-- flaky`. Bad: `-- not relevant`. Bad: `-- see PR`.

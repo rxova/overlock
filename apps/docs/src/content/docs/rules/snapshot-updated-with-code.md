@@ -2,7 +2,7 @@
 title: SNAPSHOT_UPDATED_WITH_CODE
 description: A snapshot was regenerated in the same patch as the code it snapshots.
 sidebar:
-  order: 10
+  order: 12
 ---
 
 **Severity: `medium`.**

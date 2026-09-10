@@ -15,6 +15,8 @@ overlock --json
   "ok": false,
   "base": "HEAD",
   "counts": { "high": 1, "medium": 0, "low": 0 },
+  "suppressed": 0,
+  "silenced": 0,
   "findings": [
     {
       "id": "TEST_SKIPPED_ADDED:src/auth.test.ts:42",
@@ -43,13 +45,16 @@ This is the interface. If you are building anything on overlock's output — a d
 | `scope`             | `{ files, commits }` — the size of what was read          |
 | `findings`          | The findings, in report order                             |
 | `counts`            | `{ high, medium, low }`                                   |
-| `suppressed`        | How many findings were silenced                           |
+| `suppressed`        | How many findings a directive silenced                    |
+| `silenced`          | How many a rule graded `off` dropped                      |
 | `suppressed_new`    | How many of those the patch itself added                  |
 | `renames`           | The substitutions inferred from the patch                 |
 | `explained`         | Findings the patch accounts for                           |
 | `allowed`           | The allowances that matched something                     |
 | `allowances_unused` | The allowances that matched nothing                       |
 | `suppressions_new`  | The directives this patch introduced                      |
+
+`counts` keeps its three keys whatever the config says. `off` is a grade a rule can have, not a severity a finding can carry: no finding is ever reported as `off`, it is dropped and counted in `silenced`. Both `silenced` and `suppressed` are reported on clean runs too — a gate that empties quietly is not a gate. See [configuration](configuration.md#grading-a-rule-off).
 
 `suppressed_new` and `suppressions_new` are the ones to wire up if you are building your own gate. A patch that silences its own findings is the signal the [Stop hook](../integrations/claude-code.md) stops on, and it is available to anything else that wants it.
 
@@ -58,7 +63,7 @@ This is the interface. If you are building anything on overlock's output — a d
 | Field          | Meaning                                                          |
 | -------------- | ---------------------------------------------------------------- |
 | `id`           | `<rule>:<file>:<line>`, or `<rule>:<file>` when there is no line |
-| `rule`         | One of the eleven frozen [rule IDs](../rules/overview.md)        |
+| `rule`         | One of the thirteen frozen [rule IDs](../rules/overview.md)      |
 | `severity`     | `high` \| `medium` \| `low`                                      |
 | `file`         | Repository-relative path                                         |
 | `line`         | `null` when the finding is about a file rather than a line in it |

@@ -2,7 +2,7 @@
 title: ASSERTION_WEAKENED
 description: An assertion stopped naming a value — toBe(3) became toBeDefined(), toBeTruthy() or not.toBeNull().
 sidebar:
-  order: 4
+  order: 5
 ---
 
 **Severity: `high`, or `medium` when the case gained assertions overall.**

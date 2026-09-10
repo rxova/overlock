@@ -2,7 +2,7 @@
 title: ASSERTION_NARROWED
 description: An assertion still names a value but covers less of it — a whole object became one field.
 sidebar:
-  order: 5
+  order: 6
 ---
 
 **Severity: `high`, or `medium` when the case gained assertions overall.**

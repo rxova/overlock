@@ -27,14 +27,16 @@ interface AnalyzeOptions {
   testGlobs?: RegExp[];
   /** Severity at or above which the report is not ok. Default 'high'. */
   failOn?: Severity | 'none';
-  /** Per-rule severity, replacing the built-in grade for those rules. */
-  severities?: Partial<Record<RuleId, Severity>>;
+  /** Per-rule grade, replacing the built-in one for those rules. */
+  severities?: Partial<Record<RuleId, Grade>>;
   /** Commit messages and PR body, searched for `Overlock-Allow:` trailers. */
   allowText?: string;
 }
 ```
 
 `testGlobs` takes real `RegExp` objects here, not the strings the [config file](configuration.md) uses.
+
+`severities` is `Grade`, not `Severity`: `'high' | 'medium' | 'low' | 'off'`. A rule set to `off` produces no findings and what it dropped is counted in the report's `silenced`. Note that `Grade` is not currently exported from the package, so a TypeScript consumer has to spell the union out; `Severity` is exported and does not include `'off'`, because `off` is something a rule can be set to and not something a finding can carry.
 
 `allowText` is where commit messages and a pull request body go, so [trailers](suppressions.md) apply. Leave it empty for uncommitted work, which has no message to read.
 
@@ -44,7 +46,7 @@ interface AnalyzeOptions {
 import { RULE_IDS } from 'overlock';
 ```
 
-The eleven IDs, in report order. Enumerate them from here rather than hardcoding the list — adding a rule is a minor release, and a hardcoded array silently stops covering the new one.
+The thirteen IDs, in report order. Enumerate them from here rather than hardcoding the list — adding a rule is a minor release, and a hardcoded array silently stops covering the new one.
 
 Types come with them: `Severity`, `RuleId`, `Finding`, `Report`, `Evidence`, `DiffFile`, `DiffLine`, `Hunk`.
 

@@ -2,7 +2,7 @@
 title: ASSERTION_REMOVED
 description: A test file ends the patch with fewer assertions than it started with.
 sidebar:
-  order: 8
+  order: 10
 ---
 
 **Severity: `medium`.**

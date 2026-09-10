@@ -2,7 +2,7 @@
 title: PREDICATE_NARROWED
 description: The set the assertions range over got smaller, while every expect stayed identical.
 sidebar:
-  order: 6
+  order: 7
 ---
 
 **Severity: `high` when the narrowed set drives a loop or a case table, `medium` when it is only assigned to a variable.**

@@ -2,7 +2,7 @@
 title: EXPECTED_VALUE_CHANGED
 description: An assertion kept its shape and its expected literal was edited.
 sidebar:
-  order: 9
+  order: 11
 ---
 
 **Severity: `medium`.**

@@ -1174,6 +1174,55 @@ describe('TEST_GATE_DISABLED', () => {
 describe('SUITE_SCOPE_NARROWED', () => {
   const config = (body: string): string => diffOf('vitest.config.ts', hunk(body));
 
+  const newConfig = (body: string): string =>
+    diffOf('vitest.config.ts', hunk(body), { status: 'added' });
+
+  describe('a config file the patch creates', () => {
+    it('stays quiet: a set that did not exist cannot have shrunk', () => {
+      const diff = newConfig(
+        [
+          '+export default defineConfig({',
+          '+  test: {',
+          '+    coverage: {',
+          "+      exclude: ['src/**/*.test.ts', 'src/__fixtures__/**', 'src/cli.ts'],",
+          '+    },',
+          '+  },',
+          '+});',
+        ].join('\n'),
+      );
+      expect(rulesFor(diff)).not.toContain('SUITE_SCOPE_NARROWED');
+    });
+
+    it('stays quiet for an include list too', () => {
+      const diff = newConfig("+    include: ['src/core/**/*.test.ts'],");
+      expect(rulesFor(diff)).not.toContain('SUITE_SCOPE_NARROWED');
+    });
+
+    it('stays quiet for a test command that is born filtered', () => {
+      const diff = diffOf('package.json', hunk('+    "test": "vitest run --project unit",'), {
+        status: 'added',
+      });
+      expect(rulesFor(diff)).not.toContain('SUITE_SCOPE_NARROWED');
+    });
+  });
+
+  describe('a config file that already existed', () => {
+    it('still fires when an exclude key is introduced', () => {
+      const diff = config(['     coverage: {', "+      exclude: ['src/legacy/**'],"].join('\n'));
+      expect(rulesFor(diff)).toContain('SUITE_SCOPE_NARROWED');
+    });
+
+    it('still fires when an exclude list grows', () => {
+      const diff = config(
+        [
+          "-      exclude: ['src/legacy/**'],",
+          "+      exclude: ['src/legacy/**', 'src/core/**'],",
+        ].join('\n'),
+      );
+      expect(rulesFor(diff)).toContain('SUITE_SCOPE_NARROWED');
+    });
+  });
+
   it('fires high when the include list loses a pattern', () => {
     const diff = config(
       [

@@ -4,7 +4,16 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/coverage/**', '**/.turbo/**', '**/*.config.ts', '**/*.config.js'],
+    ignores: [
+      '**/dist/**',
+      '**/coverage/**',
+      '**/.turbo/**',
+      // Astro writes these type declarations on every build. They are not ours
+      // to fix, and they fail rules the hand-written sources here pass.
+      '**/.astro/**',
+      '**/*.config.ts',
+      '**/*.config.js',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

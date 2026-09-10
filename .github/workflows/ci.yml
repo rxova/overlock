@@ -98,8 +98,12 @@ jobs:
         run: pnpm lint
       - name: Check formatting
         run: pnpm format:check
+      # The docs app is excluded on purpose: it is built in docs.yml, at the base
+      # path rxova.org actually mounts it on, which is the build whose output
+      # ships. Building it here as well would spend every pull request
+      # re-checking a dist nobody publishes.
       - name: Build
-        run: pnpm exec turbo run build
+        run: pnpm exec turbo run build --filter='!@overlock/docs'
       - name: Typecheck
         run: pnpm exec turbo run typecheck
 

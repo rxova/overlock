@@ -25,6 +25,8 @@
     "check:exports": "turbo run check:exports --filter=overlock",
     "pack:smoke": "turbo run pack:smoke --concurrency=1 --filter=overlock",
     "check:llms": "node --import tsx ./packages/tooling/check-llms.ts",
+    "docs": "pnpm --filter @overlock/docs dev",
+    "docs:build": "pnpm --filter @overlock/docs build",
     "e2e": "turbo run build --filter=overlock && pnpm --filter overlock run e2e",
     "verify": "node --import tsx ./packages/tooling/verify.ts",
     "release": "turbo run build --filter=overlock && changeset publish",

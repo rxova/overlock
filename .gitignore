@@ -7,3 +7,6 @@ coverage
 .env
 .env.*
 !.env.example
+
+# Astro's generated types and content cache for apps/docs.
+apps/docs/.astro/

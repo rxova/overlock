@@ -1,5 +1,11 @@
 # overlock
 
+## 0.6.1
+
+### Patch Changes
+
+- [#8](https://github.com/rxova/overlock/pull/8) [`d1668ba`](https://github.com/rxova/overlock/commit/d1668ba8c6ed4652d8e7c4d7f70c5efda17ce254) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Add a sewing machine SVG logo and refresh the README with centered branding, package badges, and quick links.
+
 ## 0.6.0
 
 Not published to npm. `v0.6.0` was released as the GitHub Action alone — a

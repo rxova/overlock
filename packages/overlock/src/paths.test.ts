@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isCiConfig,
+  isRunnerConfig,
   isSnapshotFile,
   isTestFile,
   isThresholdConfig,
@@ -73,5 +75,47 @@ describe('subjects', () => {
 
   it('reduces a source path to its stem', () => {
     expect(sourceSubject('src/deep/Login.tsx')).toBe('login');
+  });
+});
+
+describe('isCiConfig', () => {
+  it.each([
+    '.github/workflows/ci.yml',
+    '.github/workflows/release.yaml',
+    '.github/actions/setup/action.yml',
+    'action.yml',
+    '.gitlab-ci.yml',
+    '.circleci/config.yml',
+    'azure-pipelines.yml',
+    'Jenkinsfile',
+    'Makefile',
+    'scripts/test.sh',
+  ])('recognises %s', (path) => {
+    expect(isCiConfig(path)).toBe(true);
+  });
+
+  it.each(['src/workflows.ts', 'docs/ci.md', 'config.yml'])('does not claim %s', (path) => {
+    expect(isCiConfig(path)).toBe(false);
+  });
+});
+
+describe('isRunnerConfig', () => {
+  it.each([
+    'vitest.config.ts',
+    'packages/app/vitest.e2e.config.ts',
+    'jest.config.js',
+    'jest.config.json',
+    '.mocharc.json',
+    'package.json',
+    'pyproject.toml',
+    'pytest.ini',
+    'tox.ini',
+    'phpunit.xml',
+  ])('recognises %s', (path) => {
+    expect(isRunnerConfig(path)).toBe(true);
+  });
+
+  it.each(['tsup.config.ts', 'src/config.ts', 'README.md'])('does not claim %s', (path) => {
+    expect(isRunnerConfig(path)).toBe(false);
   });
 });

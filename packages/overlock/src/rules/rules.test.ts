@@ -1063,3 +1063,226 @@ describe('TEST_AND_IMPL_TOGETHER and reformatting', () => {
     expect(rulesFor(diff)).toContain('TEST_AND_IMPL_TOGETHER');
   });
 });
+
+describe('TEST_GATE_DISABLED', () => {
+  const workflow = (body: string, options: { status?: 'deleted' } = {}): string =>
+    diffOf('.github/workflows/ci.yml', hunk(body), options);
+
+  it('fires high when continue-on-error lands on a step that runs tests', () => {
+    const diff = workflow(
+      ['       - run: pnpm test', '+        continue-on-error: true'].join('\n'),
+    );
+    const [found] = findingsOf(diff, 'TEST_GATE_DISABLED');
+    expect(found?.severity).toBe('high');
+    expect(found?.message).toContain('continue-on-error');
+    expect(found?.evidence.after).toContain('continue-on-error: true');
+  });
+
+  it('grades down when the diff does not show what the step is', () => {
+    const diff = workflow(
+      ['       - uses: actions/upload-artifact@v4', '+        continue-on-error: true'].join('\n'),
+    );
+    const [found] = findingsOf(diff, 'TEST_GATE_DISABLED');
+    expect(found?.severity).toBe('medium');
+  });
+
+  it('fires high when a test job is switched off with if: false', () => {
+    const diff = workflow(['   test:', '+    if: false', '     runs-on: ubuntu-latest'].join('\n'));
+    const [found] = findingsOf(diff, 'TEST_GATE_DISABLED');
+    expect(found?.severity).toBe('high');
+    expect(found?.message).toContain('if: false');
+  });
+
+  it.each([
+    ['|| true', '+    "test": "vitest run || true",'],
+    ['|| exit 0', '+    "test": "vitest run || exit 0",'],
+    ['|| :', '+        run: pytest || :'],
+    ['; true', '+        run: go test ./... ; true'],
+  ])('fires high when a test command is made unable to fail with %s', (label, added) => {
+    const path = added.includes('"test"') ? 'package.json' : '.github/workflows/ci.yml';
+    const [found] = findingsOf(diffOf(path, hunk(added)), 'TEST_GATE_DISABLED');
+    expect(found?.severity).toBe('high');
+    expect(found?.message).toContain(label);
+  });
+
+  it('fires medium when the runner is told an empty run is a pass', () => {
+    const diff = workflow(
+      ['-        run: pnpm vitest run', '+        run: pnpm vitest run --passWithNoTests'].join(
+        '\n',
+      ),
+    );
+    const [found] = findingsOf(diff, 'TEST_GATE_DISABLED');
+    expect(found?.severity).toBe('medium');
+    expect(found?.message).toContain('empty run');
+  });
+
+  it('reads the config form of the same flag', () => {
+    const diff = diffOf('vitest.config.ts', hunk('+    passWithNoTests: true,'));
+    expect(findingsOf(diff, 'TEST_GATE_DISABLED')[0]?.severity).toBe('medium');
+  });
+
+  it('fires high when a deleted workflow took the suite with it', () => {
+    const diff = workflow('-      - run: pnpm test', { status: 'deleted' });
+    const [found] = findingsOf(diff, 'TEST_GATE_DISABLED');
+    expect(found?.severity).toBe('high');
+    // A deleted file has no line to send a reviewer to.
+    expect(found?.line).toBeNull();
+    expect(found?.message).toContain('nothing in this patch runs them instead');
+  });
+
+  it('points at the line when the file survived the edit', () => {
+    const diff = workflow(['       - run: pnpm lint', '-      - run: pnpm test'].join('\n'));
+    expect(findingsOf(diff, 'TEST_GATE_DISABLED')[0]?.line).toBe(2);
+  });
+
+  it('stays quiet when the same invocation moved to another gate file', () => {
+    const diff =
+      diffOf('.github/workflows/test.yml', hunk('-      - run: pnpm test'), { status: 'deleted' }) +
+      diffOf('.github/workflows/ci.yml', hunk('+      - run: pnpm test'));
+    expect(rulesFor(diff)).not.toContain('TEST_GATE_DISABLED');
+  });
+
+  it('stays quiet when the file still invokes the same suite', () => {
+    const diff = workflow(['       - run: pnpm test', '-      - run: pnpm test:e2e'].join('\n'));
+    expect(rulesFor(diff)).not.toContain('TEST_GATE_DISABLED');
+  });
+
+  it('stays quiet on a commented-out invocation', () => {
+    expect(rulesFor(workflow('-      # - run: pnpm test'))).not.toContain('TEST_GATE_DISABLED');
+    expect(rulesFor(workflow('+      # continue-on-error: true'))).not.toContain(
+      'TEST_GATE_DISABLED',
+    );
+  });
+
+  it('stays quiet when what was made unable to fail is not a test command', () => {
+    expect(rulesFor(workflow('+      - run: pnpm lint || true'))).not.toContain(
+      'TEST_GATE_DISABLED',
+    );
+  });
+
+  it('stays quiet outside the files that gate a suite', () => {
+    const diff = diffOf('src/auth.test.ts', hunk('+  // run with: pnpm vitest run || true'));
+    expect(rulesFor(diff)).not.toContain('TEST_GATE_DISABLED');
+  });
+
+  it('does not read a test glob as an invocation', () => {
+    const diff = diffOf('package.json', hunk('-    "testMatch": ["src/**/*.test.ts"],'));
+    expect(rulesFor(diff)).not.toContain('TEST_GATE_DISABLED');
+  });
+});
+
+describe('SUITE_SCOPE_NARROWED', () => {
+  const config = (body: string): string => diffOf('vitest.config.ts', hunk(body));
+
+  it('fires high when the include list loses a pattern', () => {
+    const diff = config(
+      [
+        "-    include: ['src/**/*.test.ts', 'e2e/**/*.test.ts'],",
+        "+    include: ['src/**/*.test.ts'],",
+      ].join('\n'),
+    );
+    const [found] = findingsOf(diff, 'SUITE_SCOPE_NARROWED');
+    expect(found?.severity).toBe('high');
+    expect(found?.message).toContain('e2e/**/*.test.ts');
+  });
+
+  it('reads a list the formatter spread over several lines', () => {
+    const diff = config(
+      [
+        '     include: [',
+        "       'src/**/*.test.ts',",
+        "-      'e2e/**/*.test.ts',",
+        '     ],',
+      ].join('\n'),
+    );
+    const [found] = findingsOf(diff, 'SUITE_SCOPE_NARROWED');
+    expect(found?.severity).toBe('high');
+    expect(found?.message).toContain('e2e/**/*.test.ts');
+  });
+
+  it('fires when a glob is replaced by one inside it', () => {
+    const diff = config(
+      ["-    include: ['src/**/*.test.ts'],", "+    include: ['src/core/**/*.test.ts'],"].join(
+        '\n',
+      ),
+    );
+    const [found] = findingsOf(diff, 'SUITE_SCOPE_NARROWED');
+    expect(found?.severity).toBe('high');
+    expect(found?.message).toContain('narrowed');
+  });
+
+  it('fires when the exclude list grows', () => {
+    const diff = config(
+      ["-    exclude: ['node_modules'],", "+    exclude: ['node_modules', 'src/legacy/**'],"].join(
+        '\n',
+      ),
+    );
+    const [found] = findingsOf(diff, 'SUITE_SCOPE_NARROWED');
+    expect(found?.severity).toBe('high');
+    expect(found?.message).toContain('src/legacy/**');
+  });
+
+  it('reads jest keys as well as vitest ones', () => {
+    const diff = diffOf(
+      'jest.config.js',
+      hunk(
+        [
+          "-  testMatch: ['src/**/*.test.ts', 'tools/**/*.test.ts'],",
+          "+  testMatch: ['src/**/*.test.ts'],",
+        ].join('\n'),
+      ),
+    );
+    expect(rulesFor(diff)).toContain('SUITE_SCOPE_NARROWED');
+  });
+
+  it('stays quiet when the glob became an unrelated one', () => {
+    const diff = config(
+      ["-    include: ['src/**/*.test.ts'],", "+    include: ['src/**/*.spec.ts'],"].join('\n'),
+    );
+    expect(rulesFor(diff)).not.toContain('SUITE_SCOPE_NARROWED');
+  });
+
+  it('stays quiet when the set got bigger', () => {
+    const widened = config(
+      ["-    include: ['src/core/**/*.test.ts'],", "+    include: ['src/**/*.test.ts'],"].join(
+        '\n',
+      ),
+    );
+    expect(rulesFor(widened)).not.toContain('SUITE_SCOPE_NARROWED');
+
+    const gained = config(
+      [
+        "-    include: ['src/**/*.test.ts'],",
+        "+    include: ['src/**/*.test.ts', 'e2e/**/*.test.ts'],",
+      ].join('\n'),
+    );
+    expect(rulesFor(gained)).not.toContain('SUITE_SCOPE_NARROWED');
+  });
+
+  it('stays quiet when an exclusion was swapped rather than added', () => {
+    const diff = config(["-    exclude: ['node_modules'],", "+    exclude: ['dist'],"].join('\n'));
+    expect(rulesFor(diff)).not.toContain('SUITE_SCOPE_NARROWED');
+  });
+
+  it('fires medium when a test command gains a filter', () => {
+    const diff = diffOf(
+      '.github/workflows/ci.yml',
+      hunk(
+        ['-        run: pnpm vitest run', '+        run: pnpm vitest run --project unit'].join(
+          '\n',
+        ),
+      ),
+    );
+    const [found] = findingsOf(diff, 'SUITE_SCOPE_NARROWED');
+    expect(found?.severity).toBe('medium');
+    expect(found?.message).toContain('--project');
+  });
+
+  it('stays quiet on a list in a file that configures no runner', () => {
+    const diff = diffOf(
+      'src/settings.ts',
+      hunk(["-  include: ['a', 'b'],", "+  include: ['a'],"].join('\n')),
+    );
+    expect(rulesFor(diff)).not.toContain('SUITE_SCOPE_NARROWED');
+  });
+});

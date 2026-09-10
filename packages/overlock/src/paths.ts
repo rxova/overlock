@@ -46,6 +46,58 @@ const THRESHOLD_CONFIG_PATTERNS: RegExp[] = [
   /(^|\/)tox\.ini$/,
 ];
 
+/**
+ * Files that decide whether a suite runs at all, and whether its failure counts.
+ *
+ * A workflow is not a test file and holds no assertions, which is exactly why
+ * it is the quietest place to take a suite away: deleting the job that runs the
+ * tests leaves every test in the repository byte for byte intact.
+ */
+const CI_CONFIG_PATTERNS: RegExp[] = [
+  /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/,
+  /(^|\/)\.github\/actions\/[^/]+\/action\.ya?ml$/,
+  /(^|\/)action\.ya?ml$/,
+  /(^|\/)\.gitlab-ci\.ya?ml$/,
+  /(^|\/)\.circleci\/[^/]+\.ya?ml$/,
+  /(^|\/)azure-pipelines\.ya?ml$/,
+  /(^|\/)\.travis\.ya?ml$/,
+  /(^|\/)bitbucket-pipelines\.ya?ml$/,
+  /(^|\/)\.buildkite\/[^/]+\.ya?ml$/,
+  /(^|\/)\.drone\.ya?ml$/,
+  /(^|\/)Jenkinsfile$/,
+  /(^|\/)Makefile$/,
+  /(^|\/)justfile$/i,
+  /\.sh$/,
+];
+
+/**
+ * Files that decide which tests a runner collects.
+ *
+ * Overlaps `THRESHOLD_CONFIG_PATTERNS` on purpose — `package.json` and
+ * `pyproject.toml` carry both a coverage gate and a test glob, and the two
+ * rules that read them ask different questions of the same file.
+ */
+const RUNNER_CONFIG_PATTERNS: RegExp[] = [
+  /(^|\/)(vitest|jest|karma|nyc|stryker|playwright|cypress|wdio|ava|mocha|web-test-runner)[^/]*\.config\.[cm]?[jt]s$/,
+  /(^|\/)(jest|vitest|playwright|cypress|ava)\.config\.json$/,
+  /(^|\/)\.mocharc(\.(json|ya?ml|[cm]?js))?$/,
+  /(^|\/)\.nycrc(\.json)?$/,
+  /(^|\/)package\.json$/,
+  /(^|\/)pyproject\.toml$/,
+  /(^|\/)pytest\.ini$/,
+  /(^|\/)setup\.cfg$/,
+  /(^|\/)tox\.ini$/,
+  /(^|\/)phpunit\.xml(\.dist)?$/,
+];
+
+export function isCiConfig(path: string): boolean {
+  return CI_CONFIG_PATTERNS.some((re) => re.test(path));
+}
+
+export function isRunnerConfig(path: string): boolean {
+  return RUNNER_CONFIG_PATTERNS.some((re) => re.test(path));
+}
+
 export function isTestFile(path: string, extraGlobs: RegExp[] = []): boolean {
   if (isSnapshotFile(path)) return false;
   return [...TEST_PATTERNS, ...extraGlobs].some((re) => re.test(path));

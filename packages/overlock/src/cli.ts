@@ -16,7 +16,7 @@ import { run } from './run.js';
 import { ledgerPath } from './ledger.js';
 import { readLedger, summarize } from './summary.js';
 import { MessageBuffer, handleMessage } from './mcp.js';
-import { RULE_IDS, type RuleId, type Severity } from './types.js';
+import { RULE_IDS, type Grade, type RuleId, type Severity } from './types.js';
 
 const VERSION = typeof __OVERLOCK_VERSION__ === 'string' ? __OVERLOCK_VERSION__ : '0.0.0';
 
@@ -43,7 +43,9 @@ CHECK OPTIONS
   --compact          The short form, for small screens and hook output
   --fail-on <level>  high | medium | low | none. Default: high
   --severity <r>=<l> Grade one rule differently, e.g. TEST_REMOVED=medium
-                     (repeatable; a rule graded low never blocks)
+                     high | medium | low | off. Repeatable. A rule graded low
+                     never blocks; one graded off reports nothing, and what it
+                     silenced is counted in the verdict line
   --limit <n>        Findings shown in --compact. Default: 3
   --test-glob <re>   Extra regex marking a path as a test file (repeatable)
   --cwd <dir>        Run against this directory
@@ -113,7 +115,7 @@ export interface ParsedArgs {
   limit: number;
   days: number;
   testGlobs: RegExp[];
-  severities: Partial<Record<RuleId, Severity>>;
+  severities: Partial<Record<RuleId, Grade>>;
   allowFile?: string;
   cwd: string;
   ledger: boolean;
@@ -260,8 +262,8 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
         if (!rule || !(RULE_IDS as readonly string[]).includes(rule)) {
           throw new UsageError(`--severity needs a known rule: ${spec}`);
         }
-        if (level !== 'high' && level !== 'medium' && level !== 'low') {
-          throw new UsageError(`--severity level must be high, medium or low: ${spec}`);
+        if (level !== 'high' && level !== 'medium' && level !== 'low' && level !== 'off') {
+          throw new UsageError(`--severity level must be high, medium, low or off: ${spec}`);
         }
         parsed.severities[rule as RuleId] = level;
         break;

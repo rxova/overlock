@@ -120,21 +120,23 @@ the Claude Code hook, it cannot stop a turn.
 
 ## Rules
 
-Eleven rules, all scoped to the patch.
+Thirteen rules, all scoped to the patch.
 
-| Rule                         | Severity      | Fires when                                                                                                                                                             |
-| ---------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TEST_REMOVED`               | high / medium | A test file is deleted or renamed out of the runner's glob; a case disappears from a surviving file                                                                    |
-| `TEST_SKIPPED_ADDED`         | high          | `it.skip`, `xit`, `.todo`, `@pytest.mark.skip`, `t.Skip()`, `#[ignore]`, `@Disabled` — and `.only`, which silences everything else                                     |
-| `ASSERTION_WEAKENED`         | high          | An assertion stops naming a value: `toBe(3)` becomes `toBeDefined()`, `toBeTruthy()` or `not.toBeNull()`                                                               |
-| `ASSERTION_NARROWED`         | high          | An assertion keeps naming a value but covers less of it: a whole object becomes one field                                                                              |
-| `PREDICATE_NARROWED`         | high / medium | The set an assertion ranges over shrinks: a filter gains a condition, an iterated source gains a `.filter(...)`, a case table loses rows, a named exclusion list grows |
-| `COVERAGE_THRESHOLD_LOWERED` | high          | A coverage or mutation threshold drops, or disappears                                                                                                                  |
-| `ASSERTION_REMOVED`          | medium        | A test file ends the patch with fewer assertions than it started with                                                                                                  |
-| `EXPECTED_VALUE_CHANGED`     | medium        | An assertion keeps its shape but its expected literal was edited                                                                                                       |
-| `SNAPSHOT_UPDATED_WITH_CODE` | medium        | A snapshot was regenerated in the same patch as the code it snapshots                                                                                                  |
-| `TEST_TIMEOUT_RAISED`        | low           | A timeout or retry count went up, or appeared                                                                                                                          |
-| `TEST_AND_IMPL_TOGETHER`     | low           | A test changed alongside the implementation it is named after                                                                                                          |
+| Rule                         | Severity      | Fires when                                                                                                                                                               |
+| ---------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `TEST_REMOVED`               | high / medium | A test file is deleted or renamed out of the runner's glob; a case disappears from a surviving file                                                                      |
+| `TEST_GATE_DISABLED`         | high / medium | The suite stops gating the build: `continue-on-error: true` on a test step, `\|\| true` after a test command, `--passWithNoTests`, or the job that ran the tests deleted |
+| `TEST_SKIPPED_ADDED`         | high          | `it.skip`, `xit`, `.todo`, `@pytest.mark.skip`, `t.Skip()`, `#[ignore]`, `@Disabled` — and `.only`, which silences everything else                                       |
+| `ASSERTION_WEAKENED`         | high          | An assertion stops naming a value: `toBe(3)` becomes `toBeDefined()`, `toBeTruthy()` or `not.toBeNull()`                                                                 |
+| `ASSERTION_NARROWED`         | high          | An assertion keeps naming a value but covers less of it: a whole object becomes one field                                                                                |
+| `PREDICATE_NARROWED`         | high / medium | The set an assertion ranges over shrinks: a filter gains a condition, an iterated source gains a `.filter(...)`, a case table loses rows, a named exclusion list grows   |
+| `SUITE_SCOPE_NARROWED`       | high / medium | The set the runner collects shrinks: an include glob narrowed, an include list losing patterns, an exclude list growing, a test command gaining a filter                 |
+| `COVERAGE_THRESHOLD_LOWERED` | high          | A coverage or mutation threshold drops, or disappears                                                                                                                    |
+| `ASSERTION_REMOVED`          | medium        | A test file ends the patch with fewer assertions than it started with                                                                                                    |
+| `EXPECTED_VALUE_CHANGED`     | medium        | An assertion keeps its shape but its expected literal was edited                                                                                                         |
+| `SNAPSHOT_UPDATED_WITH_CODE` | medium        | A snapshot was regenerated in the same patch as the code it snapshots                                                                                                    |
+| `TEST_TIMEOUT_RAISED`        | low           | A timeout or retry count went up, or appeared                                                                                                                            |
+| `TEST_AND_IMPL_TOGETHER`     | low           | A test changed alongside the implementation it is named after                                                                                                            |
 
 Only `high` fails a run by default. `medium` findings are reported for review.
 `low` findings are context: `TEST_AND_IMPL_TOGETHER` in particular fires on
@@ -152,6 +154,20 @@ to `medium` to unblock one rule also unblocks every other `high` rule.
 
 `--severity PREDICATE_NARROWED=high` collapses that rule's two grades into one
 if the `medium` case should also block.
+
+`--severity TEST_AND_IMPL_TOGETHER=off` switches a rule off entirely. It is the
+right answer for a rule a repository has read enough of to judge it says nothing
+here — `TEST_AND_IMPL_TOGETHER` fires on ordinary test-driven work by design, and
+a repository that has decided so should not have to write an inline directive per
+finding to say it again. What an `off` rule drops is counted and reported:
+
+```console
+$ overlock
+✓ overlock: nothing weakened in this patch. (9 silenced by config)
+```
+
+`off` is a grade a rule can have, not a severity a finding can carry: no finding
+is ever reported as `off`, and `counts` keeps its three keys.
 
 ## How findings are graded
 
@@ -224,6 +240,49 @@ It is `high` when the narrowed set is consumed by a `for...of`, a `.forEach` or
 an `it.each`, because that set decides how many times the assertions below it
 run. It is `medium` when the set is only assigned to a variable, because a diff
 cannot establish whether that variable reaches an assertion.
+
+### The suite's own gate
+
+`TEST_GATE_DISABLED` and `SUITE_SCOPE_NARROWED` are the only two rules that read
+a file with no assertions in it. They watch the workflow that invokes the runner
+and the config that tells the runner what to collect, because a suite can be
+made to ask less without any test file changing at all:
+
+```yaml
+- name: test
+  run: pnpm test
++ continue-on-error: true
+```
+
+```json
+-  "test": "vitest run"
++  "test": "vitest run || true"
+```
+
+```ts
+-  include: ['src/**/*.test.ts', 'e2e/**/*.test.ts'],
++  include: ['src/**/*.test.ts'],
+```
+
+The last one is `PREDICATE_NARROWED` one level up: a runner's include list is the
+set the whole suite ranges over, and narrowing it is the same edit as narrowing
+the set an `it.each` consumes. It is also the mirror of the `TEST_REMOVED` case
+that catches a test file renamed out of the runner's glob — same outcome, glob
+moved off the file rather than the file moved out of the glob.
+
+`TEST_GATE_DISABLED` is `high` when the diff shows what it is switching off — a
+neutralised test command, or a `continue-on-error:` in a hunk that names a test
+step — and `medium` when the diff cannot show which step a disabler belongs to,
+or when the change is `--passWithNoTests`, which is legitimate in a package that
+genuinely has no tests. A test invocation that disappears from a workflow is
+`high` only when nothing else in the patch runs it: a job moved between
+workflows, or a command rewritten in place, is silent.
+
+`SUITE_SCOPE_NARROWED` is `high` when a runner config's include list loses
+patterns or its exclude list gains them, because the file says outright what the
+runner collects. It is `medium` when a test command gains a filter flag
+(`--project`, `-k`, `--testPathPattern`), because a suite split across two CI
+jobs and a suite cut in half look identical in a diff.
 
 ## Renames and reformatting
 
@@ -366,7 +425,7 @@ overlock --fail-on-empty                  # exit 1 if the resolved patch is empt
 overlock --json                           # the full report
 overlock --compact                        # the short form
 overlock --fail-on medium                 # high | medium | low | none
-overlock --severity TEST_REMOVED=medium   # regrade one rule, repeatable
+overlock --severity TEST_REMOVED=medium   # high | medium | low | off, repeatable
 overlock --allow-file pr-body.txt         # read Overlock-Allow trailers from a file
 overlock --test-glob '\.check\.ts$'       # extra test-file pattern, repeatable
 overlock --limit 5                        # findings shown in --compact
@@ -415,7 +474,7 @@ so the same patch resolves the same way locally and in CI:
   "baseMode": "fork-point",
   "failOn": "high",
   "failOnEmpty": false,
-  "severity": { "TEST_REMOVED": "medium" },
+  "severity": { "TEST_REMOVED": "medium", "TEST_AND_IMPL_TOGETHER": "off" },
   "testGlob": ["\\.check\\.ts$"],
   "untracked": true
 }
@@ -469,6 +528,10 @@ release, changing what an existing ID means is a breaking one.
 `explained_by` is present when the rest of the patch accounts for the change —
 for example `"warehouserouting -> routing"` or `"reformatting only"`. The report
 also carries `renames`, `explained` and `allowed` alongside `findings`.
+
+`silenced` counts findings a rule graded `off` dropped, next to `suppressed` for
+the ones a directive silenced. Both are reported on clean runs too: a gate that
+empties quietly is not a gate.
 
 ## Programmatic use
 

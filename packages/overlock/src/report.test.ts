@@ -102,6 +102,17 @@ describe('the suppressed note', () => {
     expect(human(withBoth, false)).toContain('(2 suppressed)');
     expect(compact(withBoth)).toContain('(2 suppressed)');
   });
+
+  it('says what a rule graded off took out of the report', () => {
+    const withOff = { ...dirty, silenced: 3 };
+    expect(human(withOff, false)).toContain('(3 silenced by config)');
+    expect(compact(withOff)).toContain('(3 silenced by config)');
+  });
+
+  it('says both when both silenced something', () => {
+    const withBoth = { ...dirty, suppressed: 1, silenced: 2 };
+    expect(human(withBoth, false)).toContain('(1 suppressed, 2 silenced by config)');
+  });
 });
 
 describe('json', () => {

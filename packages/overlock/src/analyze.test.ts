@@ -50,6 +50,25 @@ describe('analyze', () => {
     expect(report.ok).toBe(true);
   });
 
+  it('drops a rule graded off, and counts what it dropped', () => {
+    const report = analyze({ diff: skip, severities: { TEST_SKIPPED_ADDED: 'off' } });
+    expect(report.findings).toEqual([]);
+    expect(report.counts).toEqual({ high: 0, medium: 0, low: 0 });
+    expect(report.silenced).toBe(1);
+    expect(report.ok).toBe(true);
+  });
+
+  it('grades off one rule without touching the next', () => {
+    const report = analyze({ diff: skip + timeout, severities: { TEST_TIMEOUT_RAISED: 'off' } });
+    expect(report.findings.map((f) => f.rule)).toEqual(['TEST_SKIPPED_ADDED']);
+    expect(report.silenced).toBe(1);
+    expect(report.ok).toBe(false);
+  });
+
+  it('counts nothing as silenced when no rule is off', () => {
+    expect(analyze({ diff: skip }).silenced).toBe(0);
+  });
+
   it('leaves the rules it does not name at their built-in grade', () => {
     const report = analyze({ diff: skip, severities: { TEST_REMOVED: 'low' } });
     expect(report.findings[0]?.severity).toBe('high');

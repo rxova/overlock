@@ -12,7 +12,7 @@ import {
   untrackedFiles,
 } from './git.js';
 import { appendLedger, toEntry } from './ledger.js';
-import type { Report, RuleId, Severity } from './types.js';
+import type { Grade, Report, RuleId, Severity } from './types.js';
 
 export interface RunOptions {
   cwd: string;
@@ -21,8 +21,8 @@ export interface RunOptions {
   baseMode?: BaseMode | undefined;
   staged?: boolean | undefined;
   failOn?: Severity | 'none';
-  /** Per-rule severity, replacing the built-in grade for those rules. */
-  severities?: Partial<Record<RuleId, Severity>>;
+  /** Per-rule grade, replacing the built-in one. `off` drops the rule's findings. */
+  severities?: Partial<Record<RuleId, Grade>>;
   testGlobs?: RegExp[];
   mode?: 'check' | 'hook';
   ledger?: boolean;

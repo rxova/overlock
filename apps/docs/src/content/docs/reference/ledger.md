@@ -33,6 +33,12 @@ Context only
 
 `--days <n>` moves the window. `--json` returns the aggregate as data. `report` always exits `0` — it reports history and gates nothing.
 
+## What a rule graded off leaves behind
+
+The ledger records `suppressed` — findings silenced by name, with a reason. It does not record `silenced`, the count a rule [graded `off`](configuration.md#grading-a-rule-off) dropped.
+
+That is deliberate rather than an omission. A suppression is an event: somebody met a finding and decided about it, and the history of those decisions is worth having. A rule graded off produces the same answer in every run for as long as the config says so, and thirty days of it would be thirty copies of one line in `overlock.config.json`. Read that line if you want to know what is off; the verdict on every run says how much it is silencing.
+
 ## Why `low` is counted separately
 
 "Caught" counts `high` and `medium` only.

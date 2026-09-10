@@ -19,7 +19,7 @@ The signal is in the delta. Nothing that reads one version of a file can see it.
 
 It has no opinion about your architecture, your naming, your test design, or whether the change is a good idea. It does not read your pull request description to work out what you were trying to do.
 
-Eleven rules, one question each. A reviewer asks a hundred questions and knows things overlock never will.
+Thirteen rules, one question each. A reviewer asks a hundred questions and knows things overlock never will.
 
 ## It does not run your tests
 

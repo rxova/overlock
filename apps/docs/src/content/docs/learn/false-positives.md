@@ -62,9 +62,26 @@ That count is the point. A suppression is not a way to make the finding go away;
 
 [Suppressions](../reference/suppressions.md) covers both forms in full, including how to name a finding that has no line to sit on.
 
-## Do not: turn the rule off
+## Fourth, and only for a rule you keep answering: grade it off
 
-`--severity ASSERTION_NARROWED=low` makes today's finding stop failing the run. It also makes every future one stop failing the run, silently, in every patch, for everyone on the repository, and nothing anywhere records that a decision was made. Six months later the rule is off and no one alive knows why.
+When you have suppressed the same rule with the same reason for the fourth time, the finding is not the problem — the rule's question does not apply to your repository. Say that once, in the [config file](../reference/configuration.md):
+
+```json
+{ "severity": { "TEST_AND_IMPL_TOGETHER": "off" } }
+```
+
+`off` is a grade like `high`, `medium` and `low`, and it is deliberately visible. The rule still runs, what it would have reported is dropped, and the count is printed in the verdict line on every run, clean ones included:
+
+```console
+$ overlock
+✓ overlock: nothing weakened in this patch. (9 silenced by config)
+```
+
+That is the difference between a decision and a leak. Nine silenced findings you can see are a policy; nine you cannot are a gate that stopped being one. [Severity](severity.md) has the longer version, including why `off` is a judgement about one rule and `--fail-on none` is a judgement about all of them.
+
+## Do not: reach for a regrade to get past one patch
+
+`--severity ASSERTION_NARROWED=low` makes today's finding stop failing the run. It also makes every future one stop failing the run, in every patch, for everyone on the repository. If it went into your shell instead of a committed file, nothing anywhere records that a decision was made. Six months later the rule is down and no one alive knows why.
 
 Regrade a rule when you have concluded something about your _codebase_ — "test files move constantly here, `TEST_REMOVED` at `high` is not informative for us" — not when you want to get past one patch. That is what [severity](severity.md) is for, and the config file is where it belongs, in a commit, with a message.
 

@@ -2,7 +2,7 @@
 title: TEST_SKIPPED_ADDED
 description: A test stopped running — .skip, xit, .todo, @pytest.mark.skip, #[ignore] — or .only silenced everything else.
 sidebar:
-  order: 3
+  order: 4
 ---
 
 **Severity: `high`.**

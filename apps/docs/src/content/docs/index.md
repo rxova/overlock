@@ -9,7 +9,7 @@ overlock reads the patch and answers one question:
 
 > Did this change make the tests pass by weakening the tests?
 
-It is a CLI. It reads a git diff, applies eleven rules, and prints what it found. There are no model calls, no network calls and no telemetry, and the published package has zero runtime dependencies, so `npx overlock` on a cold cache is one small download.
+It is a CLI. It reads a git diff, applies thirteen rules, and prints what it found. There are no model calls, no network calls and no telemetry, and the published package has zero runtime dependencies, so `npx overlock` on a cold cache is one small download.
 
 ```console
 $ npx overlock
@@ -47,23 +47,25 @@ That writes a committed `.claude/settings.json` with a `Stop` hook. When the age
 
 ## What it looks at
 
-Eleven rules, all scoped to the patch, all graded `high`, `medium` or `low`. Only `high` fails a run by default.
+Thirteen rules, all scoped to the patch, all graded `high`, `medium` or `low`. Only `high` fails a run by default.
 
-| Rule                                                                | Severity      | Fires when                                                                                                                         |
-| ------------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| [`TEST_REMOVED`](rules/test-removed.md)                             | high / medium | A test file is deleted or renamed out of the runner's glob; a case disappears from a surviving file                                |
-| [`TEST_SKIPPED_ADDED`](rules/test-skipped-added.md)                 | high          | `it.skip`, `xit`, `.todo`, `@pytest.mark.skip`, `t.Skip()`, `#[ignore]`, `@Disabled` — and `.only`, which silences everything else |
-| [`ASSERTION_WEAKENED`](rules/assertion-weakened.md)                 | high          | An assertion stops naming a value: `toBe(3)` becomes `toBeDefined()`                                                               |
-| [`ASSERTION_NARROWED`](rules/assertion-narrowed.md)                 | high          | An assertion keeps naming a value but covers less of it                                                                            |
-| [`PREDICATE_NARROWED`](rules/predicate-narrowed.md)                 | high / medium | The set an assertion ranges over shrinks                                                                                           |
-| [`COVERAGE_THRESHOLD_LOWERED`](rules/coverage-threshold-lowered.md) | high          | A coverage or mutation threshold drops, or disappears                                                                              |
-| [`ASSERTION_REMOVED`](rules/assertion-removed.md)                   | medium        | A test file ends the patch with fewer assertions than it started with                                                              |
-| [`EXPECTED_VALUE_CHANGED`](rules/expected-value-changed.md)         | medium        | An assertion keeps its shape but its expected literal was edited                                                                   |
-| [`SNAPSHOT_UPDATED_WITH_CODE`](rules/snapshot-updated-with-code.md) | medium        | A snapshot was regenerated in the same patch as the code it snapshots                                                              |
-| [`TEST_TIMEOUT_RAISED`](rules/test-timeout-raised.md)               | low           | A timeout or retry count went up, or appeared                                                                                      |
-| [`TEST_AND_IMPL_TOGETHER`](rules/test-and-impl-together.md)         | low           | A test changed alongside the implementation it is named after                                                                      |
+| Rule                                                                | Severity      | Fires when                                                                                                                                          |
+| ------------------------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`TEST_REMOVED`](rules/test-removed.md)                             | high / medium | A test file is deleted or renamed out of the runner's glob; a case disappears from a surviving file                                                 |
+| [`TEST_GATE_DISABLED`](rules/test-gate-disabled.md)                 | high / medium | The suite stops gating the build: `continue-on-error: true` on a test step, `\|\| true` after a test command, or the job that ran the tests deleted |
+| [`TEST_SKIPPED_ADDED`](rules/test-skipped-added.md)                 | high          | `it.skip`, `xit`, `.todo`, `@pytest.mark.skip`, `t.Skip()`, `#[ignore]`, `@Disabled` — and `.only`, which silences everything else                  |
+| [`ASSERTION_WEAKENED`](rules/assertion-weakened.md)                 | high          | An assertion stops naming a value: `toBe(3)` becomes `toBeDefined()`                                                                                |
+| [`ASSERTION_NARROWED`](rules/assertion-narrowed.md)                 | high          | An assertion keeps naming a value but covers less of it                                                                                             |
+| [`PREDICATE_NARROWED`](rules/predicate-narrowed.md)                 | high / medium | The set an assertion ranges over shrinks                                                                                                            |
+| [`SUITE_SCOPE_NARROWED`](rules/suite-scope-narrowed.md)             | high / medium | The set the runner collects shrinks: an include list loses patterns, an exclude list grows, a test command gains a filter                           |
+| [`COVERAGE_THRESHOLD_LOWERED`](rules/coverage-threshold-lowered.md) | high          | A coverage or mutation threshold drops, or disappears                                                                                               |
+| [`ASSERTION_REMOVED`](rules/assertion-removed.md)                   | medium        | A test file ends the patch with fewer assertions than it started with                                                                               |
+| [`EXPECTED_VALUE_CHANGED`](rules/expected-value-changed.md)         | medium        | An assertion keeps its shape but its expected literal was edited                                                                                    |
+| [`SNAPSHOT_UPDATED_WITH_CODE`](rules/snapshot-updated-with-code.md) | medium        | A snapshot was regenerated in the same patch as the code it snapshots                                                                               |
+| [`TEST_TIMEOUT_RAISED`](rules/test-timeout-raised.md)               | low           | A timeout or retry count went up, or appeared                                                                                                       |
+| [`TEST_AND_IMPL_TOGETHER`](rules/test-and-impl-together.md)         | low           | A test changed alongside the implementation it is named after                                                                                       |
 
-Test files are recognised by the conventions of TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, Ruby and C#. [The rules overview](rules/overview.md) covers the table as a whole; each row links to the page for that rule.
+Test files are recognised by the conventions of TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, Ruby and C#. The last two rules read no test files at all — they watch the workflow that invokes the runner and the config that tells it what to collect, because a suite can be made to ask less without a single test changing. [The rules overview](rules/overview.md) covers the table as a whole; each row links to the page for that rule.
 
 ## What it will not do
 

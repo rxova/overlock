@@ -2,7 +2,7 @@
 title: COVERAGE_THRESHOLD_LOWERED
 description: A coverage or mutation threshold dropped, or disappeared entirely.
 sidebar:
-  order: 7
+  order: 9
 ---
 
 **Severity: `high`.**

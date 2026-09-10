@@ -2,7 +2,7 @@
 title: TEST_AND_IMPL_TOGETHER
 description: A test changed alongside the implementation it is named after. Context, not an accusation.
 sidebar:
-  order: 12
+  order: 14
 ---
 
 **Severity: `low`.**

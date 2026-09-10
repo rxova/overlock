@@ -16,6 +16,7 @@ overlock --json                           # the full report
 overlock --compact                        # the short form
 overlock --fail-on medium                 # high | medium | low | none
 overlock --severity TEST_REMOVED=medium   # regrade one rule, repeatable
+overlock --severity TEST_AND_IMPL_TOGETHER=off  # or turn one off entirely
 overlock --allow-file pr-body.txt         # read Overlock-Allow trailers from a file
 overlock --test-glob '\.check\.ts$'       # extra test-file pattern, repeatable
 overlock --limit 5                        # findings shown in --compact
@@ -60,7 +61,11 @@ Requires Node.js 20.11 or newer.
 
 `--fail-on high | medium | low | none` moves the bar for the whole run. Default `high`.
 
-`--severity <RULE>=<grade>` regrades one rule and leaves the rest alone. Repeatable. Use this instead of lowering `--fail-on` when one rule is noisy in your repository — see [severity](../learn/severity.md) for why that distinction is worth caring about.
+`--severity <RULE>=<grade>` regrades one rule and leaves the rest alone, where `<grade>` is `high`, `medium`, `low` or `off`. Repeatable. Use this instead of lowering `--fail-on` when one rule is noisy in your repository — see [severity](../learn/severity.md) for why that distinction is worth caring about.
+
+`off` is the far end of that range: the rule still runs, reports nothing, and what it silenced is counted in the verdict line as `(N silenced by config)`. That count appears on clean runs as well, so a rule turned off cannot quietly empty the gate. It is a judgement about one rule, which is why it lives here and not in `--fail-on none`.
+
+Passing any `--severity` replaces the config file's whole `severity` block rather than adding to it.
 
 An unrecognised `--fail-on` value fails closed at `high` rather than making every comparison false.
 

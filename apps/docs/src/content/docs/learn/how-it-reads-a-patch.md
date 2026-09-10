@@ -74,7 +74,17 @@ overlock --test-glob '\.check\.ts$'
 
 The value is a regular expression matched against the path, and the flag repeats. Put it in the [config file](../reference/configuration.md) rather than in each invocation, so the hook and CI agree with your terminal.
 
+## Files that are not tests, and are read anyway
+
+Four rules ask about files no convention would call a test.
+
 Snapshot files (`.snap`, `__snapshots__/`, `.ambr`) and coverage-threshold config files (`vitest.config.*`, `jest.config.*`, `.nycrc`, `pyproject.toml`, `codecov.yml`, and friends) are recognised separately, because `COVERAGE_THRESHOLD_LOWERED` and `SNAPSHOT_UPDATED_WITH_CODE` are about files that are not themselves tests.
+
+**CI config** — `.github/workflows/*`, composite `action.yml`, `.gitlab-ci.yml`, `.circleci/config.yml`, `azure-pipelines.yml`, `.travis.yml`, `bitbucket-pipelines.yml`, `.buildkite/`, `.drone.yml`, `Jenkinsfile`, `Makefile`, `justfile` and shell scripts — is read by [`TEST_GATE_DISABLED`](../rules/test-gate-disabled.md), because the shortest way to stop a suite failing a build is not to touch a test at all.
+
+**Runner config** — `vitest.config.*`, `jest.config.*`, `playwright.config.*`, `cypress.config.*`, `karma.conf.*`, `.mocharc`, `.nycrc`, `package.json`, `pyproject.toml`, `pytest.ini`, `setup.cfg`, `tox.ini`, `phpunit.xml` and friends — is read by [`SUITE_SCOPE_NARROWED`](../rules/suite-scope-narrowed.md), because a suite can shrink by editing the list of what gets collected rather than the tests themselves.
+
+Neither adds anything to the test-file question: `--test-glob` still only widens what counts as a test.
 
 ## An empty patch is not a pass
 
@@ -90,5 +100,7 @@ This matters in CI, where a misconfigured base is silent otherwise: the job goes
 ## What it does not read
 
 overlock reads the patch. It does not read your test results, your coverage output, your issue tracker, or the rest of the repository beyond what the patch touches and the files it needs to resolve a case match.
+
+It does not run your CI config either. It reads the diff of it — which is why `TEST_GATE_DISABLED` can drop to `medium` on a bare `continue-on-error: true` whose step header is outside the patch's three lines of context: it can see the switch, and not always what the switch is on.
 
 So it cannot tell you that the test you deleted was the only one covering a module — it can only tell you that you deleted it, and whether the cases in it reappear somewhere else in the same patch. That distinction runs through every rule, and [scope](../under-the-hood/scope.md) is the long version of it.

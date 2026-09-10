@@ -2,7 +2,7 @@
 title: TEST_TIMEOUT_RAISED
 description: A timeout or retry count went up, or appeared where there was none.
 sidebar:
-  order: 11
+  order: 13
 ---
 
 **Severity: `low`.**

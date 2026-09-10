@@ -62,7 +62,8 @@
         "pnpm-lock.yaml",
         "pnpm-workspace.yaml",
         "package.json",
-        "packages/*/package.json"
+        "packages/*/package.json",
+        "apps/*/package.json"
       ],
       "outputLogs": "new-only"
     }

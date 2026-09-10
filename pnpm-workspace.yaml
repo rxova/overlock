@@ -1,5 +1,6 @@
 packages:
   - packages/*
+  - apps/*
 allowBuilds:
   esbuild: true
 
@@ -14,3 +15,9 @@ fetchTimeout: 15000
 fetchRetries: 1
 fetchRetryMintimeout: 5000
 fetchRetryMaxtimeout: 10000
+# pnpm holds back releases younger than a day, which is the right default for a
+# supply chain and the wrong one for our own package: @rxova/brand is published
+# from a repository next door, and waiting a day to consume a version we just cut
+# only means the docs build here and the brand it renders drift for a day.
+minimumReleaseAgeExclude:
+  - '@rxova/brand@0.13.0'

@@ -1,5 +1,11 @@
 # overlock
 
+## 0.8.0
+
+### Minor Changes
+
+- [#20](https://github.com/rxova/overlock/pull/20) [`5e91d3b`](https://github.com/rxova/overlock/commit/5e91d3b686aa3e8e77a81beaf9f891ec01356e4a) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Add opt-in repository evaluation records with portable sessions, exact patch fingerprints and snapshots, final hook decisions, and evidence before suppression. Exclude `.overlock` records from patch acquisition and scope. Add artifact import, independent outcome reviews, deduplicated evaluation reports, and corpus replay with separate detection and blocking oracles. Stop interpreting repeated legacy ledger detections as verified catches; the deprecated `meetsBar` now always returns false.
+
 ## 0.7.1
 
 ### Patch Changes

@@ -136,19 +136,10 @@ export function summarize(entries: LedgerEntry[], window: Window = {}): Summary 
   };
 }
 
-/**
- * The bar, pre-registered before any of this was built so the result could not
- * be read the way it was wanted: four real catches in thirty days, and zero
- * false blocks annoying enough to make you switch it off.
- *
- * Only the first half is measurable from the ledger. The second half is a
- * judgement only the person who lived with it can make, so it is stated rather
- * than scored — a tool that graded itself on both halves would be marking its
- * own homework.
- */
+/** @deprecated Legacy detections cannot establish usefulness. Use evaluationSummary. */
 export const CATCH_BAR = 4;
 export const BAR_DAYS = 30;
-
-export function meetsBar(summary: Summary): boolean {
-  return summary.caught >= CATCH_BAR;
+/** @deprecated Always false: a run ledger contains no verified corrections. */
+export function meetsBar(_summary: Summary): boolean {
+  return false;
 }

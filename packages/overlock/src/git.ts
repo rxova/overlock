@@ -206,7 +206,7 @@ export function explainRange(options: RangeOptions): ResolvedRange {
 
   steps.push('auto');
 
-  const dirty = git(['status', '--porcelain'], cwd).trim();
+  const dirty = git(['status', '--porcelain', '--', '.', ':(top,exclude).overlock'], cwd).trim();
   if (dirty) {
     steps.push('uncommitted changes present: the working tree');
     return { range: 'HEAD', steps };
@@ -262,8 +262,8 @@ export function resolveRange(options: RangeOptions): string {
 export function rangeScope(range: string, cwd: string): { files: number; commits: number } {
   const files = countLines(
     range === '--cached'
-      ? git(['diff', '--cached', '--name-only', '--'], cwd)
-      : git(['diff', '--name-only', range, '--'], cwd),
+      ? git(['diff', '--cached', '--name-only', '--', '.', ':(top,exclude).overlock'], cwd)
+      : git(['diff', '--name-only', range, '--', '.', ':(top,exclude).overlock'], cwd),
   );
 
   if (range === '--cached' || range === 'HEAD') return { files, commits: 0 };
@@ -346,7 +346,7 @@ export function readDiff(range: string, cwd: string): string {
 
   // Everything after this is a pathspec, so nothing downstream can be read as
   // an option even if a future caller forgets the check above.
-  args.push('--');
+  args.push('--', '.', ':(top,exclude).overlock');
 
   return git(args, cwd);
 }
@@ -359,7 +359,12 @@ export function readDiff(range: string, cwd: string): string {
  * straight into path matching.
  */
 export function untrackedFiles(cwd: string): string[] {
-  return git(['ls-files', '--others', '--exclude-standard', '-z'], cwd).split('\0').filter(Boolean);
+  return git(
+    ['ls-files', '--others', '--exclude-standard', '-z', '--', '.', ':(top,exclude).overlock'],
+    cwd,
+  )
+    .split('\0')
+    .filter(Boolean);
 }
 
 /** Files above this are not what anyone hand-wrote as a test. */
@@ -422,4 +427,14 @@ export function untrackedDiff(cwd: string, paths: string[]): string {
   }
 
   return chunks.join('');
+}
+
+/** Immutable revision identifiers for portable evaluation records. */
+export function revision(ref: string, cwd: string): string | null {
+  assertSafeRef(ref);
+  try {
+    return git(['rev-parse', '--verify', ref], cwd).trim();
+  } catch {
+    return null;
+  }
 }

@@ -1,6 +1,7 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import type { EvaluationRun } from './evaluation-record.js';
 import type { Report, Severity } from './types.js';
 
 export interface LedgerEntry {
@@ -60,7 +61,7 @@ export function toEntry(input: {
  * lines in a finding are source code, and a ledger that accumulated them would
  * be a copy of the repository sitting in a home directory.
  */
-export function appendLedger(entry: LedgerEntry, path = ledgerPath()): boolean {
+export function appendLedger(entry: LedgerEntry | EvaluationRun, path = ledgerPath()): boolean {
   try {
     mkdirSync(dirname(path), { recursive: true });
     appendFileSync(path, `${JSON.stringify(entry)}\n`, 'utf8');

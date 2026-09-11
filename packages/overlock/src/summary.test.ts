@@ -156,7 +156,7 @@ describe('summarize', () => {
 });
 
 describe('meetsBar', () => {
-  it('needs the pre-registered number of catches', () => {
+  it('cannot establish success from any number of unreviewed detections', () => {
     const under = summarize(
       Array.from({ length: CATCH_BAR - 1 }, () => entry({ rules: high })),
       {
@@ -171,7 +171,7 @@ describe('meetsBar', () => {
     );
 
     expect(meetsBar(under)).toBe(false);
-    expect(meetsBar(over)).toBe(true);
+    expect(meetsBar(over)).toBe(false);
   });
 
   it('cannot be met by low findings alone', () => {
@@ -200,7 +200,7 @@ describe('summaryText', () => {
     expect(text.indexOf('TEST_AND_IMPL_TOGETHER')).toBeGreaterThan(text.indexOf('Context only'));
   });
 
-  it('states whether the bar was met, and what it cannot judge', () => {
+  it('states that repeated detections cannot measure useful corrections', () => {
     const met = summaryText(
       summarize(
         Array.from({ length: CATCH_BAR }, () => entry({ rules: high })),
@@ -208,11 +208,11 @@ describe('summaryText', () => {
       ),
       false,
     );
-    expect(met).toContain('met.');
-    expect(met).toContain('only you can answer');
+    expect(met).toContain('cannot measure useful corrections');
+    expect(met).toContain('overlock evaluate');
 
     const missed = summaryText(summarize([entry({ rules: high })], { now: NOW }), false);
-    expect(missed).toContain('not met yet');
+    expect(missed).not.toContain('Bar:');
   });
 
   it('breaks down by repository once there is more than one', () => {

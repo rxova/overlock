@@ -19,6 +19,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import type { BaseMode } from './git.js';
+import type { EvaluationConfig } from './evaluation-record.js';
 import { RULE_IDS, type Grade, type RuleId, type Severity } from './types.js';
 
 export class ConfigError extends Error {}
@@ -31,6 +32,7 @@ export interface OverlockConfig {
   severity?: Partial<Record<RuleId, Grade>>;
   testGlob?: string[];
   untracked?: boolean;
+  evaluation?: EvaluationConfig;
 }
 
 export interface LoadedConfig {
@@ -44,7 +46,16 @@ export const CONFIG_FILE = 'overlock.config.json';
 /** The key read from a package.json when there is no config file beside it. */
 export const CONFIG_KEY = 'overlock';
 
-const KEYS = ['base', 'baseMode', 'failOn', 'failOnEmpty', 'severity', 'testGlob', 'untracked'];
+const KEYS = [
+  'base',
+  'baseMode',
+  'failOn',
+  'failOnEmpty',
+  'severity',
+  'testGlob',
+  'untracked',
+  'evaluation',
+];
 const LEVELS = ['high', 'medium', 'low'];
 /**
  * What a rule may be graded, which is one more than a finding may carry.
@@ -77,6 +88,22 @@ export function parseConfig(value: unknown, where: string): OverlockConfig {
   }
 
   const config: OverlockConfig = {};
+  if (value.evaluation !== undefined) {
+    const entry = value.evaluation;
+    if (
+      !isObject(entry) ||
+      Object.keys(entry).some((k) => k !== 'repository' && k !== 'captureDiff') ||
+      (entry.captureDiff !== undefined && typeof entry.captureDiff !== 'boolean') ||
+      typeof entry.repository !== 'string' ||
+      !/^[\w.-]+(?:\/[\w.-]+)*$/.test(entry.repository)
+    ) {
+      throw new ConfigError(
+        `${where}: evaluation must contain a stable repository name, e.g. {"repository":"team/project"}`,
+      );
+    }
+    config.evaluation = { repository: entry.repository };
+    if (typeof entry.captureDiff === 'boolean') config.evaluation.captureDiff = entry.captureDiff;
+  }
 
   if (value.base !== undefined) {
     if (typeof value.base !== 'string' || value.base === '') {

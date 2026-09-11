@@ -73,3 +73,20 @@ export {
   type RuleId,
   type Severity,
 } from './types.js';
+
+export {
+  evaluationSummary,
+  evaluationMarkdown,
+  readEvaluation,
+  readRunFile,
+  importEvaluation,
+  replay,
+  parseEvaluationRun,
+  parseEvaluationReview,
+  type EvaluationReview,
+} from './evaluation.js';
+export {
+  type EvaluationRun,
+  type EvaluationConfig,
+  type EvaluationFinding,
+} from './evaluation-record.js';

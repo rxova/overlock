@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -821,5 +821,88 @@ describe('the whole loop', () => {
     const result = overlock(['check', '--base', 'auto', '--json'], { cwd: r.dir });
     const report = JSON.parse(result.stdout) as { findings: { rule: string }[] };
     expect(report.findings.map((f) => f.rule)).toContain('COVERAGE_THRESHOLD_LOWERED');
+  });
+});
+
+describe('portable evaluation', () => {
+  it('records one event per analysis and excludes its own records on repeat checks', () => {
+    const r = weakenedRepo();
+    r.write(
+      'overlock.config.json',
+      JSON.stringify({ base: 'HEAD', evaluation: { repository: 'team/repo', captureDiff: true } }),
+    );
+    const first = overlock(['check', '--no-ledger', '--json'], { cwd: r.dir });
+    const second = overlock(['check', '--no-ledger', '--json'], { cwd: r.dir });
+    expect(first.status).toBe(1);
+    expect(second.stdout).toBe(first.stdout);
+    const result = overlock(['evaluate', '--json'], { cwd: r.dir });
+    const summary = JSON.parse(result.stdout) as {
+      runs: number;
+      distinct_findings: number;
+      builds: string[];
+      useful_corrections: number;
+    };
+    expect(summary.runs).toBe(2);
+    expect(summary.distinct_findings).toBe(1);
+    expect(summary.useful_corrections).toBe(0);
+    expect(summary.builds[0]).not.toContain('source');
+    expect(overlock(['evaluate'], { cwd: r.dir }).stdout).toContain('Unreviewed');
+    expect(overlock(['check', '--no-ledger', '--no-evaluation'], { cwd: r.dir }).status).toBe(1);
+    expect(readdirSync(join(r.dir, '.overlock/runs'))).toHaveLength(2);
+    const file = readdirSync(join(r.dir, '.overlock/runs'))[0]!;
+    expect(overlock(['import', '.overlock/runs/' + file], { cwd: r.dir }).status).toBe(0);
+    expect(
+      (JSON.parse(overlock(['evaluate', '--json'], { cwd: r.dir }).stdout) as { runs: number })
+        .runs,
+    ).toBe(2);
+    const manifest = {
+      schema: 1,
+      cases: [
+        {
+          id: 'captured',
+          kind: 'historical',
+          split: 'holdout',
+          expected: null,
+          diff: 'patches/' + readdirSync(join(r.dir, '.overlock/patches'))[0]!,
+        },
+      ],
+    };
+    r.write('.overlock/manifest.json', JSON.stringify(manifest));
+    expect(overlock(['replay', '.overlock/manifest.json'], { cwd: r.dir }).status).toBe(0);
+  });
+
+  it('records a retry bypass and counts suppression blocks in the legacy ledger accurately', () => {
+    const r = weakenedRepo();
+    r.write(
+      'overlock.config.json',
+      JSON.stringify({ base: 'HEAD', evaluation: { repository: 'team/repo' } }),
+    );
+    expect(
+      overlock(['hook', 'claude'], {
+        cwd: r.dir,
+        stdin: JSON.stringify({ session_id: 'session', stop_hook_active: true }),
+      }).status,
+    ).toBe(0);
+    const file = readdirSync(join(r.dir, '.overlock/runs'))[0]!;
+    expect(JSON.parse(readFileSync(join(r.dir, '.overlock/runs', file), 'utf8'))).toMatchObject({
+      decision: 'retry_bypass',
+      exit_code: 0,
+    });
+    expect(JSON.parse(readFileSync(join(r.dir, '.overlock-ledger.jsonl'), 'utf8'))).toMatchObject({
+      blocked: false,
+    });
+    r.write(
+      'src/auth.test.ts',
+      '// overlock-ignore TEST_SKIPPED_ADDED -- probe\n' + "it.skip('probe', () => {});\n",
+    );
+    expect(overlock(['hook', 'claude'], { cwd: r.dir }).status).toBe(2);
+    const legacy = readFileSync(join(r.dir, '.overlock-ledger.jsonl'), 'utf8').trim().split('\n');
+    expect(JSON.parse(legacy.at(-1)!)).toMatchObject({ blocked: true, ok: true });
+  });
+
+  it('rejects missing import and replay inputs without producing evaluation events', () => {
+    const r = cleanRepo();
+    expect(overlock(['replay'], { cwd: r.dir }).status).toBe(2);
+    expect(overlock(['import'], { cwd: r.dir }).status).toBe(2);
   });
 });

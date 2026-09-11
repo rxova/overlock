@@ -39,6 +39,8 @@ export interface AnalyzeOptions {
    * no message to read.
    */
   allowText?: string;
+  /** Observe detections before policy and suppressions, for opt-in evaluation. */
+  onFindings?: (findings: Finding[]) => void;
 }
 
 /**
@@ -65,6 +67,7 @@ export function analyze(options: AnalyzeOptions): Report {
   };
 
   const produced = RULES.flatMap((rule) => rule.run(ctx));
+  options.onFindings?.(produced);
   const silenced = produced.filter((f) => severities[f.rule] === 'off');
   const raw = produced
     .filter((f) => severities[f.rule] !== 'off')

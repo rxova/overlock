@@ -1,4 +1,4 @@
-import { BAR_DAYS, CATCH_BAR, meetsBar, type Summary } from './summary.js';
+import { type Summary } from './summary.js';
 import { EMPTY_TREE } from './git.js';
 import type { Finding, Report, Severity } from './types.js';
 
@@ -463,8 +463,8 @@ export function summaryText(summary: Summary, color: boolean): string {
   lines.push(
     paint(`overlock — ${window}, ${repos}, ${summary.runs} runs`, ANSI.bold, color),
     '',
-    row('Caught', summary.caught, 'runs with a high or medium finding', color),
-    row('Blocked', summary.blocked, 'times an agent was stopped', color),
+    row('Flagged', summary.caught, 'runs with a high or medium finding', color),
+    row('Blocked', summary.blocked, 'recorded blocks (legacy entries may be estimates)', color),
     row('Suppressed', summary.suppressed, 'findings silenced with a reason', color),
     row('Noted', summary.noted, 'runs with low findings only', color),
   );
@@ -500,18 +500,10 @@ export function summaryText(summary: Summary, color: boolean): string {
     }
   }
 
-  const met = meetsBar(summary);
   lines.push(
     '',
-    paint(`Bar: ${CATCH_BAR}+ catches in ${BAR_DAYS} days.`, ANSI.dim, color) +
-      ' ' +
-      paint(
-        met ? `${summary.caught} caught — met.` : `${summary.caught} caught — not met yet.`,
-        met ? ANSI.green : ANSI.yellow,
-        color,
-      ),
-    paint('The other half of the bar — whether it ever blocked you wrongly', ANSI.dim, color),
-    paint('enough to switch it off — only you can answer.', ANSI.dim, color),
+    'Repeated runs are not independent catches. This legacy ledger cannot measure useful corrections.',
+    'Use overlock evaluate for distinct findings and reviewed outcomes.',
   );
 
   return lines.join('\n');

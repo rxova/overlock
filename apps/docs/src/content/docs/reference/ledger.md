@@ -1,75 +1,37 @@
 ---
-title: The ledger
-description: One line per run in ~/.overlock/ledger.jsonl, and what overlock report makes of it.
+title: The legacy ledger
+description: Local run history, its limits, and portable evaluation records.
 sidebar:
   order: 6
 ---
 
-Every run appends one line to `~/.overlock/ledger.jsonl`: timestamp, repository, branch, which rules fired, and whether the run failed.
+Every run appends one line to `~/.overlock/ledger.jsonl`: timestamp, repository, branch, which rules
+fired, and whether the run failed. It records rule, severity and location only, never source.
+Nothing is uploaded.
 
-It records **rule, severity and location only — never file contents.** The evidence lines in a finding are source code, and a durable file in your home directory quietly accumulating fragments of every repository you work on is not a thing anyone asked for.
+`overlock report` summarizes that history. `--days <n>` chooses the window and `--json` emits data.
+The human output says **Flagged**, not "Caught": the JSON field `caught` remains for compatibility,
+but counts runs with a high or medium finding. The same patch checked fifty times can produce fifty
+flagged runs. This is not fifty distinct defects or fifty useful corrections.
 
-Nothing is uploaded. There is no network code in this package at all.
+Current records compute `blocked` from the final hook decision. Older records estimated it from
+the presence of findings, so historical block counts cannot be assumed accurate. Suppression
+counts are acknowledgments, not independent evidence that a change was harmless. Low findings are
+listed separately under Noted and Context only.
 
-## `overlock report`
+The legacy ledger does not have patch fingerprints, build identities, review labels, or findings
+silenced by configuration. It cannot establish whether the tool is useful. The deprecated
+`meetsBar` API therefore returns false. Use [repository evaluation](evaluation.md) for portable
+records, independently reviewed outcomes, and replay against a labeled corpus.
 
-```console
-$ overlock report
-overlock — 30 days, 3 repos, 60 runs
+## Storage and CI
 
-  Caught           10   runs with a high or medium finding
-  Blocked           5   times an agent was stopped
-  Suppressed        5   findings silenced with a reason
-  Noted             3   runs with low findings only
+`--no-ledger` skips this legacy record. `OVERLOCK_LEDGER` sets the full file path; otherwise
+`OVERLOCK_HOME` replaces `~/.overlock`. Neither controls opt-in repository evaluation, whose
+records live at the git root under `.overlock/`.
 
-By rule
-  ASSERTION_WEAKENED             5  ████████████████████████
-  COVERAGE_THRESHOLD_LOWERED     2  ██████████
-  TEST_SKIPPED_ADDED             2  ██████████
+The GitHub Action disables the home ledger. Repository evaluation can still record its analysis
+invocation and export it as a CI artifact. Its human-log rendering invocation does not record a
+second evaluation event.
 
-Context only
-  TEST_AND_IMPL_TOGETHER         6
-```
-
-`--days <n>` moves the window. `--json` returns the aggregate as data. `report` always exits `0` — it reports history and gates nothing.
-
-## What a rule graded off leaves behind
-
-The ledger records `suppressed` — findings silenced by name, with a reason. It does not record `silenced`, the count a rule [graded `off`](configuration.md#grading-a-rule-off) dropped.
-
-That is deliberate rather than an omission. A suppression is an event: somebody met a finding and decided about it, and the history of those decisions is worth having. A rule graded off produces the same answer in every run for as long as the config says so, and thirty days of it would be thirty copies of one line in `overlock.config.json`. Read that line if you want to know what is off; the verdict on every run says how much it is silencing.
-
-## Why `low` is counted separately
-
-"Caught" counts `high` and `medium` only.
-
-[`TEST_AND_IMPL_TOGETHER`](../rules/test-and-impl-together.md) fires on ordinary test-driven work — every time you change a module and its test in the same commit. Counting it as a catch would produce an impressive number that means nothing, and the first person to notice would stop believing the other numbers too.
-
-So `low` findings go under "Noted", and "Context only" lists them by rule. The headline number is the one you can act on.
-
-## What the numbers are for
-
-The per-run verdict tells you about a patch. The ledger tells you about a habit.
-
-"Blocked 5" over a month means an agent tried to finish with a `high` finding standing five times, and did not. "Suppressed 5" means five findings were decided to be fine — and if that number is climbing while "Caught" stays flat, the suppressions have become the workflow, which is worth knowing before it is a year old.
-
-The rule breakdown is the other useful shape. A repository where `COVERAGE_THRESHOLD_LOWERED` shows up every week does not have a coverage problem; it has a threshold nobody believes in.
-
-## Turning it off and moving it
-
-`--no-ledger` skips recording for a run. `"noLedger"` is not a config key — this is a per-run decision, and a repository that turns off its own history for everyone who checks it out is a strange default to ship.
-
-Two environment variables move the file:
-
-- **`OVERLOCK_LEDGER`** — the full path to the ledger file itself.
-- **`OVERLOCK_HOME`** — the directory it lives in, replacing `~/.overlock`. The ledger is then `$OVERLOCK_HOME/ledger.jsonl`.
-
-`OVERLOCK_LEDGER` wins when both are set. `OVERLOCK_HOME` is the one to use in a test or a sandbox, where you want the whole directory somewhere disposable.
-
-## Not in CI
-
-The [GitHub Action](../integrations/github-action.md) never writes a ledger. The file records what agents did on a developer's machine; a fresh runner has no history to add to and nothing to carry it forward, so all it would produce is one orphaned line per job.
-
-## The format
-
-JSON Lines — one JSON object per line, appended. Readable with `jq`, tail-able, and safe to truncate. `readLedger` and `summarize` are [exported](api.md) if you would rather compute your own aggregate.
+The format is JSON Lines. `readLedger` and `summarize` remain exported for historical analysis.

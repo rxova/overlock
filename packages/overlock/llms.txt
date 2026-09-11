@@ -188,6 +188,23 @@ silences stops the hook once and quotes your reason back to the person, so it
 buys nothing except their attention. If you believe a finding is wrong, say so
 in your reply and let them decide.
 
+## Evaluating usefulness
+
+`overlock evaluate` reads opt-in `.overlock/runs` and independent `.overlock/reviews`.
+`overlock evaluate --json` includes finding keys and source evidence for review.
+`overlock import <artifact>` imports portable session records and captured patches.
+`overlock replay <manifest>` scores frozen diffs against separate detection and blocking
+oracles; null oracles remain unreviewed. None of these commands needs a network service.
+
+Enable collection with `"evaluation": { "repository": "team/project", "captureDiff": true }`
+in the repository config. Completed records can be committed; containers need a mounted
+checkout or explicit export before disposal. The root `.overlock` directory is reserved
+for this evidence and is excluded from analysis. Do not put application tests there.
+
+The legacy `overlock report` counts invocations, not verified corrections. Do not claim
+that a warning prevented a defect without independent review and a resolving change.
+Suppression and a later green run are not independent evidence of usefulness.
+
 ## What it is not
 
 Not a linter, not a code reviewer, not a scope gate. It reads a patch for the

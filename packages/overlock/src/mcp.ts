@@ -83,7 +83,7 @@ export const TOOLS = [
     title: 'Summarise what overlock has recorded',
     description:
       'Reads the local ledger and reports how often findings occurred, which rules fired, and ' +
-      'whether the pre-registered bar was met. History only — it gates nothing.',
+      'recorded blocks. Repeated runs are not verified corrections. History only.',
     inputSchema: {
       type: 'object',
       properties: {

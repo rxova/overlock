@@ -183,7 +183,7 @@ runs:
         run_overlock config "${base_args[@]}" "${fail_args[@]}" "${severity_args[@]}" || true
         echo "::endgroup::"
 
-        # The ledger is a record of what a person's agents did on their machine.
+        # The legacy ledger is a record of what a person's agents did on their machine.
         # A CI runner is neither, and it is thrown away, so nothing is written.
         set +e
         run_overlock check "${base_args[@]}" "${fail_args[@]}" "${severity_args[@]}" \
@@ -216,7 +216,7 @@ runs:
 
         # The human-readable form in the log, regardless of pass or fail.
         set +e
-        run_overlock check "${base_args[@]}" --fail-on none "${severity_args[@]}" \
+        OVERLOCK_NO_EVALUATION=1 run_overlock check "${base_args[@]}" --fail-on none "${severity_args[@]}" \
           --allow-file "$allow" --no-ledger --explain-base
         set -e
 

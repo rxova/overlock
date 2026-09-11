@@ -1,8 +1,17 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import {
+  evaluationSummary,
+  evaluationMarkdown,
+  readEvaluation,
+  replay,
+  importEvaluation,
+} from './evaluation.js';
+import type { EvaluationConfig } from './evaluation-record.js';
 import { CONFIG_FILE, loadConfig, type OverlockConfig } from './config.js';
 import { type BaseMode, GitError, repoRoot } from './git.js';
-import { parseStopPayload, sessionBase, stopHookOutcome } from './hook.js';
+import { parseStopPayload, sessionBase } from './hook.js';
 import {
   AGENTS,
   type Agent,
@@ -11,7 +20,7 @@ import {
   instructionSnippet,
   mcpSnippet,
 } from './init.js';
-import { compact, human, isEmptyPatch, json, summaryText, useColor } from './report.js';
+import { compact, human, json, summaryText, useColor } from './report.js';
 import { run } from './run.js';
 import { ledgerPath } from './ledger.js';
 import { readLedger, summarize } from './summary.js';
@@ -27,6 +36,9 @@ USAGE
   overlock hook claude           Run as a Claude Code Stop hook (reads stdin)
   overlock init <agent>          Wire it into an agent: ${AGENTS.join(', ')}
   overlock report [--days N]     What the ledger has been recording
+  overlock evaluate [dir]        Summarize .overlock runs and human reviews
+  overlock replay <manifest>     Replay labeled diffs; exit 1 on mismatches
+  overlock import <file-or-dir>  Import CI/container JSONL artifacts
   overlock mcp                   Serve as an MCP tool over stdio
   overlock config                Show the settings in force, and where from
 
@@ -51,7 +63,9 @@ CHECK OPTIONS
   --cwd <dir>        Run against this directory
   --allow-file <f>   Also read Overlock-Allow trailers from this file
   --no-untracked     Skip files git does not track yet (they are included by default)
-  --no-ledger        Do not record this run in ~/.overlock/ledger.jsonl
+  --no-ledger        Do not record in the legacy home ledger
+  --no-evaluation    Do not write repository evaluation records
+  --build <hash>     Evaluate one recorded build (evaluate only)
   --config <file>    Read settings from this file instead of searching
   --no-config        Ignore ${CONFIG_FILE} entirely
 
@@ -91,7 +105,7 @@ SILENCING A FINDING
   reason silences nothing.
 
 REPORT OPTIONS
-  --days <n>         Only count runs from the last n days. Default: 30
+  --days <n>         Legacy report window in days. Default: 30
   --json             The aggregate as data
 
 EXIT CODES
@@ -103,7 +117,18 @@ Findings are advisory. The tool reads a diff; it never edits your code, and it
 makes no network calls.`;
 
 export interface ParsedArgs {
-  command: 'check' | 'hook' | 'init' | 'report' | 'mcp' | 'config' | 'help' | 'version';
+  command:
+    | 'check'
+    | 'hook'
+    | 'init'
+    | 'report'
+    | 'mcp'
+    | 'config'
+    | 'evaluate'
+    | 'replay'
+    | 'import'
+    | 'help'
+    | 'version';
   target?: string;
   base?: string;
   baseMode: BaseMode;
@@ -119,6 +144,9 @@ export interface ParsedArgs {
   allowFile?: string;
   cwd: string;
   ledger: boolean;
+  evaluation?: EvaluationConfig;
+  noEvaluation?: boolean;
+  build?: string;
   untracked: boolean;
   configPath?: string;
   config: boolean;
@@ -152,7 +180,17 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
   const first = rest[0];
 
   if (first !== undefined && !first.startsWith('-')) {
-    const commands = ['check', 'hook', 'init', 'report', 'mcp', 'config'] as const;
+    const commands = [
+      'check',
+      'hook',
+      'init',
+      'report',
+      'mcp',
+      'config',
+      'evaluate',
+      'replay',
+      'import',
+    ] as const;
     if (!(commands as readonly string[]).includes(first)) {
       throw new UsageError(`Unknown command: ${first}`);
     }
@@ -192,6 +230,12 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
         break;
       case '--staged':
         parsed.staged = true;
+        break;
+      case '--no-evaluation':
+        parsed.noEvaluation = true;
+        break;
+      case '--build':
+        parsed.build = value('--build');
         break;
       case '--no-ledger':
         parsed.ledger = false;
@@ -310,6 +354,7 @@ export function applyConfig(args: ParsedArgs, config: OverlockConfig): ParsedArg
     args.testGlobs = config.testGlob.map((pattern) => new RegExp(pattern));
   }
 
+  if (config.evaluation && !args.noEvaluation) args.evaluation = config.evaluation;
   return args;
 }
 
@@ -359,6 +404,41 @@ export function main(argv: string[], io: Io): number {
   }
 
   try {
+    if (args.command === 'evaluate') {
+      const directory = args.target
+        ? resolve(args.cwd, args.target)
+        : join(repoRoot(args.cwd), '.overlock');
+      const data = readEvaluation(directory);
+      const runs = args.build ? data.runs.filter((r) => r.build === args.build) : data.runs;
+      if (args.build && runs.length === 0)
+        throw new UsageError(`No evaluation records for build ${args.build}`);
+      const keys = new Set(runs.flatMap((r) => r.findings.map((f) => f.key)));
+      const reviews = args.build ? data.reviews.filter((r) => keys.has(r.finding)) : data.reviews;
+      const summary = evaluationSummary(runs, reviews);
+      io.stdout(
+        args.format === 'json'
+          ? JSON.stringify(summary, null, 2) + '\n'
+          : evaluationMarkdown(summary),
+      );
+      return 0;
+    }
+    if (args.command === 'replay') {
+      if (!args.target) throw new UsageError('replay needs a manifest path');
+      const result = replay(resolve(args.cwd, args.target));
+      io.stdout(JSON.stringify(result, null, 2) + '\n');
+      return result.matched === result.scored && result.blocking_matched === result.blocking_scored
+        ? 0
+        : 1;
+    }
+    if (args.command === 'import') {
+      if (!args.target) throw new UsageError('import needs an artifact file or directory');
+      const count = importEvaluation(
+        resolve(args.cwd, args.target),
+        join(repoRoot(args.cwd), '.overlock'),
+      );
+      io.stdout(`overlock: imported ${count} evaluation records.\n`);
+      return 0;
+    }
     if (args.command === 'config') return runConfig(args, settings, settingsPath, io);
     if (args.command === 'init') return runInit(args, io);
     if (args.command === 'report') return runReport(args, io);
@@ -370,7 +450,7 @@ export function main(argv: string[], io: Io): number {
     const session =
       args.command === 'hook' && args.base === undefined ? sessionBase(payload, args.cwd) : null;
 
-    const { report, steps } = run({
+    const { report, steps, outcome, exitCode } = run({
       cwd: args.cwd,
       // `auto` for both: a check run right after the agent committed is exactly
       // when the working tree is empty and the commits are the whole patch, and
@@ -388,6 +468,12 @@ export function main(argv: string[], io: Io): number {
       testGlobs: args.testGlobs,
       mode: args.command === 'hook' ? 'hook' : 'check',
       ledger: args.ledger,
+      evaluation: args.evaluation,
+      env: io.env,
+      session: typeof payload.session_id === 'string' ? payload.session_id : undefined,
+      stopPayload: payload,
+      failOnEmpty: args.failOnEmpty,
+      warn: io.stderr,
       untracked: args.untracked,
     });
 
@@ -400,8 +486,7 @@ export function main(argv: string[], io: Io): number {
       io.stderr(`overlock: base — ${how}${from}${steps.join(' -> ')}\n`);
     }
 
-    if (args.command === 'hook') {
-      const outcome = stopHookOutcome(report, payload);
+    if (outcome) {
       if (outcome.stdout) io.stdout(outcome.stdout);
       if (outcome.stderr) io.stderr(outcome.stderr);
       return outcome.exitCode;
@@ -414,9 +499,7 @@ export function main(argv: string[], io: Io): number {
     // An empty patch is not a pass and not an error: nothing was examined, and
     // only the caller knows whether that is expected. `--fail-on-empty` is for
     // the callers for which it never is.
-    if (args.failOnEmpty && isEmptyPatch(report)) return 1;
-
-    return report.ok ? 0 : 1;
+    return exitCode;
   } catch (error) {
     if (error instanceof GitError) {
       io.stderr(`overlock: ${error.message}${error.hint ? `. ${error.hint}` : ''}\n`);
@@ -452,14 +535,18 @@ function runMcp(args: ParsedArgs, io: Io): number {
     check: (call: { base?: string; baseMode?: string; staged?: boolean; failOn?: string }) =>
       run({
         cwd: args.cwd,
-        base: call.base ?? 'auto',
+        base: call.base ?? args.base ?? 'auto',
         baseMode: call.baseMode === 'direct' ? 'direct' : args.baseMode,
         ...(call.staged === undefined ? {} : { staged: call.staged }),
-        failOn: (call.failOn ?? 'high') as Severity | 'none',
+        failOn: (call.failOn ?? args.failOn) as Severity | 'none',
         severities: args.severities,
         testGlobs: args.testGlobs,
         mode: 'check' as const,
         ledger: args.ledger,
+        evaluation: args.evaluation,
+        env: io.env,
+        source: 'mcp',
+        warn: io.stderr,
         untracked: args.untracked,
       }).report,
     report: (call: { days?: number }) =>
@@ -494,6 +581,7 @@ function runConfig(args: ParsedArgs, config: OverlockConfig, path: string | null
     severity: args.severities,
     testGlob: args.testGlobs.map((r) => r.source),
     untracked: args.untracked,
+    evaluation: args.evaluation ?? null,
   };
 
   /** The flag that would set each setting, so each line can say who won. */
@@ -505,6 +593,7 @@ function runConfig(args: ParsedArgs, config: OverlockConfig, path: string | null
     severity: '--severity',
     testGlob: '--test-glob',
     untracked: '--no-untracked',
+    evaluation: '--no-evaluation',
   };
 
   const origin = (key: string): 'flag' | 'config' | 'default' => {

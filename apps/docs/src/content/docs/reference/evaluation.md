@@ -29,6 +29,9 @@ The root `.overlock` directory is reserved for evidence and excluded from analys
 base selection, and scope counts. Keep application code and tests outside it. Commit completed
 records periodically, or export them from containers before disposal. A container needs a mounted
 checkout or an explicit artifact export; the tool never commits or transmits records itself.
+Other tools' evidence directories can be left out the same way with the
+[`exclude` setting](configuration.md#leaving-paths-out), e.g. `"exclude": [".basting", ".saidso"]`;
+each record carries it in `settings.exclude`.
 
 ```sh
 overlock evaluate              # Markdown: distinct findings and reviewed outcomes

@@ -62,6 +62,27 @@ describe('run', () => {
   });
 });
 
+describe('excluded paths', () => {
+  it('reads neither the findings nor the files of an excluded directory', () => {
+    const r = new TempRepo();
+    repo = r;
+    r.write('src/auth.test.ts', PASSING_TEST);
+    r.write('.basting/fixtures/probe.test.ts', PASSING_TEST);
+    r.commit('feat: add auth tests');
+    // The same weakening in the agent's work and in a sibling tool's evidence.
+    r.write('src/auth.test.ts', SKIPPED_TEST);
+    r.write('.basting/fixtures/probe.test.ts', SKIPPED_TEST);
+    r.write('.basting/runs/s.jsonl', '{}\n');
+
+    const all = run({ cwd: r.dir, base: 'HEAD', ledger: false });
+    expect(all.report.findings.map((f) => f.file)).toContain('.basting/fixtures/probe.test.ts');
+
+    const { report } = run({ cwd: r.dir, base: 'HEAD', ledger: false, exclude: ['.basting'] });
+    expect(report.findings.map((f) => f.file)).toEqual(['src/auth.test.ts']);
+    expect(report.scope).toEqual({ files: 1, commits: 0 });
+  });
+});
+
 describe('reading Overlock-Allow trailers from a file', () => {
   it('applies what the file says', () => {
     const r = repoWithWeakenedTest();

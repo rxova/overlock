@@ -32,6 +32,8 @@ export interface OverlockConfig {
   severity?: Partial<Record<RuleId, Grade>>;
   testGlob?: string[];
   untracked?: boolean;
+  /** Repository-root-relative paths left out of the patch, normalised. */
+  exclude?: string[];
   evaluation?: EvaluationConfig;
 }
 
@@ -54,6 +56,7 @@ const KEYS = [
   'severity',
   'testGlob',
   'untracked',
+  'exclude',
   'evaluation',
 ];
 const LEVELS = ['high', 'medium', 'low'];
@@ -65,6 +68,41 @@ const LEVELS = ['high', 'medium', 'low'];
  * and the second already exists.
  */
 const GRADES = [...LEVELS, 'off'];
+
+/**
+ * One `exclude` entry as git will be given it, or the reason it is refused.
+ *
+ * Every entry is a prefix anchored at the repository root, the way a leading
+ * `/` anchors a .gitignore line — so `/.basting`, `./.basting` and `.basting`
+ * are the same entry. Anything that could mean more than that literal prefix is
+ * refused rather than interpreted: a pattern that quietly matched more than was
+ * written is a way to take files out of the patch that nobody decided to.
+ */
+function excludeEntry(entry: unknown): string | { refused: string } {
+  if (typeof entry !== 'string' || entry.trim() === '') {
+    return { refused: 'must be a non-empty string' };
+  }
+  if ([...entry].some((c) => c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f)) {
+    return { refused: 'contains a control character' };
+  }
+  if (entry.startsWith(':'))
+    return { refused: 'starts with ":", which git reads as pathspec magic' };
+  if (/[*?[\]\\]/.test(entry)) {
+    return { refused: 'contains glob characters (* ? [ ] \\); name the path literally' };
+  }
+  if (entry.startsWith('//') || entry.startsWith('~') || /^[A-Za-z]:/.test(entry)) {
+    return { refused: 'is a filesystem path; name it relative to the repository root' };
+  }
+
+  const path = entry.replace(/^\.?\//, '').replace(/\/+$/, '');
+  const segments = path.split('/');
+  if (path === '' || path === '.') return { refused: 'would exclude the whole repository' };
+  if (segments.includes('..')) return { refused: 'climbs out with ".."' };
+  if (segments.some((segment) => segment === '' || segment === '.')) {
+    return { refused: 'has an empty or "." segment' };
+  }
+  return path;
+}
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -138,6 +176,23 @@ export function parseConfig(value: unknown, where: string): OverlockConfig {
       throw new ConfigError(`${where}: untracked must be true or false`);
     }
     config.untracked = value.untracked;
+  }
+
+  if (value.exclude !== undefined) {
+    if (!Array.isArray(value.exclude)) {
+      throw new ConfigError(
+        `${where}: exclude must be an array of repository paths, e.g. [".basting", ".saidso"]`,
+      );
+    }
+    const exclude: string[] = [];
+    for (const entry of value.exclude as unknown[]) {
+      const path = excludeEntry(entry);
+      if (typeof path !== 'string') {
+        throw new ConfigError(`${where}: exclude entry ${JSON.stringify(entry)} ${path.refused}`);
+      }
+      if (!exclude.includes(path)) exclude.push(path);
+    }
+    config.exclude = exclude;
   }
 
   if (value.severity !== undefined) {

@@ -50,6 +50,11 @@ export interface RunOptions {
   /** Include files git does not track yet. Default true, except for --staged. */
   untracked?: boolean;
   /**
+   * Repository-root-relative paths left out of the patch, as `.overlock` always
+   * is: another tool's evidence directory, most often. Validated by the config.
+   */
+  exclude?: readonly string[] | undefined;
+  /**
    * A file holding extra text to read `Overlock-Allow:` trailers from — the
    * pull request body, in the action. The commit messages in the range are read
    * regardless.
@@ -81,6 +86,7 @@ export function run(options: RunOptions): RunResult {
     ledger = true,
     untracked,
     allowFile,
+    exclude = [],
   } = options;
 
   const started = performance.now();
@@ -115,6 +121,7 @@ export function run(options: RunOptions): RunResult {
       severity: severities,
       testGlob: testGlobs.map((r) => r.source),
       untracked: untracked ?? !staged,
+      exclude: [...exclude],
     },
     scope: null,
     duration_ms: 0,
@@ -131,7 +138,7 @@ export function run(options: RunOptions): RunResult {
     const branch = currentBranch(cwd);
     record.branch = branch;
     record.head = revision('HEAD', cwd);
-    const { range, steps } = explainRange({ cwd, base, baseMode, staged });
+    const { range, steps } = explainRange({ cwd, base, baseMode, staged, exclude });
 
     record.base = revision(range === '--cached' ? 'HEAD' : range, cwd);
 
@@ -140,8 +147,8 @@ export function run(options: RunOptions): RunResult {
     // asked is specifically what the index holds.
     const includeUntracked = untracked ?? range !== '--cached';
     record.settings.untracked = includeUntracked;
-    const untrackedChunk = includeUntracked ? untrackedDiff(cwd, untrackedFiles(cwd)) : '';
-    const diff = readDiff(range, cwd) + untrackedChunk;
+    const untrackedChunk = includeUntracked ? untrackedDiff(cwd, untrackedFiles(cwd, exclude)) : '';
+    const diff = readDiff(range, cwd, exclude) + untrackedChunk;
     record.patch = fingerprint(diff);
     if (options.evaluation?.captureDiff && env.OVERLOCK_NO_EVALUATION !== '1')
       captureEvaluationDiff(root, diff, warn);
@@ -175,7 +182,7 @@ export function run(options: RunOptions): RunResult {
     // rather than from the path list, because that list is filtered on the way in
     // — a directory, a symlink, a binary or an oversized file is listed and then
     // not diffed, and claiming it was examined would be the same lie in miniature.
-    const tracked = rangeScope(range, cwd);
+    const tracked = rangeScope(range, cwd, exclude);
     const report: Report = {
       ...analyzed,
       scope: {

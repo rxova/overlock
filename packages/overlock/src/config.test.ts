@@ -96,6 +96,45 @@ describe('parseConfig', () => {
     expect(() => parseConfig(value, 'test')).toThrow(ConfigError);
   });
 
+  it('reads exclude as repository-root prefixes, however they are spelled', () => {
+    const config = parseConfig(
+      { exclude: ['/.basting', './.saidso/', 'tools/out', '.basting', 'odd name'] },
+      'test',
+    );
+    // Normalised and deduplicated, so the record says the same thing for the
+    // same policy however it was written down.
+    expect(config.exclude).toEqual(['.basting', '.saidso', 'tools/out', 'odd name']);
+    expect(parseConfig({ exclude: [] }, 'test').exclude).toEqual([]);
+  });
+
+  it.each([
+    ['not an array', '.basting', /must be an array of repository paths/],
+    ['a non-string entry', [42], /entry 42 must be a non-empty string/],
+    ['a null entry', [null], /must be a non-empty string/],
+    ['an empty entry', [''], /must be a non-empty string/],
+    ['a blank entry', ['   '], /must be a non-empty string/],
+    ['a control character', ['a\nb'], /control character/],
+    ['pathspec magic', [':(exclude)src'], /pathspec magic/],
+    ['short pathspec magic', [':!src'], /pathspec magic/],
+    ['a star', ['*.log'], /glob characters/],
+    ['a question mark', ['a?c'], /glob characters/],
+    ['a bracket', ['dir/[ab]'], /glob characters/],
+    ['a backslash', ['a\\b'], /glob characters/],
+    ['a UNC-style path', ['//server/share'], /filesystem path/],
+    ['a home path', ['~/evidence'], /filesystem path/],
+    ['a drive path', ['C:/evidence'], /filesystem path/],
+    ['the repository itself', ['.'], /whole repository/],
+    ['the root anchor alone', ['/'], /whole repository/],
+    ['a bare ./', ['./'], /whole repository/],
+    ['a parent segment', ['../sibling'], /climbs out/],
+    ['a parent segment inside', ['a/../b'], /climbs out/],
+    ['an empty segment', ['a//b'], /empty or "\." segment/],
+    ['a dot segment', ['a/./b'], /empty or "\." segment/],
+  ])('refuses an exclude with %s', (_case, exclude, message) => {
+    expect(() => parseConfig({ exclude }, 'test')).toThrow(ConfigError);
+    expect(() => parseConfig({ exclude }, 'test')).toThrow(message);
+  });
+
   it('names the file in the message', () => {
     expect(() => parseConfig({ failOn: 'nope' }, '/repo/overlock.config.json')).toThrow(
       /^\/repo\/overlock\.config\.json:/,
@@ -243,8 +282,13 @@ describe('applyConfig', () => {
     expect(globs.testGlobs.map((r) => r.source)).toEqual(['a$']);
   });
 
+  it('takes exclude from the file, which is the only place it can come from', () => {
+    expect(applyConfig(args([]), { exclude: ['.basting'] }).exclude).toEqual(['.basting']);
+  });
+
   it('changes nothing when the file declares nothing', () => {
     const applied = applyConfig(args([]), {});
+    expect(applied.exclude).toEqual([]);
     expect(applied.base).toBeUndefined();
     expect(applied.failOn).toBe('high');
     expect(applied.severities).toEqual({});

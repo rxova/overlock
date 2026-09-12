@@ -15,7 +15,8 @@ sidebar:
   "failOnEmpty": false,
   "severity": { "TEST_REMOVED": "medium", "TEST_AND_IMPL_TOGETHER": "off" },
   "testGlob": ["\\.check\\.ts$"],
-  "untracked": true
+  "untracked": true,
+  "exclude": [".basting", ".saidso"]
 }
 ```
 
@@ -34,8 +35,27 @@ The alternative — settings in workflow inputs, settings in a hook command line
 | `severity`    | `{ "<RULE_ID>": "<grade>" }`                  | `high` \| `medium` \| `low` \| `off`. Regrade individual rules               |
 | `testGlob`    | array of regex strings                        | Extra test-file patterns                                                     |
 | `untracked`   | boolean                                       | Default `true`                                                               |
+| `exclude`     | array of repository paths                     | Left out of the patch, as `.overlock` is. See [below](#leaving-paths-out)    |
 
 Note that `testGlob` takes **regular expressions**, not shell globs, and they are matched against the path. In JSON that means escaping backslashes: `"\\.check\\.ts$"`.
+
+## Leaving paths out
+
+`exclude` names paths overlock treats the way it already treats its own `.overlock` evidence directory: absent from the diff, the findings, the file count, the patch fingerprint, `auto` base selection and [captured snapshots](evaluation.md).
+
+```json
+{ "exclude": [".basting", ".saidso"] }
+```
+
+It exists for other tools that commit their evidence beside overlock's. Without it, a sibling tool's run log written on every turn changes the patch overlock reads on every turn — a new fingerprint each time — and a sibling that snapshots the working tree snapshots overlock's snapshots, which snapshot the sibling's, so both grow without end. Evidence committed on a branch would also land in the pull request's range.
+
+Each entry is a literal prefix anchored at the repository root, whichever directory overlock runs from. A directory excludes everything under it, a file excludes that file, and `.basting` does not reach `.bastingx`. A leading `/` or `./` and a trailing `/` are dropped, so `/.basting`, `./.basting/` and `.basting` are the same entry: the leading `/` is a root anchor, as in `.gitignore`, not a filesystem path.
+
+These stop the run with exit 2 rather than being read generously: anything but an array of non-empty strings; glob characters and escapes (`*`, `?`, `[`, `]`, `\`); pathspec magic (a leading `:`); `..`, `.` and empty segments; `~`, `//` and drive-letter paths; control characters. A pattern that matched more than it said would be a way to take files out of the patch that nobody decided to take out.
+
+There is no flag. Where a repository keeps other tools' evidence is a fact about the repository, not a choice one invocation should make differently. Every [evaluation record](evaluation.md) carries the list in `settings.exclude`, so runs with different exclusions can be told apart.
+
+Exclude evidence and generated output, nothing else: a test under an excluded path is never checked.
 
 ## Grading a rule off
 

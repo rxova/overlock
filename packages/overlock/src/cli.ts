@@ -76,7 +76,7 @@ REPOSITORY SETTINGS
 
     { "base": "origin/main", "failOn": "high",
       "severity": { "TEST_REMOVED": "medium" },
-      "testGlob": ["\\.check\\.ts$"] }
+      "testGlob": ["\\.check\\.ts$"], "exclude": [".basting"] }
 
   A flag always wins over the file. "overlock config" prints what is in force.
 
@@ -148,6 +148,8 @@ export interface ParsedArgs {
   noEvaluation?: boolean;
   build?: string;
   untracked: boolean;
+  /** Config-only: paths left out of the patch besides `.overlock`. */
+  exclude: string[];
   configPath?: string;
   config: boolean;
   /** Flags the caller actually passed, so the file never overrides them. */
@@ -172,6 +174,7 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
     cwd,
     ledger: true,
     untracked: true,
+    exclude: [],
     config: true,
     explicit: new Set<string>(),
   };
@@ -343,6 +346,7 @@ export function applyConfig(args: ParsedArgs, config: OverlockConfig): ParsedArg
     args.failOnEmpty = config.failOnEmpty;
   }
   if (config.untracked !== undefined && !said('--no-untracked')) args.untracked = config.untracked;
+  if (config.exclude !== undefined) args.exclude = [...config.exclude];
 
   // The repeatable options are all-or-nothing rather than merged: a caller
   // passing one --severity means that list, and quietly adding the file's
@@ -475,6 +479,7 @@ export function main(argv: string[], io: Io): number {
       failOnEmpty: args.failOnEmpty,
       warn: io.stderr,
       untracked: args.untracked,
+      exclude: args.exclude,
     });
 
     if (args.explainBase) {
@@ -548,6 +553,7 @@ function runMcp(args: ParsedArgs, io: Io): number {
         source: 'mcp',
         warn: io.stderr,
         untracked: args.untracked,
+        exclude: args.exclude,
       }).report,
     report: (call: { days?: number }) =>
       summarize(readLedger(ledgerPath(io.env)), { days: call.days ?? args.days }),
@@ -581,6 +587,7 @@ function runConfig(args: ParsedArgs, config: OverlockConfig, path: string | null
     severity: args.severities,
     testGlob: args.testGlobs.map((r) => r.source),
     untracked: args.untracked,
+    exclude: args.exclude,
     evaluation: args.evaluation ?? null,
   };
 
@@ -597,7 +604,10 @@ function runConfig(args: ParsedArgs, config: OverlockConfig, path: string | null
   };
 
   const origin = (key: string): 'flag' | 'config' | 'default' => {
-    if (args.explicit.has(FLAGS[key] as string)) return 'flag';
+    // `exclude` has no flag: it names paths the repository keeps, not a choice
+    // one invocation should be able to make differently.
+    const flag = FLAGS[key];
+    if (flag !== undefined && args.explicit.has(flag)) return 'flag';
     return Object.hasOwn(config, key) ? 'config' : 'default';
   };
 

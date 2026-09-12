@@ -24,7 +24,11 @@ import { RULE_IDS } from './types.js';
  * the tree has no commit message to read. That is why it is an addition to the
  * inline directive rather than a replacement for it.
  */
-const TRAILER = /^\s*Overlock-Allow:\s*([A-Z_]+)(?:\s+(?!--)("[^"]*"|\S+))?\s*--\s*(\S.*)$/i;
+// Stops at the `--`; the reason is the rest of the line, sliced and trimmed. A
+// pattern for the reason has to leave trailing whitespace out, and each way of
+// writing that either backtracks across a long run of spaces or refuses the
+// `\r` a CRLF body leaves at the end of every line.
+const TRAILER = /^\s*Overlock-Allow:\s*([A-Z_]+)(?:\s+(?!--)("[^"]*"|\S+))?\s*--/i;
 
 export interface Allowance {
   rule: RuleId;
@@ -60,9 +64,7 @@ export function collectAllowances(text: string): Allowance[] {
     const rule = match?.[1]?.toUpperCase();
     // A case title has spaces in it, so a target naming one has to be quotable.
     const target = match?.[2]?.replace(/^"(.*)"$/, '$1');
-    // Trimmed here, not in the pattern: a lazy `.*?` before `\s*$` retries every
-    // split of a long run of spaces, which is quadratic on a crafted trailer.
-    const reason = match?.[3]?.trimEnd();
+    const reason = match ? line.slice(match[0].length).trim() : '';
     if (!rule || !reason || !isRuleId(rule)) continue;
 
     found.push({

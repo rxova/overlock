@@ -56,6 +56,12 @@ describe('a trailer with whitespace around its reason', () => {
     ]);
   });
 
+  it('reads a trailer from a CRLF body, which is how GitHub returns one', () => {
+    expect(collectAllowances('fix: x\r\n\r\nOverlock-Allow: TEST_REMOVED -- split\r\n')).toEqual([
+      { rule: 'TEST_REMOVED', target: null, reason: 'split' },
+    ]);
+  });
+
   it('reads a long run of spaces inside the reason in linear time', () => {
     const reason = `a${' '.repeat(100_000)}b`;
     const [allowance] = collectAllowances(`Overlock-Allow: TEST_REMOVED -- ${reason}`);

@@ -1,5 +1,11 @@
 # overlock
 
+## 0.9.1
+
+### Patch Changes
+
+- [#26](https://github.com/rxova/overlock/pull/26) [`e9f13e6`](https://github.com/rxova/overlock/commit/e9f13e60194f2f2b031876b6cef1e10d123ce7c4) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Crafted input no longer stalls a run. Four parsers backtracked quadratically on text the patch author controls: an `Overlock-Allow:` trailer with a long run of spaces in its reason, a `diff --git` header made of many quoted segments, a line holding a string literal of escaped quotes that never closes (`"\"\"\"…`), and an `exclude` entry with a long run of slashes. Each now reads in linear time, and every result is the same as before.
+
 ## 0.9.0
 
 ### Minor Changes

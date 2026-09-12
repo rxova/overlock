@@ -1,5 +1,11 @@
 # overlock
 
+## 0.9.0
+
+### Minor Changes
+
+- [#24](https://github.com/rxova/overlock/pull/24) [`d9858e3`](https://github.com/rxova/overlock/commit/d9858e3a4995e81ccbc8b3b124e22176c060e3c8) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Add an `exclude` setting: repository-root-relative paths left out of the patch the way `.overlock` already is, so another tool's evidence directory (`.basting`, `.saidso`) no longer changes the patch fingerprint on every turn, grows captured diffs recursively, or makes `auto` read the working tree. Excluded paths are absent from findings, file counts, base selection and snapshots, and the evaluation record carries the setting. Entries are literal prefixes; globs, pathspec magic, `..` and filesystem paths are refused.
+
 ## 0.8.0
 
 ### Minor Changes

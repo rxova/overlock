@@ -4,17 +4,27 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # One consolidated PR per week instead of a stream of single-dependency ones.
+    open-pull-requests-limit: 1
     # `skip-changeset` is what the changeset gate reads. A bump changes what the
     # repository builds with, never what it publishes, so there is no changelog
     # entry to write — and a gate that demanded one anyway would be answered with
     # an empty changeset every week, which is how a gate stops meaning anything.
     labels: ['dependencies', 'skip-changeset']
+    # `chore(deps): …`, as the history already has it.
+    commit-message:
+      prefix: chore
+      include: scope
     groups:
-      # One PR per ecosystem cluster rather than one per package: this repo has
-      # no runtime dependencies, so every bump here is dev tooling and reviewing
-      # them individually is noise.
+      # One PR rather than one per package: this repo has no runtime
+      # dependencies, so every bump here is dev tooling and reviewing them
+      # individually is noise.
       dev-tooling:
+        applies-to: version-updates
+        patterns: ['*']
+      # Security fixes are grouped too, so an advisory batch is also one PR.
+      dev-tooling-security:
+        applies-to: security-updates
         patterns: ['*']
     ignore:
       # TypeScript 7 is held, not skipped. Two parts of the toolchain refuse it,
@@ -42,5 +52,16 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
+    open-pull-requests-limit: 1
     labels: ['dependencies', 'skip-changeset']
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      all-actions:
+        applies-to: version-updates
+        patterns: ['*']
+      all-actions-security:
+        applies-to: security-updates
+        patterns: ['*']

@@ -94,7 +94,12 @@ function excludeEntry(entry: unknown): string | { refused: string } {
     return { refused: 'is a filesystem path; name it relative to the repository root' };
   }
 
-  const path = entry.replace(/^\.?\//, '').replace(/\/+$/, '');
+  // Trailing slashes are counted off by hand: `/\/+$/` rescans a run of slashes
+  // from every position in it, which is quadratic on `a//////…/b`.
+  const relative = entry.replace(/^\.?\//, '');
+  let end = relative.length;
+  while (end > 0 && relative[end - 1] === '/') end -= 1;
+  const path = relative.slice(0, end);
   const segments = path.split('/');
   if (path === '' || path === '.') return { refused: 'would exclude the whole repository' };
   if (segments.includes('..')) return { refused: 'climbs out with ".."' };

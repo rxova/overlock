@@ -49,6 +49,20 @@ describe('collectAllowances', () => {
   });
 });
 
+describe('a trailer with whitespace around its reason', () => {
+  it('drops the trailing whitespace from the reason', () => {
+    expect(collectAllowances('Overlock-Allow: TEST_REMOVED -- split \t  ')).toEqual([
+      { rule: 'TEST_REMOVED', target: null, reason: 'split' },
+    ]);
+  });
+
+  it('reads a long run of spaces inside the reason in linear time', () => {
+    const reason = `a${' '.repeat(100_000)}b`;
+    const [allowance] = collectAllowances(`Overlock-Allow: TEST_REMOVED -- ${reason}`);
+    expect(allowance?.reason.startsWith('a  ')).toBe(true);
+  });
+});
+
 describe('a patch-level acknowledgement', () => {
   it('silences its rule across the patch, and is counted', () => {
     const report = analyze({

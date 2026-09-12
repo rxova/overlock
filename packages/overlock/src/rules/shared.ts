@@ -38,6 +38,10 @@ export function sanitize(text: string): string {
   return stripped.length <= MAX_TEXT ? stripped : `${stripped.slice(0, MAX_TEXT)}...`;
 }
 
+const QUOTES = new Set(["'", '"', '`']);
+/** What a regex `.` refuses, so an escape cannot swallow one. */
+const LINE_TERMINATORS = new Set(['\n', '\r', ' ', ' ']);
+
 /**
  * Blanks the contents of string literals, keeping the quotes.
  *
@@ -45,9 +49,54 @@ export function sanitize(text: string): string {
  * `"it.skip(...)"`, a lint rule naming the pattern it bans, a doc line showing
  * how to write a suppression. Every one of those is a false positive, and on a
  * blocking rule a false positive is how the tool gets uninstalled.
+ *
+ * Scanned by hand rather than with `/(['"`])(?:\\.|(?!\1)[^\\])*\1/g`, which
+ * this reproduces exactly: the regex rescans to the end of the line from every
+ * quote that never closes, so `"\"\"\"…` is quadratic. A scan that failed from
+ * one quote fails at the same place from any later copy of that quote before
+ * it — that copy was consumed as an escaped character — so it is not repeated.
  */
 export function withoutStringContents(text: string): string {
-  return text.replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, '$1$1');
+  const unclosedUntil = new Map<string, number>();
+  let out = '';
+  let copied = 0;
+  let i = 0;
+
+  while (i < text.length) {
+    const quote = text[i] as string;
+    if (!QUOTES.has(quote) || i < (unclosedUntil.get(quote) ?? 0)) {
+      i += 1;
+      continue;
+    }
+
+    const close = closingQuote(text, i);
+    if (text[close] === quote) {
+      out += text.slice(copied, i + 1) + quote;
+      copied = close + 1;
+      i = close + 1;
+    } else {
+      unclosedUntil.set(quote, close);
+      i += 1;
+    }
+  }
+
+  return out + text.slice(copied);
+}
+
+/** Where the literal opened at `open` closes, or where it stopped without closing. */
+function closingQuote(text: string, open: number): number {
+  const quote = text[open];
+  let i = open + 1;
+  while (i < text.length && text[i] !== quote) {
+    if (text[i] !== '\\') {
+      i += 1;
+      continue;
+    }
+    const escaped = text[i + 1];
+    if (escaped === undefined || LINE_TERMINATORS.has(escaped)) return i;
+    i += 2;
+  }
+  return i;
 }
 
 /**

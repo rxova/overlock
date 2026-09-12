@@ -61,6 +61,11 @@ describe('parseDiff', () => {
     expect(parseDiff(raw)[0]?.path).toBe('src/my file.ts');
   });
 
+  it('reads a header of many quoted segments in linear time', () => {
+    const raw = [`diff --git "a" "${'a" "a'.repeat(50_000)}`, hunk('+const x = 1;')].join('\n');
+    expect(parseDiff(raw)).toHaveLength(1);
+  });
+
   it('splits an unquoted pair of paths that contain spaces', () => {
     const raw = [
       'diff --git a/my file.ts b/my file.ts',

@@ -24,7 +24,7 @@ import { RULE_IDS } from './types.js';
  * the tree has no commit message to read. That is why it is an addition to the
  * inline directive rather than a replacement for it.
  */
-const TRAILER = /^\s*Overlock-Allow:\s*([A-Z_]+)(?:\s+(?!--)("[^"]*"|\S+))?\s*--\s*(\S.*?)\s*$/i;
+const TRAILER = /^\s*Overlock-Allow:\s*([A-Z_]+)(?:\s+(?!--)("[^"]*"|\S+))?\s*--\s*(\S.*)$/i;
 
 export interface Allowance {
   rule: RuleId;
@@ -60,7 +60,9 @@ export function collectAllowances(text: string): Allowance[] {
     const rule = match?.[1]?.toUpperCase();
     // A case title has spaces in it, so a target naming one has to be quotable.
     const target = match?.[2]?.replace(/^"(.*)"$/, '$1');
-    const reason = match?.[3];
+    // Trimmed here, not in the pattern: a lazy `.*?` before `\s*$` retries every
+    // split of a long run of spaces, which is quadratic on a crafted trailer.
+    const reason = match?.[3]?.trimEnd();
     if (!rule || !reason || !isRuleId(rule)) continue;
 
     found.push({

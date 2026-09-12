@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   EMPTY_TREE,
@@ -11,6 +12,7 @@ import {
   readMessages,
   repoRoot,
   resolveRange,
+  untrackedFiles,
 } from './git.js';
 import { PASSING_TEST, SKIPPED_TEST, TempRepo } from './__fixtures__/repo.js';
 
@@ -361,6 +363,95 @@ describe('readDiff', () => {
     r.git(['mv', 'a.test.ts', 'a.helpers.ts']);
 
     expect(readDiff('HEAD', r.dir)).toContain('rename to a.helpers.ts');
+  });
+});
+
+/**
+ * A sibling tool's evidence, committed and uncommitted, beside the agent's own
+ * work — the shape that made every Stop hook read a different patch.
+ */
+describe('excluded paths', () => {
+  const EXCLUDE = ['.basting', '.saidso'];
+
+  function repoWithSiblingEvidence(): TempRepo {
+    const r = makeRepo();
+    r.write('src/a.test.ts', PASSING_TEST);
+    r.write('.basting/runs/one.jsonl', '{"run":1}\n');
+    r.commit('feat: first');
+
+    // A tracked change and untracked files under excluded directories...
+    r.write('.basting/runs/one.jsonl', '{"run":1}\n{"run":2}\n');
+    r.write('.basting/patches/abc.diff', 'diff --git a/x b/x\n');
+    r.write('.saidso/reviews/r.json', '{}\n');
+    // ...and the agent's work, tracked and untracked, which must still be read.
+    r.write('src/a.test.ts', SKIPPED_TEST);
+    r.write('notes.txt', 'kept\n');
+    // A name that only starts like an excluded directory is not inside it.
+    r.write('.bastingx', 'kept\n');
+    return r;
+  }
+
+  it('leaves excluded tracked changes out of the diff and the file count', () => {
+    const r = repoWithSiblingEvidence();
+
+    const diff = readDiff('HEAD', r.dir, EXCLUDE);
+    expect(diff).toContain('src/a.test.ts');
+    expect(diff).not.toContain('.basting/');
+    expect(rangeScope('HEAD', r.dir, EXCLUDE)).toEqual({ files: 1, commits: 0 });
+
+    // Without the setting, the sibling's run log is part of the patch.
+    expect(readDiff('HEAD', r.dir)).toContain('.basting/runs/one.jsonl');
+    expect(rangeScope('HEAD', r.dir)).toEqual({ files: 2, commits: 0 });
+  });
+
+  it('leaves excluded untracked directories out of the untracked files', () => {
+    const r = repoWithSiblingEvidence();
+
+    expect(untrackedFiles(r.dir, EXCLUDE).sort()).toEqual(['.bastingx', 'notes.txt']);
+    expect(untrackedFiles(r.dir)).toContain('.basting/patches/abc.diff');
+    expect(untrackedFiles(r.dir)).toContain('.saidso/reviews/r.json');
+  });
+
+  it('reads excluded paths from the repository root, whatever the working directory', () => {
+    const r = repoWithSiblingEvidence();
+    r.write('src/.basting/local.txt', 'kept\n');
+
+    expect(untrackedFiles(join(r.dir, 'src'), EXCLUDE)).toEqual(['.basting/local.txt']);
+  });
+
+  it('counts a staged excluded change as outside the patch', () => {
+    const r = repoWithSiblingEvidence();
+    r.git(['add', '-A']);
+
+    expect(readDiff('--cached', r.dir, EXCLUDE)).not.toContain('.basting/');
+    expect(rangeScope('--cached', r.dir, EXCLUDE).files).toBe(3);
+  });
+
+  it('does not let excluded evidence make auto stop at the working tree', () => {
+    const r = makeRepo();
+    r.write('a.test.ts', PASSING_TEST);
+    r.commit('feat: first');
+    r.git(['checkout', '--quiet', '-b', 'feature']);
+    r.write('a.test.ts', SKIPPED_TEST);
+    r.commit('fix: the agent committed its work');
+    r.write('.basting/runs/s.jsonl', '{}\n');
+
+    expect(explainRange({ cwd: r.dir, base: 'auto' }).steps).toContain(
+      'uncommitted changes present: the working tree',
+    );
+    const { range, steps } = explainRange({ cwd: r.dir, base: 'auto', exclude: EXCLUDE });
+    expect(steps).toContain('nothing uncommitted');
+    expect(range).not.toBe('HEAD');
+  });
+
+  it('matches an excluded path literally, never as a pattern', () => {
+    const r = makeRepo();
+    r.write('a.txt', 'one\n');
+    r.commit('feat: first');
+    r.write('ab.txt', 'two\n');
+
+    // A library caller skips the config's refusal of `*`; git still must not glob.
+    expect(untrackedFiles(r.dir, ['a*'])).toEqual(['ab.txt']);
   });
 });
 

@@ -114,6 +114,44 @@ it('validates opt-in repository configuration and preserves captured uncommitted
   expect(data.settings.testGlob).toEqual(['custom']);
 });
 
+it('records the exclusions, and keeps a sibling tool out of the fingerprint and the snapshot', () => {
+  repo = new TempRepo();
+  repo.write('a.test.ts', PASSING_TEST);
+  repo.commit('initial');
+  repo.write('a.test.ts', SKIPPED_TEST);
+  const options = {
+    cwd: repo.dir,
+    base: 'HEAD',
+    ledger: false,
+    evaluation: { repository: 'repo', captureDiff: true },
+    env: { OVERLOCK_SESSION_ID: 'excluded' },
+    exclude: ['.basting'],
+  };
+  run(options);
+  // The sibling records its own turn, which used to change this patch's identity
+  // and put its snapshot inside the next overlock snapshot.
+  repo.write('.basting/runs/s.jsonl', '{"turn":1}\n');
+  repo.write('.basting/patches/p.diff', 'diff --git a/x b/x\n');
+  run(options);
+  run({ ...options, exclude: [] });
+
+  const runFile = readdirSync(join(repo.dir, '.overlock/runs'))[0]!;
+  const rows = readFileSync(join(repo.dir, '.overlock/runs', runFile), 'utf8')
+    .trim()
+    .split('\n')
+    .map((s) => JSON.parse(s) as EvaluationRun);
+  expect(rows.map((r) => r.settings.exclude)).toEqual([['.basting'], ['.basting'], []]);
+  expect(rows[0]?.patch).toBe(rows[1]?.patch);
+  expect(rows[2]?.patch).not.toBe(rows[1]?.patch);
+
+  const snapshot = readFileSync(
+    join(repo.dir, '.overlock/patches', `${rows[1]!.patch}.diff`),
+    'utf8',
+  );
+  expect(snapshot).toContain('it.skip');
+  expect(snapshot).not.toContain('.basting');
+});
+
 it('uses portable session identities and explicit environment overrides', () => {
   expect(evaluationIdentity({ CI: 'true' }, 'session').environment).toBe('ci');
   expect(evaluationIdentity({ container: 'docker' }, 'session').environment).toBe('container');

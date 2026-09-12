@@ -107,6 +107,25 @@ export function defaultBranch(cwd: string): string | null {
   return null;
 }
 
+/**
+ * The pathspec every read of "the patch" ends with: this directory, minus the
+ * repository-root `.overlock` evidence directory, minus whatever the repository
+ * asked to leave out.
+ *
+ * `top` anchors each exclusion at the repository root whatever the working
+ * directory is. `literal` on the configured ones means a `*` or a `:` in a path
+ * is a character, not magic — the config refuses those anyway, but this is the
+ * boundary that hands the value to git, and a library caller skips the config.
+ */
+export function patchPathspec(exclude: readonly string[] = []): string[] {
+  return [
+    '--',
+    '.',
+    ':(top,exclude).overlock',
+    ...exclude.map((path) => `:(top,exclude,literal)${path}`),
+  ];
+}
+
 export interface RangeOptions {
   cwd: string;
   /** An explicit ref, `auto`, or undefined for the working tree. */
@@ -117,6 +136,12 @@ export interface RangeOptions {
    * left that ref; `direct` diffs against the ref itself.
    */
   baseMode?: BaseMode | undefined;
+  /**
+   * Repository-root-relative paths left out of the patch, as `.overlock` is.
+   * Here so that a sibling tool's uncommitted evidence cannot make `auto` read
+   * the working tree when the agent's own work is committed.
+   */
+  exclude?: readonly string[] | undefined;
 }
 
 /** See `RangeOptions.baseMode`. */
@@ -154,7 +179,7 @@ export interface ResolvedRange {
  * since it left main. `--base-mode direct` asks for the literal comparison.
  */
 export function explainRange(options: RangeOptions): ResolvedRange {
-  const { cwd, base, staged, baseMode = 'fork-point' } = options;
+  const { cwd, base, staged, baseMode = 'fork-point', exclude } = options;
   const steps: string[] = [];
 
   if (staged) {
@@ -206,7 +231,7 @@ export function explainRange(options: RangeOptions): ResolvedRange {
 
   steps.push('auto');
 
-  const dirty = git(['status', '--porcelain', '--', '.', ':(top,exclude).overlock'], cwd).trim();
+  const dirty = git(['status', '--porcelain', ...patchPathspec(exclude)], cwd).trim();
   if (dirty) {
     steps.push('uncommitted changes present: the working tree');
     return { range: 'HEAD', steps };
@@ -259,11 +284,15 @@ export function resolveRange(options: RangeOptions): string {
  * to the diff afterwards, and a caller comparing "83 files" against `git diff
  * --stat` should get the same number.
  */
-export function rangeScope(range: string, cwd: string): { files: number; commits: number } {
+export function rangeScope(
+  range: string,
+  cwd: string,
+  exclude: readonly string[] = [],
+): { files: number; commits: number } {
   const files = countLines(
     range === '--cached'
-      ? git(['diff', '--cached', '--name-only', '--', '.', ':(top,exclude).overlock'], cwd)
-      : git(['diff', '--name-only', range, '--', '.', ':(top,exclude).overlock'], cwd),
+      ? git(['diff', '--cached', '--name-only', ...patchPathspec(exclude)], cwd)
+      : git(['diff', '--name-only', range, ...patchPathspec(exclude)], cwd),
   );
 
   if (range === '--cached' || range === 'HEAD') return { files, commits: 0 };
@@ -323,7 +352,7 @@ export function readMessages(range: string, cwd: string): string {
   }
 }
 
-export function readDiff(range: string, cwd: string): string {
+export function readDiff(range: string, cwd: string, exclude: readonly string[] = []): string {
   const args = [
     'diff',
     '--no-color',
@@ -346,7 +375,7 @@ export function readDiff(range: string, cwd: string): string {
 
   // Everything after this is a pathspec, so nothing downstream can be read as
   // an option even if a future caller forgets the check above.
-  args.push('--', '.', ':(top,exclude).overlock');
+  args.push(...patchPathspec(exclude));
 
   return git(args, cwd);
 }
@@ -358,11 +387,8 @@ export function readDiff(range: string, cwd: string): string {
  * non-ASCII byte comes back quoted and escaped otherwise, and this list is fed
  * straight into path matching.
  */
-export function untrackedFiles(cwd: string): string[] {
-  return git(
-    ['ls-files', '--others', '--exclude-standard', '-z', '--', '.', ':(top,exclude).overlock'],
-    cwd,
-  )
+export function untrackedFiles(cwd: string, exclude: readonly string[] = []): string[] {
+  return git(['ls-files', '--others', '--exclude-standard', '-z', ...patchPathspec(exclude)], cwd)
     .split('\0')
     .filter(Boolean);
 }

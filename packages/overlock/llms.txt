@@ -44,8 +44,16 @@ the test are not repairs at all.
 
 `overlock.config.json` beside package.json — or an `overlock` key inside it — is
 read by the CLI, the Stop hook and the GitHub action alike: `base`, `baseMode`,
-`failOn`, `failOnEmpty`, `severity`, `testGlob`, `untracked`. A flag always wins
-over the file. An unknown setting or a bad value is an error, not a warning.
+`failOn`, `failOnEmpty`, `severity`, `testGlob`, `untracked`, `exclude`. A flag
+always wins over the file. An unknown setting or a bad value is an error, not a
+warning.
+
+`exclude` lists repository-root-relative paths, e.g. `[".basting", ".saidso"]`,
+left out of the patch exactly as `.overlock` is — for other tools' committed
+evidence. Entries are literal prefixes; globs, a leading `:`, `..` and
+filesystem paths are errors. It has no flag, and evaluation records carry it in
+`settings.exclude`. Never add a path to make a finding go away: a test under an
+excluded path is not checked at all.
 
 `severity` grades one rule `high`, `medium`, `low` or `off`. `off` reports
 nothing for that rule and is a decision for the repository's owners to record,
@@ -200,6 +208,7 @@ Enable collection with `"evaluation": { "repository": "team/project", "captureDi
 in the repository config. Completed records can be committed; containers need a mounted
 checkout or explicit export before disposal. The root `.overlock` directory is reserved
 for this evidence and is excluded from analysis. Do not put application tests there.
+Other tools' evidence directories can be excluded the same way with `exclude`.
 
 The legacy `overlock report` counts invocations, not verified corrections. Do not claim
 that a warning prevented a defect without independent review and a resolving change.

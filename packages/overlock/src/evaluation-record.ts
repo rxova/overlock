@@ -36,6 +36,11 @@ export interface EvaluationRun {
     severity: Partial<Record<RuleId, Grade>>;
     testGlob: string[];
     untracked: boolean;
+    /**
+     * Paths left out of the patch besides `.overlock`. Optional because records
+     * written before it existed carry none, and those excluded nothing.
+     */
+    exclude?: string[];
   };
   scope: { files: number; commits: number } | null;
   duration_ms: number;

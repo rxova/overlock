@@ -456,7 +456,8 @@ so the same patch resolves the same way locally and in CI:
   "failOnEmpty": false,
   "severity": { "TEST_REMOVED": "medium", "TEST_AND_IMPL_TOGETHER": "off" },
   "testGlob": ["\\.check\\.ts$"],
-  "untracked": true
+  "untracked": true,
+  "exclude": [".basting", ".saidso"]
 }
 ```
 
@@ -466,6 +467,17 @@ directory applies, so a package in a monorepo can carry its own settings.
 
 An unknown setting or an invalid value stops the run with exit 2 rather than
 being ignored.
+
+`exclude` lists paths left out of the patch the way `.overlock` always is:
+absent from the diff, findings, file count, patch fingerprint, `auto` base
+selection and captured snapshots. It is for other tools that commit evidence
+beside overlock's — without it a sibling's per-turn run log changes the patch on
+every turn, and two tools snapshotting each other's snapshots grow without end.
+Entries are literal prefixes anchored at the repository root (`/.basting`,
+`./.basting/` and `.basting` are the same entry, and none of them reaches
+`.bastingx`). Globs, pathspec magic (a leading `:`), `..` segments and
+filesystem paths are refused. It is config-only, and every evaluation record
+carries it in `settings.exclude`. A test under an excluded path is never checked.
 
 `overlock config` prints what is in force and where each value came from:
 
@@ -640,6 +652,8 @@ The root `.overlock` directory is reserved for evidence and excluded from analys
 base selection, and scope counts. Keep application code and tests outside it. Commit completed
 records periodically, or export them from containers before disposal. A container needs a mounted
 checkout or an explicit artifact export; the tool never commits or transmits records itself.
+Other tools' evidence directories can be left out the same way with the `exclude` setting, e.g.
+`"exclude": [".basting", ".saidso"]`; each record carries it in `settings.exclude`.
 
 ```sh
 overlock evaluate              # Markdown: distinct findings and reviewed outcomes

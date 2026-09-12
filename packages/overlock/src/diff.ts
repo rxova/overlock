@@ -133,7 +133,10 @@ export function parseDiff(raw: string): DiffFile[] {
 function parseDiffGitHeader(line: string): { a: string; b: string } {
   const rest = line.slice('diff --git '.length);
 
-  const quoted = /^"(.+)" "(.+)"$/.exec(rest);
+  // git escapes a quote inside a quoted path, so each path is a run of
+  // non-quotes and escapes. `(.+)" "(.+)` also split on an escaped `\" "`, and
+  // tried every such split, which is quadratic.
+  const quoted = /^"((?:[^"\\]|\\.)+)" "((?:[^"\\]|\\.)+)"$/.exec(rest);
   if (quoted) {
     return { a: cleanPath(quoted[1] ?? ''), b: cleanPath(quoted[2] ?? '') };
   }

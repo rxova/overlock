@@ -76,12 +76,14 @@ describe('verify', () => {
   });
 });
 
+// `node` from PATH, not `process.execPath` spliced into the string: an absolute
+// path is unquoted in a shell command, and one under `C:\Program Files` splits.
 describe('shell', () => {
   it('runs a command', () => {
-    expect(() => shell(`${process.execPath} -e "0"`)).not.toThrow();
+    expect(() => shell('node -e "0"')).not.toThrow();
   });
 
   it('throws when the command fails, which is what verify catches', () => {
-    expect(() => shell(`${process.execPath} -e "process.exit(3)"`)).toThrow();
+    expect(() => shell('node -e "process.exit(3)"')).toThrow();
   });
 });

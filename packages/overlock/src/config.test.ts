@@ -96,6 +96,13 @@ describe('parseConfig', () => {
     expect(() => parseConfig(value, 'test')).toThrow(ConfigError);
   });
 
+  it('drops every trailing slash from an exclude, and a long run of them costs nothing', () => {
+    expect(parseConfig({ exclude: ['tools/out///'] }, 'test').exclude).toEqual(['tools/out']);
+    expect(() => parseConfig({ exclude: [`a${'/'.repeat(100_000)}b`] }, 'test')).toThrow(
+      /empty or "\." segment/,
+    );
+  });
+
   it('reads exclude as repository-root prefixes, however they are spelled', () => {
     const config = parseConfig(
       { exclude: ['/.basting', './.saidso/', 'tools/out', '.basting', 'odd name'] },

@@ -1,6 +1,20 @@
 packages:
   - packages/*
   - apps/*
+overrides:
+  # GHSA-g7r4-m6w7-qqqr: esbuild's development server resolves a backslash in
+  # the request path on Windows, so a request can read files outside the serve
+  # directory (arbitrary file read). Reached only through tsup, which builds
+  # packages/overlock and pins esbuild ^0.27, both directly and via
+  # bundle-require. Nothing here starts esbuild's server, it is build tooling,
+  # and none of it ships: the tarball is dist/, with no runtime dependencies.
+  # Scoped to the 0.27 line, the only one that resolves below the fix. tsup
+  # 8.5.1 is the latest release and still asks for 0.27. 0.28's one breaking
+  # change is an install-time integrity check, and the dist it builds matches
+  # 0.27's. Drop this once tsup accepts 0.28.
+  # The upper bound is load-bearing: esbuild 0.x minors can break, and a bare
+  # floor would move tsup onto the newest minor without a review.
+  esbuild@0.27: '>=0.28.1 <0.29'
 allowBuilds:
   esbuild: true
 

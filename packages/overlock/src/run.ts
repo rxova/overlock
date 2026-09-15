@@ -1,5 +1,6 @@
 import { performance } from 'node:perf_hooks';
 import { stopHookOutcome, type HookOutcome } from './hook.js';
+import { suppressionMemory } from './announced.js';
 import {
   BUILD,
   VERSION,
@@ -192,7 +193,15 @@ export function run(options: RunOptions): RunResult {
     };
 
     const outcome =
-      mode === 'hook' ? stopHookOutcome(report, options.stopPayload ?? {}) : undefined;
+      mode === 'hook'
+        ? stopHookOutcome(
+            report,
+            options.stopPayload ?? {},
+            // Read per run, not per process: the hook is a fresh process every
+            // turn, and what it must not repeat was recorded by an earlier one.
+            suppressionMemory({ scope: { repo, branch }, env, warn }),
+          )
+        : undefined;
     const empty = report.scope?.files === 0;
     const exitCode = outcome?.exitCode ?? (!report.ok || (options.failOnEmpty && empty) ? 1 : 0);
     if (
@@ -209,9 +218,11 @@ export function run(options: RunOptions): RunResult {
         ? report.ok
           ? 'suppression_block'
           : 'block'
-        : !report.ok || report.suppressed_new > 0 || report.allowed.length > 0
-          ? 'retry_bypass'
-          : 'pass'
+        : outcome.bypass === 'announced'
+          ? 'already_announced'
+          : outcome.bypass === 'retry'
+            ? 'retry_bypass'
+            : 'pass'
       : exitCode === 0
         ? 'pass'
         : 'fail';

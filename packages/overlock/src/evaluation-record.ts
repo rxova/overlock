@@ -45,7 +45,16 @@ export interface EvaluationRun {
   scope: { files: number; commits: number } | null;
   duration_ms: number;
   status: 'analyzed' | 'empty' | 'error';
-  decision: 'pass' | 'fail' | 'block' | 'suppression_block' | 'retry_bypass' | 'error';
+  decision:
+    | 'pass'
+    | 'fail'
+    | 'block'
+    | 'suppression_block'
+    /** Stopped once already this turn, and let through rather than looped. */
+    | 'retry_bypass'
+    /** The claim in this patch was already put to a person on this branch. */
+    | 'already_announced'
+    | 'error';
   exit_code: number;
   error: string | null;
   findings: EvaluationFinding[];

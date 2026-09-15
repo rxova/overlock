@@ -19,7 +19,9 @@ package version and a source build hash, so unpublished builds remain distinguis
 
 Records include base and HEAD object IDs, the exact analyzed-diff hash, effective settings,
 duration, scope, errors, final exit code, actual hook decision, and findings before and after
-suppression. Unlike the legacy home ledger, this opt-in record includes source evidence.
+suppression. The decision is one of `pass`, `fail`, `block`, `suppression_block`, `retry_bypass`,
+`already_announced` — the patch's own claim had already been put to a person on this branch, so the
+turn was not stopped again — or `error`. Unlike the legacy home ledger, this opt-in record includes source evidence.
 `captureDiff` additionally saves exact diffs once under `.overlock/patches/<hash>.diff`, including
 uncommitted work that might otherwise disappear with a container. Recording failures are visible
 on stderr and do not alter the integrity verdict. Invalid configuration fails before collection

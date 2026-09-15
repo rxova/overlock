@@ -349,7 +349,10 @@ overlock: this patch silenced 1 of its own findings.
 If that is right, say so and finish. If not, fix the cause.
 ```
 
-The hook never stops twice for the same directive, so the next turn continues. A
+The hook never stops twice for the same directive, so the next turn continues. It records what it
+quoted — the rule, the file, the path it names and your reason, hashed — in
+`~/.overlock/announced.jsonl`, scoped to the repository and branch, so "once" survives the end of
+the turn. Changing the reason, or adding another directive, is a new claim and stops once more. A
 directive that was already in the tree passes without comment.
 
 ### Commit or pull request trailer

@@ -51,9 +51,15 @@ export function parseEvaluationRun(value: unknown): EvaluationRun {
       typeof value.timestamp === 'string' &&
       Number.isFinite(Date.parse(value.timestamp)) &&
       ['analyzed', 'empty', 'error'].includes(String(value.status)) &&
-      ['pass', 'fail', 'block', 'suppression_block', 'retry_bypass', 'error'].includes(
-        String(value.decision),
-      ) &&
+      [
+        'pass',
+        'fail',
+        'block',
+        'suppression_block',
+        'retry_bypass',
+        'already_announced',
+        'error',
+      ].includes(String(value.decision)) &&
       Number.isInteger(value.exit_code) &&
       typeof value.duration_ms === 'number' &&
       value.duration_ms >= 0 &&

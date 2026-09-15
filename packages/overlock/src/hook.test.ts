@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { analyze } from './analyze.js';
+import { patchClaims, type Claim, type SuppressionMemory } from './announced.js';
 import { parseStopPayload, sessionBase, sessionStart, stopHookOutcome } from './hook.js';
 import { diffOf, hunk } from './__fixtures__/diffs.js';
 import { PASSING_TEST, SKIPPED_TEST, TempRepo } from './__fixtures__/repo.js';
@@ -215,5 +216,133 @@ describe('a patch that silenced itself inline', () => {
     const outcome = stopHookOutcome(report, {});
     expect(outcome.stderr).toContain('covering src/gone.test.ts');
     expect(outcome.stderr).toContain('re-homed in store.test.ts');
+  });
+});
+
+/**
+ * The Stop hook is a fresh process every turn, and `stop_hook_active` is set
+ * only on the Stop that directly follows a blocked one. Without a memory of
+ * what it already quoted, "stops once" means once per turn: the same directive
+ * stopped the agent on every turn until the branch merged.
+ */
+describe('a claim already put to a person', () => {
+  /** What `suppressionMemory` gives the hook, with the writes kept in memory. */
+  function memory(seen: Iterable<string> = []): SuppressionMemory & { recorded: Claim[] } {
+    const recorded: Claim[] = [];
+    return {
+      seen: new Set(seen),
+      remember: (claims) => recorded.push(...claims),
+      recorded,
+    };
+  }
+
+  function silenced(reason: string, padding = 0) {
+    return analyze({
+      diff: diffOf(
+        'src/a.test.ts',
+        hunk(
+          [
+            ...Array.from({ length: padding }, (_, i) => `+const unrelated${i} = ${i};`),
+            `+  // overlock-ignore TEST_SKIPPED_ADDED -- ${reason}`,
+            "+  it.skip('x', () => {})",
+          ].join('\n'),
+        ),
+      ),
+    });
+  }
+
+  it('stops the first turn and records what it quoted', () => {
+    const report = silenced('flaky');
+    const seen = memory();
+
+    expect(stopHookOutcome(report, {}, seen).exitCode).toBe(2);
+    expect(seen.recorded).toEqual(patchClaims(report));
+  });
+
+  it('does not stop the next turn, and says nothing', () => {
+    const report = silenced('flaky');
+    const keys = patchClaims(report).map((c) => c.key);
+
+    // A new turn: `stop_hook_active` is false again, and the directive is still
+    // new against the same base.
+    const outcome = stopHookOutcome(report, {}, memory(keys));
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).toBe('');
+    expect(outcome.stderr).toBe('');
+    expect(outcome.bypass).toBe('announced');
+  });
+
+  it('does not stop when the directive has only moved down the file', () => {
+    const keys = patchClaims(silenced('flaky')).map((c) => c.key);
+    expect(stopHookOutcome(silenced('flaky', 6), {}, memory(keys)).exitCode).toBe(0);
+  });
+
+  it('records nothing twice, because the turn it would record was not stopped', () => {
+    const keys = patchClaims(silenced('flaky')).map((c) => c.key);
+    const seen = memory(keys);
+
+    stopHookOutcome(silenced('flaky'), {}, seen);
+    expect(seen.recorded).toEqual([]);
+  });
+
+  it('stops again when the reason changes', () => {
+    const keys = patchClaims(silenced('flaky')).map((c) => c.key);
+    const outcome = stopHookOutcome(silenced('quarantined pending #412'), {}, memory(keys));
+
+    expect(outcome.exitCode).toBe(2);
+    expect(outcome.stderr).toContain('quarantined pending #412');
+  });
+
+  it('stops again when the patch adds a second claim', () => {
+    const report = analyze({
+      diff:
+        diffOf(
+          'src/a.test.ts',
+          hunk(
+            ['+  // overlock-ignore TEST_SKIPPED_ADDED -- flaky', "+  it.skip('x', () => {})"].join(
+              '\n',
+            ),
+          ),
+        ) +
+        diffOf(
+          'src/b.test.ts',
+          hunk(
+            [
+              '+  // overlock-ignore TEST_SKIPPED_ADDED -- also flaky',
+              "+  it.skip('y', () => {})",
+            ].join('\n'),
+          ),
+        ),
+    });
+    const [first] = patchClaims(report);
+
+    const outcome = stopHookOutcome(report, {}, memory([first?.key as string]));
+    expect(outcome.exitCode).toBe(2);
+    expect(outcome.stderr).toContain('silenced 2 of its own findings');
+  });
+
+  it('still stops on a finding nobody silenced, however many turns it takes', () => {
+    const seen = memory(patchClaims(dirty).map((c) => c.key));
+    expect(stopHookOutcome(dirty, {}, seen).exitCode).toBe(2);
+    expect(stopHookOutcome(dirty, {}, seen).exitCode).toBe(2);
+  });
+
+  it('still lets the retry through, and still says why', () => {
+    // The retry directly follows the stop that recorded the claim, so the
+    // memory already holds it — and the agent is still told, as it always was.
+    const report = silenced('flaky');
+    const outcome = stopHookOutcome(
+      report,
+      { stop_hook_active: true },
+      memory(patchClaims(report).map((c) => c.key)),
+    );
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stderr).toContain('not blocking again');
+    expect(outcome.bypass).toBe('retry');
+  });
+
+  it('stops without a memory at all, which is where this started', () => {
+    expect(stopHookOutcome(silenced('flaky'), {}).exitCode).toBe(2);
   });
 });

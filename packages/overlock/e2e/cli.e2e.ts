@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,9 +16,22 @@ const CLI = fileURLToPath(new URL('../dist/cli.js', import.meta.url));
 
 let repo: TempRepo | null = null;
 
+/**
+ * Where the hook remembers the claims it has already put to a person. Outside
+ * every repository under test, as the real one is: it lives beside the ledger
+ * in the user's home, and a copy in the tree would be an untracked file the
+ * next run then read as part of the patch. Scoped by repository path, so the
+ * temp repositories in this file cannot answer for each other.
+ */
+const ANNOUNCED = join(mkdtempSync(join(tmpdir(), 'overlock-e2e-home-')), 'announced.jsonl');
+
 afterEach(() => {
   repo?.cleanup();
   repo = null;
+});
+
+afterAll(() => {
+  rmSync(ANNOUNCED, { force: true });
 });
 
 interface RunResult {
@@ -39,6 +52,7 @@ function overlock(
       ...process.env,
       // Never touch the developer's real ledger from a test run.
       OVERLOCK_LEDGER: join(options.cwd, '.overlock-ledger.jsonl'),
+      OVERLOCK_ANNOUNCED: ANNOUNCED,
       NO_COLOR: '1',
     },
   });
@@ -661,6 +675,46 @@ describe('suppressions', () => {
     expect(JSON.parse(line)).toMatchObject({ ok: true, suppressed: 1 });
   });
 
+  /**
+   * The hook stops once for a claim, and "once" used to mean once per turn: the
+   * agent's retry was let through, and then every later turn arrived with
+   * `stop_hook_active` false, found the same directive still new against the
+   * same base, and stopped again — for the life of the branch.
+   */
+  it('does not stop again on a later turn for the same directive', () => {
+    const r = repoWithSuppressedSkip(
+      '// overlock-ignore TEST_SKIPPED_ADDED -- quarantined, see #412',
+    );
+    expect(overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' }).status).toBe(2);
+
+    // The retry the agent makes straight after, which was always let through.
+    expect(
+      overlock(['hook', 'claude'], {
+        cwd: r.dir,
+        stdin: JSON.stringify({ stop_hook_active: true }),
+      }).status,
+    ).toBe(0);
+
+    // A new turn that changed nothing: same directive, same base, and the flag
+    // is false again.
+    const later = overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' });
+    expect(later.status).toBe(0);
+    expect(later.stdout).toBe('');
+
+    // A different claim is a different question, and is still put to the person.
+    r.write(
+      'src/auth.test.ts',
+      readFileSync(join(r.dir, 'src/auth.test.ts'), 'utf8').replace('see #412', 'see #413'),
+    );
+    expect(overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' }).status).toBe(2);
+  });
+
+  it('keeps stopping for a finding nobody silenced', () => {
+    const r = weakenedRepo();
+    expect(overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' }).status).toBe(2);
+    expect(overlock(['hook', 'claude'], { cwd: r.dir, stdin: '{}' }).status).toBe(2);
+  });
+
   it('says nothing about a directive that was already in the tree', () => {
     const r = new TempRepo();
     repo = r;
@@ -898,6 +952,35 @@ describe('portable evaluation', () => {
     expect(overlock(['hook', 'claude'], { cwd: r.dir }).status).toBe(2);
     const legacy = readFileSync(join(r.dir, '.overlock-ledger.jsonl'), 'utf8').trim().split('\n');
     expect(JSON.parse(legacy.at(-1)!)).toMatchObject({ blocked: true, ok: true });
+  });
+
+  it('tells a quiet turn apart from a retry in the record', () => {
+    const r = cleanRepo();
+    r.write(
+      'overlock.config.json',
+      JSON.stringify({ base: 'HEAD', evaluation: { repository: 'team/repo' } }),
+    );
+    r.commit('chore: collect evaluation records');
+    r.write(
+      'src/auth.test.ts',
+      '// overlock-ignore TEST_SKIPPED_ADDED -- quarantined, see #412\n' +
+        "it.skip('rejects expired tokens', () => {});\n",
+    );
+
+    // One session, two turns: the second is a Stop like any other, and the
+    // agent's own retry never happened.
+    const turn = JSON.stringify({ session_id: 'session' });
+    expect(overlock(['hook', 'claude'], { cwd: r.dir, stdin: turn }).status).toBe(2);
+    expect(overlock(['hook', 'claude'], { cwd: r.dir, stdin: turn }).status).toBe(0);
+
+    const file = readdirSync(join(r.dir, '.overlock/runs'))[0]!;
+    const rows = readFileSync(join(r.dir, '.overlock/runs', file), 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { decision: string });
+
+    // Not `retry_bypass`: nothing retried. The claim had already been answered.
+    expect(rows.map((row) => row.decision)).toEqual(['suppression_block', 'already_announced']);
   });
 
   it('rejects missing import and replay inputs without producing evaluation events', () => {

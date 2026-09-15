@@ -60,6 +60,8 @@ If that is right, say so and finish. If not, fix the cause.
 
 An agent writing its own permission slip is precisely the loop the gate exists to interrupt, so the claim gets quoted back at a human once. The hook never stops twice for the same directive, so the next turn continues either way. A directive that was already in the tree before this patch passes without comment.
 
+Once is once for the claim, not once per turn. The hook records what it quoted — the rule, the file, the path it names and your reason, hashed — in `~/.overlock/announced.jsonl`, beside the [ledger](../reference/ledger.md), scoped to the repository and branch it stopped on. Later turns on that branch pass without comment. Changing the reason, or adding another directive, is a new claim and stops once more. If that file cannot be written the hook says so, because the notice will then repeat.
+
 ## Tuning it
 
 The hook reads [`overlock.config.json`](../reference/configuration.md), the same file the CLI and the [GitHub Action](github-action.md) read. So the threshold that blocks the agent, the base it resolves against, and any per-rule regrades are set once and agree everywhere:

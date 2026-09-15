@@ -30,6 +30,15 @@ records, independently reviewed outcomes, and replay against a labeled corpus.
 `OVERLOCK_HOME` replaces `~/.overlock`. Neither controls opt-in repository evaluation, whose
 records live at the git root under `.overlock/`.
 
+One sibling file is not history but memory: `~/.overlock/announced.jsonl` holds the claims the
+[Stop hook](../integrations/claude-code.md#the-self-suppression-stop) has already put in front of a
+person, so a directive the patch wrote about itself stops one turn rather than every turn. It
+stores a timestamp, the repository path, the branch, the rule, and a hash of the claim — never the
+reason itself, which is a line of your source. `OVERLOCK_ANNOUNCED` sets its path; otherwise it
+follows `OVERLOCK_HOME`. `--no-ledger` does not disable it: it decides whether a turn is stopped,
+and a gate whose behavior changed with a logging flag would be two gates. Deleting the file costs
+one more stop per live claim.
+
 The GitHub Action disables the home ledger. Repository evaluation can still record its analysis
 invocation and export it as a CI artifact. Its human-log rendering invocation does not record a
 second evaluation event.

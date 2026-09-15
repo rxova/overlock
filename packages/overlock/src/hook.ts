@@ -1,4 +1,5 @@
 import { statSync } from 'node:fs';
+import { patchClaims, type SuppressionMemory } from './announced.js';
 import { commitBefore } from './git.js';
 import { compact } from './report.js';
 import type { Report } from './types.js';
@@ -7,6 +8,15 @@ export interface HookOutcome {
   exitCode: number;
   stdout: string;
   stderr: string;
+  /**
+   * Why a claim that would otherwise have stopped the turn did not.
+   *
+   * Recorded rather than inferred: "the agent retried and was let through" and
+   * "this claim was already put to a person" are different events, and a record
+   * that called both a retry is the kind of small untruth that makes the
+   * evidence useless for the next person reading it.
+   */
+  bypass?: 'retry' | 'announced';
 }
 
 interface StopPayload {
@@ -124,7 +134,11 @@ export function parseStopPayload(raw: string): StopPayload {
  * string is the only thing that reaches a person reading on a phone, so it is
  * worth sending twice rather than discovering one channel was the wrong one.
  */
-export function stopHookOutcome(report: Report, payload: StopPayload): HookOutcome {
+export function stopHookOutcome(
+  report: Report,
+  payload: StopPayload,
+  memory?: SuppressionMemory,
+): HookOutcome {
   // A patch that silences its own findings passes every check and prints
   // nothing, which on a phone is indistinguishable from a clean run. Stopping
   // once is what puts the claim in front of the person: they can accept it and
@@ -141,8 +155,24 @@ export function stopHookOutcome(report: Report, payload: StopPayload): HookOutco
       exitCode: 0,
       stdout: '',
       stderr: `${reason}\n\n(overlock: already retried once, not blocking again.)\n`,
+      bypass: 'retry',
     };
   }
+
+  // Once, and once only. The flag above covers the retry that directly follows
+  // a stop and nothing after it, so on its own it makes "once" mean once per
+  // turn: every later turn arrives with the flag false, finds the directive
+  // still new against the same base, and stops the agent again for a claim the
+  // person already answered. The memory is what makes it once per claim.
+  const claimed = laundered ? patchClaims(report) : [];
+  if (memory && claimed.length > 0 && claimed.every((c) => memory.seen.has(c.key))) {
+    // Silently, as a directive that predates the patch passes: repeating an
+    // answered claim every turn is how a notice becomes something to scroll
+    // past. A new directive, or a changed reason, is a new claim and stops.
+    return { exitCode: 0, stdout: '', stderr: '', bypass: 'announced' };
+  }
+
+  if (memory && claimed.length > 0) memory.remember(claimed);
 
   const body = {
     hookSpecificOutput: {

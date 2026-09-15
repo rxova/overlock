@@ -47,6 +47,17 @@ export {
   type JsonRpcResponse,
 } from './mcp.js';
 export { appendLedger, ledgerPath, toEntry, type LedgerEntry } from './ledger.js';
+export {
+  announcedPath,
+  patchClaims,
+  readAnnounced,
+  recordAnnounced,
+  suppressionMemory,
+  type Announcement,
+  type Claim,
+  type ClaimScope,
+  type SuppressionMemory,
+} from './announced.js';
 export { BAR_DAYS, CATCH_BAR, meetsBar, readLedger, summarize, type Summary } from './summary.js';
 export { isTestFile, isSnapshotFile, isThresholdConfig } from './paths.js';
 export {

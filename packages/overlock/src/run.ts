@@ -23,6 +23,7 @@ import {
   readMessages,
   repoRoot,
   revision,
+  stageEvidence,
   untrackedDiff,
   untrackedFiles,
 } from './git.js';
@@ -61,6 +62,16 @@ export interface RunOptions {
    * regardless.
    */
   allowFile?: string | undefined;
+  /**
+   * Stage the evaluation evidence this run writes, so the commit being built
+   * carries the record of the run that judged it.
+   *
+   * Per invocation rather than per repository, and deliberately: the only run
+   * with a commit to join is the one a pre-commit hook makes. A Stop hook or a
+   * CI job staging its own record would be adding files to an index nobody
+   * asked it to touch.
+   */
+  stageRecord?: boolean | undefined;
 }
 
 export interface RunResult {
@@ -133,6 +144,10 @@ export function run(options: RunOptions): RunResult {
     findings: [],
   };
   let root = cwd;
+  // Collected as they are written, because the record itself is only written in
+  // the `finally` — including on the throw path, where the evidence of a run
+  // that could not finish is the evidence most worth keeping.
+  const evidence: string[] = [];
   try {
     const repo = repoRoot(cwd);
     root = repo;
@@ -151,8 +166,10 @@ export function run(options: RunOptions): RunResult {
     const untrackedChunk = includeUntracked ? untrackedDiff(cwd, untrackedFiles(cwd, exclude)) : '';
     const diff = readDiff(range, cwd, exclude) + untrackedChunk;
     record.patch = fingerprint(diff);
-    if (options.evaluation?.captureDiff && env.OVERLOCK_NO_EVALUATION !== '1')
-      captureEvaluationDiff(root, diff, warn);
+    if (options.evaluation?.captureDiff && env.OVERLOCK_NO_EVALUATION !== '1') {
+      const captured = captureEvaluationDiff(root, diff, warn);
+      if (captured) evidence.push(captured);
+    }
 
     // Unreadable is the same as absent: a missing pull request body must never be
     // the reason a gate stops gating.
@@ -240,7 +257,20 @@ export function run(options: RunOptions): RunResult {
     throw error;
   } finally {
     record.duration_ms = Math.round(performance.now() - started);
-    if (options.evaluation && env.OVERLOCK_NO_EVALUATION !== '1')
-      persistEvaluation(root, record, warn);
+    if (options.evaluation && env.OVERLOCK_NO_EVALUATION !== '1') {
+      const persisted = persistEvaluation(root, record, warn);
+      if (persisted) evidence.push(persisted);
+      if (options.stageRecord && !stageEvidence(evidence, root))
+        warn(
+          'overlock: evaluation evidence could not be staged; it is still on disk, and .overlock may be ignored by this repository.\n',
+        );
+    } else if (options.stageRecord) {
+      // A flag that silently did nothing would leave someone certain their
+      // commits carried their own evidence, and finding out otherwise from an
+      // empty `overlock evaluate`.
+      warn(
+        'overlock: nothing to stage — repository evaluation is off, so this run wrote no record.\n',
+      );
+    }
   }
 }

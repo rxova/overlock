@@ -73,6 +73,14 @@ otherwise pass clean. `src/git.ts` synthesises additions for them. Do not
 replace this with `git add -N`: that writes to the index of a repository this
 tool promises only to read, and the e2e suite asserts the index is untouched.
 
+**The index is written only when named.** `--stage-record` is the single
+exception to the line above, and `stageEvidence` in `src/git.ts` is the only
+place it lives: it stages the evaluation files that run just wrote, and nothing
+else. It is a flag rather than a config key because the only run with a commit
+to join is the one a pre-commit hook makes. Every other invocation — the Stop
+hook, the action, a plain `overlock check` — still leaves the index exactly as
+it found it, and the e2e suite asserts both halves.
+
 **Suppressions require a reason.** `overlock-ignore RULE_ID -- reason` silences
 one rule on one line. No reason, no unknown rule, no wildcard; the count of
 suppressed findings is reported and logged. Making the escape hatch easier to

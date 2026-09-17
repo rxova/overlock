@@ -658,6 +658,23 @@ checkout or an explicit artifact export; the tool never commits or transmits rec
 Other tools' evidence directories can be left out the same way with the `exclude` setting, e.g.
 `"exclude": [".basting", ".saidso"]`; each record carries it in `settings.exclude`.
 
+A record is written after the analysis that produced it, so left alone it can only ever reach the
+_next_ commit: the evidence for a change trails one commit behind the change itself, and the working
+tree is never quite clean. `--stage-record` closes that gap from a pre-commit hook, where the commit
+is still being assembled — it stages the record and captured patch this run just wrote, and nothing
+else, so the commit carries the record of the run that judged it:
+
+```sh
+# .husky/pre-commit, or .git/hooks/pre-commit
+npx -y overlock check --staged --stage-record
+```
+
+It is a flag and not a config key on purpose. The only run with a commit to join is the one a
+pre-commit hook makes; a Stop hook or a CI job staging its own record would be adding files to an
+index nobody asked it to touch. Staging is the one write overlock makes, it happens only when named,
+and a repository that has ignored `.overlock` keeps that decision — the record stays on disk and the
+refusal is reported on stderr.
+
 ```sh
 overlock evaluate              # Markdown: distinct findings and reviewed outcomes
 overlock evaluate --json       # Includes finding keys and evidence for review

@@ -211,3 +211,85 @@ it('records empty and staged checks, changed settings, and clean hook completion
     run({ ...options, severities: { TEST_SKIPPED_ADDED: 'medium' }, failOn: 'none' }).exitCode,
   ).toBe(0);
 });
+
+it('stages the evidence a run wrote, so a pre-commit hook commits it with the change', () => {
+  repo = new TempRepo();
+  repo.write('a.test.ts', PASSING_TEST);
+  repo.commit('initial');
+  repo.write('a.test.ts', SKIPPED_TEST);
+  repo.git(['add', 'a.test.ts']);
+  const options = {
+    cwd: repo.dir,
+    staged: true,
+    ledger: false,
+    evaluation: { repository: 'fixture', captureDiff: true },
+    env: { OVERLOCK_SESSION_ID: 'pre-commit' },
+  };
+
+  // Without the flag the index is exactly what the author staged: the evidence
+  // is on disk and nowhere else.
+  run(options);
+  expect(repo.git(['diff', '--cached', '--name-only'])).toBe('a.test.ts\n');
+
+  run({ ...options, stageRecord: true });
+  const staged = repo.git(['diff', '--cached', '--name-only']).trim().split('\n');
+  expect(staged).toContain('a.test.ts');
+  expect(staged.filter((path) => path.startsWith('.overlock/runs/'))).toHaveLength(1);
+  expect(staged.filter((path) => path.startsWith('.overlock/patches/'))).toHaveLength(1);
+
+  // What was staged is the record of this run, not a placeholder the next one
+  // has to come back and fill in.
+  const file = staged.find((path) => path.startsWith('.overlock/runs/'))!;
+  const rows = repo
+    .git(['show', `:${file}`])
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line) as EvaluationRun);
+  expect(rows).toHaveLength(2);
+  expect(rows[1]?.settings.staged).toBe(true);
+  expect(rows[1]?.findings[0]?.finding.rule).toBe('TEST_SKIPPED_ADDED');
+});
+
+it('says so when the evidence cannot be staged, and still reports the findings', () => {
+  repo = new TempRepo();
+  repo.write('a.test.ts', PASSING_TEST);
+  repo.commit('initial');
+  // A repository that ignored .overlock has already said where the records go;
+  // staging over that decision is not overlock's call to make.
+  repo.write('.gitignore', '.overlock\n');
+  repo.commit('chore: ignore evidence');
+  repo.write('a.test.ts', SKIPPED_TEST);
+  const warnings: string[] = [];
+  const result = run({
+    cwd: repo.dir,
+    base: 'HEAD',
+    ledger: false,
+    stageRecord: true,
+    evaluation: { repository: 'fixture' },
+    env: { OVERLOCK_SESSION_ID: 'ignored' },
+    warn: (message) => warnings.push(message),
+  });
+  expect(result.exitCode).toBe(1);
+  expect(warnings.join('')).toContain('could not be staged');
+  expect(repo.git(['diff', '--cached', '--name-only'])).toBe('');
+});
+
+it('says there is nothing to stage when no record is being written at all', () => {
+  repo = new TempRepo();
+  repo.write('a.test.ts', PASSING_TEST);
+  repo.commit('initial');
+  repo.write('a.test.ts', SKIPPED_TEST);
+  const warnings: string[] = [];
+  const options = {
+    cwd: repo.dir,
+    base: 'HEAD',
+    ledger: false,
+    stageRecord: true,
+    warn: (message: string) => warnings.push(message),
+  };
+
+  run(options);
+  run({ ...options, evaluation: { repository: 'fixture' }, env: { OVERLOCK_NO_EVALUATION: '1' } });
+  expect(warnings.filter((message) => message.includes('nothing to stage'))).toHaveLength(2);
+  expect(repo.git(['diff', '--cached', '--name-only'])).toBe('');
+});

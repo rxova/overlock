@@ -12,6 +12,7 @@ import {
   readMessages,
   repoRoot,
   resolveRange,
+  stageEvidence,
   untrackedFiles,
 } from './git.js';
 import { PASSING_TEST, SKIPPED_TEST, TempRepo } from './__fixtures__/repo.js';
@@ -495,5 +496,28 @@ describe('readMessages', () => {
     r.commit('feat: the base');
 
     expect(() => readMessages('--output=/tmp/pwned', r.dir)).toThrow(GitError);
+  });
+});
+
+describe('stageEvidence', () => {
+  it('stages the paths it is given and nothing else', () => {
+    const r = makeRepo();
+    r.write('src/a.test.ts', PASSING_TEST);
+    r.commit('feat: the base');
+    r.write('.overlock/runs/session.jsonl', '{"schema":2}\n');
+    r.write('src/a.test.ts', SKIPPED_TEST);
+
+    expect(stageEvidence([join(r.dir, '.overlock/runs/session.jsonl')], r.dir)).toBe(true);
+    expect(r.git(['diff', '--cached', '--name-only'])).toBe('.overlock/runs/session.jsonl\n');
+  });
+
+  it('touches nothing when there is nothing to stage, and reports a refusal', () => {
+    const r = makeRepo();
+    r.write('src/a.test.ts', PASSING_TEST);
+    r.commit('feat: the base');
+
+    expect(stageEvidence([], r.dir)).toBe(true);
+    expect(stageEvidence([join(r.dir, '.overlock/runs/absent.jsonl')], r.dir)).toBe(false);
+    expect(r.git(['diff', '--cached', '--name-only'])).toBe('');
   });
 });

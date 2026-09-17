@@ -65,6 +65,10 @@ CHECK OPTIONS
   --no-untracked     Skip files git does not track yet (they are included by default)
   --no-ledger        Do not record in the legacy home ledger
   --no-evaluation    Do not write repository evaluation records
+  --stage-record     Stage the evaluation evidence this run writes, so the
+                     commit being built carries the record of the run that
+                     judged it. For a pre-commit hook; the one write this tool
+                     makes, and the only run with a commit to join
   --build <hash>     Evaluate one recorded build (evaluate only)
   --config <file>    Read settings from this file instead of searching
   --no-config        Ignore ${CONFIG_FILE} entirely
@@ -146,6 +150,7 @@ export interface ParsedArgs {
   ledger: boolean;
   evaluation?: EvaluationConfig;
   noEvaluation?: boolean;
+  stageRecord: boolean;
   build?: string;
   untracked: boolean;
   /** Config-only: paths left out of the patch besides `.overlock`. */
@@ -173,6 +178,7 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
     severities: {},
     cwd,
     ledger: true,
+    stageRecord: false,
     untracked: true,
     exclude: [],
     config: true,
@@ -236,6 +242,9 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
         break;
       case '--no-evaluation':
         parsed.noEvaluation = true;
+        break;
+      case '--stage-record':
+        parsed.stageRecord = true;
         break;
       case '--build':
         parsed.build = value('--build');
@@ -473,6 +482,7 @@ export function main(argv: string[], io: Io): number {
       mode: args.command === 'hook' ? 'hook' : 'check',
       ledger: args.ledger,
       evaluation: args.evaluation,
+      stageRecord: args.stageRecord,
       env: io.env,
       session: typeof payload.session_id === 'string' ? payload.session_id : undefined,
       stopPayload: payload,

@@ -206,7 +206,10 @@ oracles; null oracles remain unreviewed. None of these commands needs a network 
 
 Enable collection with `"evaluation": { "repository": "team/project", "captureDiff": true }`
 in the repository config. Completed records can be committed; containers need a mounted
-checkout or explicit export before disposal. The root `.overlock` directory is reserved
+checkout or explicit export before disposal. A record is written after the analysis it
+describes, so it reaches the next commit rather than that one; `overlock check --staged
+--stage-record`, from a pre-commit hook, stages the evidence it just wrote so the commit
+carries its own record. That is the only write overlock makes, and only when named. The root `.overlock` directory is reserved
 for this evidence and is excluded from analysis. Do not put application tests there.
 Other tools' evidence directories can be excluded the same way with `exclude`.
 

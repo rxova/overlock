@@ -464,3 +464,31 @@ export function revision(ref: string, cwd: string): string | null {
     return null;
   }
 }
+
+/**
+ * Stages the evidence files a run has just written. The one write this tool
+ * makes, and only when asked for by name.
+ *
+ * The record describing a commit is written after the analysis that produced
+ * it, so on its own it can only ever reach the *next* commit — every repository
+ * collecting records ends up with the last run's evidence trailing behind the
+ * change it judged, and a working tree that is never quite clean. From a
+ * pre-commit hook, where the commit is still being assembled, the index is the
+ * one place that gap can be closed.
+ *
+ * `--` so a path can never be read as an option, and no `--force`: a repository
+ * that has ignored `.overlock` has already said where the records go, and
+ * staging them over that decision would be the tool quietly doing more than it
+ * was asked. Best-effort, like every other write here — a locked index must
+ * never be the reason a gate stops gating. Evidence is evidence, not control
+ * flow.
+ */
+export function stageEvidence(paths: readonly string[], cwd: string): boolean {
+  if (paths.length === 0) return true;
+  try {
+    git(['add', '--', ...paths], cwd);
+    return true;
+  } catch {
+    return false;
+  }
+}

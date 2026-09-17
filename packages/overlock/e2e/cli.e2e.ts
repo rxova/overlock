@@ -925,6 +925,32 @@ describe('portable evaluation', () => {
     expect(overlock(['replay', '.overlock/manifest.json'], { cwd: r.dir }).status).toBe(0);
   });
 
+  it('stages its own record for the commit being built, when asked to and not otherwise', () => {
+    const r = weakenedRepo();
+    r.write(
+      'overlock.config.json',
+      JSON.stringify({ base: 'HEAD', evaluation: { repository: 'team/repo', captureDiff: true } }),
+    );
+    r.git(['add', 'src/auth.test.ts']);
+    const before = r.git(['diff', '--cached', '--name-only']);
+
+    expect(overlock(['check', '--no-ledger'], { cwd: r.dir }).status).toBe(1);
+    expect(r.git(['diff', '--cached', '--name-only'])).toBe(before);
+
+    expect(overlock(['check', '--no-ledger', '--stage-record'], { cwd: r.dir }).status).toBe(1);
+    const staged = r.git(['diff', '--cached', '--name-only']).trim().split('\n');
+    expect(staged).toContain('src/auth.test.ts');
+    expect(staged.some((path) => path.startsWith('.overlock/runs/'))).toBe(true);
+    expect(staged.some((path) => path.startsWith('.overlock/patches/'))).toBe(true);
+
+    // The commit that carries the evidence is the commit the evidence is about,
+    // and it leaves nothing of that record behind for a later one to pick up.
+    r.git(['commit', '--quiet', '--no-verify', '-m', 'test: skip the auth case']);
+    const record = staged.find((path) => path.startsWith('.overlock/runs/'))!;
+    expect(r.git(['show', '--name-only', '--format=', 'HEAD'])).toContain(record);
+    expect(r.git(['status', '--porcelain', '--', record])).toBe('');
+  });
+
   it('records a retry bypass and counts suppression blocks in the legacy ledger accurately', () => {
     const r = weakenedRepo();
     r.write(

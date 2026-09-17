@@ -122,12 +122,13 @@ export function persistEvaluation(
   root: string,
   record: EvaluationRun,
   warn: (message: string) => void,
-): void {
+): string | null {
   const path = join(root, '.overlock', 'runs', `${record.session}.jsonl`);
-  if (!appendLedger(record, path))
-    warn(
-      'overlock: evaluation record could not be saved; export or mount .overlock before ending this session.\n',
-    );
+  if (appendLedger(record, path)) return path;
+  warn(
+    'overlock: evaluation record could not be saved; export or mount .overlock before ending this session.\n',
+  );
+  return null;
 }
 
 /** Store each exact pre-review patch once, including work never committed. */
@@ -135,14 +136,16 @@ export function captureEvaluationDiff(
   root: string,
   diff: string,
   warn: (message: string) => void,
-): void {
+): string | null {
   try {
     const directory = join(root, '.overlock', 'patches');
     mkdirSync(directory, { recursive: true });
     const path = join(directory, `${fingerprint(diff)}.diff`);
     // Concurrent writers have identical content under this content-addressed path.
     writeFileSync(path, diff);
+    return path;
   } catch {
     warn('overlock: evaluation diff could not be saved.\n');
+    return null;
   }
 }

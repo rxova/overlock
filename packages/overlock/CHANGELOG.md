@@ -1,5 +1,11 @@
 # overlock
 
+## 0.10.2
+
+### Patch Changes
+
+- [#40](https://github.com/rxova/overlock/pull/40) [`a60395c`](https://github.com/rxova/overlock/commit/a60395ce71e671c57e92c2e00d13165a26497df8) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Drop `export` from nine symbols that nothing imported. The published API is unchanged — none of them was re-exported from `src/index.ts` — but the built output no longer carries them.
+
 ## 0.10.1
 
 ### Patch Changes

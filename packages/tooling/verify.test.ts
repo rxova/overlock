@@ -11,8 +11,10 @@ describe('STEPS', () => {
       'unit tests',
       'package exports',
       'llms.txt',
-      'dependency dedupe',
+      'dependency versions',
+      'unused files, exports and dependencies',
       'audit',
+      'dependency dedupe',
     ]);
   });
 

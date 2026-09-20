@@ -147,7 +147,7 @@ export function finding(input: {
  * positive here costs a `medium` finding a human glances at, while a miss is
  * the whole failure mode the tool exists to catch.
  */
-export const ASSERTION_TOKENS: RegExp[] = [
+const ASSERTION_TOKENS: RegExp[] = [
   /\bexpect\s*\(/,
   /\bassert[A-Za-z_]*\s*\(/,
   /\bassert\s+/,

@@ -58,7 +58,7 @@ interface Group {
   count: number;
 }
 
-export function groupFindings(findings: Finding[]): Group[] {
+function groupFindings(findings: Finding[]): Group[] {
   const groups = new Map<string, Group>();
 
   for (const f of findings) {
@@ -145,7 +145,7 @@ const MIN_CLUSTER = 3;
  * reading every row to discover that. It is stated as a count and never acted
  * on: this groups the list, it does not shorten it.
  */
-export function sharedIdentifier(findings: Finding[]): { name: string; count: number } | null {
+function sharedIdentifier(findings: Finding[]): { name: string; count: number } | null {
   const counts = new Map<string, number>();
   for (const f of findings) {
     const text = `${f.evidence.before ?? ''}\n${f.evidence.after ?? ''}`;
@@ -433,8 +433,6 @@ function suppressedNote(report: Report): string {
 function clip(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}...`;
 }
-
-export type { Finding };
 
 /**
  * The ledger, read back.

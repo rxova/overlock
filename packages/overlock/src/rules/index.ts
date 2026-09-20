@@ -29,4 +29,4 @@ export const RULES: Rule[] = [
   testAndImplTogether,
 ];
 
-export type { Rule, RuleContext } from './shared.js';
+export type { Rule } from './shared.js';

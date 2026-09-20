@@ -54,7 +54,7 @@ const MAX_TARGETS = 2;
 const MAX_TOKENS = 400;
 
 /** Why a change is not what it looks like. */
-export type Explanation = 'rename' | 'reformatting';
+type Explanation = 'rename' | 'reformatting';
 
 export interface PatchExplanation {
   renames: Rename[];

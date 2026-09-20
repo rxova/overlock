@@ -17,8 +17,13 @@ export const STEPS: [name: string, command: string][] = [
   ['unit tests', 'pnpm exec turbo run test'],
   ['package exports', 'pnpm run check:exports'],
   ['llms.txt', 'pnpm run check:llms'],
-  ['dependency dedupe', 'pnpm run dedupe:check'],
+  ['dependency versions', 'pnpm run sherif:check'],
+  ['unused files, exports and dependencies', 'pnpm run knip:check'],
   ['audit', 'pnpm run audit:check'],
+  // Last, and it has to stay last: `pnpm dedupe --check` removes the modules
+  // directory when CI is set, so anything after it runs without node_modules
+  // and fails looking for its own binary.
+  ['dependency dedupe', 'pnpm run dedupe:check'],
 ];
 
 /** Runs one step. Injected so the sequencing can be tested without running it. */

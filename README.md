@@ -779,7 +779,7 @@ what a report needs to carry.
 
 ```bash
 pnpm install
-pnpm exec turbo run build   # tsup, ESM, with .d.ts
+pnpm exec turbo run build   # tsdown, ESM, with .d.ts
 pnpm test                   # unit suite, coverage thresholds enforced per file
 pnpm run e2e                # drives the built binary against real git repos
 pnpm run verify             # the pre-push gate: the same list CI runs

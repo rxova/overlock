@@ -27,7 +27,7 @@ package itself supports Node.js 20.11 and up, which CI verifies by packing the
 tarball and running it under Node 20.
 
 ```bash
-pnpm exec turbo run build        # tsup, ESM, with .d.ts
+pnpm exec turbo run build        # tsdown, ESM, with .d.ts
 pnpm test                        # unit suite with coverage thresholds
 pnpm run e2e                     # end-to-end against real git repositories
 pnpm lint

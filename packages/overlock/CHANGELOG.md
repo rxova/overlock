@@ -1,5 +1,11 @@
 # overlock
 
+## 0.10.1
+
+### Patch Changes
+
+- [#36](https://github.com/rxova/overlock/pull/36) [`a2b2167`](https://github.com/rxova/overlock/commit/a2b21677ee5c4f0f3d90fb7cc7a200bdc300c3e2) Thanks [@jonatankruszewski](https://github.com/jonatankruszewski)! - Build with tsdown instead of tsup. The published output is unchanged in shape — ESM-only, same `dist/index.js`, `dist/cli.js` and type declarations — but rolldown shares code between the two entries rather than duplicating it, so the tarball is smaller.
+
 ## 0.10.0
 
 ### Minor Changes

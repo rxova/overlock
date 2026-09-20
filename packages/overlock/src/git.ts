@@ -117,7 +117,7 @@ export function defaultBranch(cwd: string): string | null {
  * is a character, not magic — the config refuses those anyway, but this is the
  * boundary that hands the value to git, and a library caller skips the config.
  */
-export function patchPathspec(exclude: readonly string[] = []): string[] {
+function patchPathspec(exclude: readonly string[] = []): string[] {
   return [
     '--',
     '.',

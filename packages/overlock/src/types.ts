@@ -207,7 +207,7 @@ export interface Report {
   }[];
 }
 
-export type DiffLineKind = 'add' | 'del' | 'ctx';
+type DiffLineKind = 'add' | 'del' | 'ctx';
 
 export interface DiffLine {
   kind: DiffLineKind;
@@ -224,7 +224,7 @@ export interface Hunk {
   lines: DiffLine[];
 }
 
-export type FileStatus = 'added' | 'modified' | 'deleted' | 'renamed';
+type FileStatus = 'added' | 'modified' | 'deleted' | 'renamed';
 
 export interface DiffFile {
   /** Post-image path, or the pre-image path when the file was deleted. */

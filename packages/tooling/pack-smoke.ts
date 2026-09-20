@@ -4,7 +4,7 @@
  *
  * This is the only check that catches a `files` entry that dropped dist, an
  * exports map that resolves for a bundler but not for plain Node, or a bin that
- * lost its execute bit somewhere between tsup and npm. Every one of those ships
+ * lost its execute bit somewhere between tsdown and npm. Every one of those ships
  * green through lint, types and unit tests.
  *
  * The commands and the scratch directory are injected rather than reached for

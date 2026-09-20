@@ -37,7 +37,7 @@ add one. Dev dependencies are fine.
 
 ```bash
 pnpm install                     # pnpm 11, Node >= 22.13 for the toolchain
-pnpm exec turbo run build        # tsup, ESM, with .d.ts
+pnpm exec turbo run build        # tsdown, ESM, with .d.ts
 pnpm test                        # unit suite with per-file coverage thresholds
 pnpm run e2e                     # spawns real git repositories; slow
 pnpm lint                        # eslint

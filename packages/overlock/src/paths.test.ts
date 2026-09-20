@@ -115,7 +115,7 @@ describe('isRunnerConfig', () => {
     expect(isRunnerConfig(path)).toBe(true);
   });
 
-  it.each(['tsup.config.ts', 'src/config.ts', 'README.md'])('does not claim %s', (path) => {
+  it.each(['tsdown.config.ts', 'src/config.ts', 'README.md'])('does not claim %s', (path) => {
     expect(isRunnerConfig(path)).toBe(false);
   });
 });

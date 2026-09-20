@@ -53,7 +53,7 @@ Common failures:
 - **`llms.txt`** — a rule was added, renamed or removed and `llms.txt` was not
   updated. It must name every rule ID and every documented command.
 - **`package exports`** — `publint` or `are-the-types-wrong`. Usually a `files`
-  entry or an `exports` map that no longer matches what `tsup` emits.
+  entry or an `exports` map that no longer matches what `tsdown` emits.
 - **`dependency dedupe`** — run `pnpm dedupe` and commit the lockfile.
 - **`audit`** — a dev dependency has an advisory. The package has no runtime
   dependencies, so this is always dev tooling.

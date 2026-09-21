@@ -40,7 +40,7 @@ export const hasChangeset = (changed: string[]): boolean =>
  * A dependency bump changes what the repository builds *with* and nothing about
  * what it publishes, so the gate has nothing to ask for — and a gate that asks
  * anyway teaches people to write empty changesets, which is worse than not
- * asking. Dependabot applies this to every pull request it opens.
+ * asking. Renovate applies this to every pull request it opens.
  *
  * A label rather than a file, and deliberately: it is applied on the pull
  * request where a reviewer is already looking, it cannot be set without leaving

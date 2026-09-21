@@ -31,6 +31,7 @@ jobs:
   dedupe:
     if: github.event.pull_request.user.login == 'dependabot[bot]' && github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       # `DEPENDABOT_AUTOFIX_TOKEN` is load-bearing and cannot be swapped for the
       # default GITHUB_TOKEN. A push made with GITHUB_TOKEN deliberately does not

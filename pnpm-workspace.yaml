@@ -19,5 +19,8 @@ fetchRetryMaxtimeout: 10000
 # supply chain and the wrong one for our own package: @rxova/brand is published
 # from a repository next door, and waiting a day to consume a version we just cut
 # only means the docs build here and the brand it renders drift for a day.
+#
+# By name rather than by version, matching the sibling repos: an exact version
+# means nothing a day after it is published and has to be renewed at every bump.
 minimumReleaseAgeExclude:
-  - '@rxova/brand@0.13.0'
+  - '@rxova/brand'

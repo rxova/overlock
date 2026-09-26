@@ -5,7 +5,7 @@ import { unified } from '@astrojs/markdown-remark';
 import starlight from '@astrojs/starlight';
 import starlightLinksValidator from 'starlight-links-validator';
 import sitemap from '@astrojs/sitemap';
-import { sharedStarlightConfig } from '@rxova/brand';
+import { sharedStarlightConfig } from '@rxova/astro-ui/starlight';
 
 import { rehypeMdLinks } from './src/lib/rehype-md-links.mjs';
 

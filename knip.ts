@@ -19,6 +19,12 @@ export default {
   // a gate that stops being read.
   treatConfigHintsAsErrors: true,
   workspaces: {
+    'apps/docs': {
+      // Reached only as a string: the Starlight preset from @rxova/astro-ui lists
+      // `@rxova/brand/fonts.css` in `customCss`, which Vite resolves from this
+      // site's root. Knip reads imports, so the path is invisible to it.
+      ignoreDependencies: ['@rxova/brand'],
+    },
     'packages/tooling': {
       // Repo scripts, invoked by name from package.json and CI, never imported.
       entry: ['*.ts'],

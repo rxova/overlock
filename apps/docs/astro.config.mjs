@@ -61,10 +61,6 @@ export default defineConfig({
     starlight({
       ...sharedStarlightConfig({
         project: 'overlock',
-        // These docs ship as a page component: rxova.org composes each rendered
-        // body into its own header and footer, so this build must not draw the
-        // umbrella footer itself.
-        pageComponent: true,
         sidebar: [
           { label: 'Learn', items: [{ autogenerate: { directory: 'learn' } }] },
           { label: 'Rules', items: [{ autogenerate: { directory: 'rules' } }] },

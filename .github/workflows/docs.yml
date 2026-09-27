@@ -57,10 +57,7 @@ jobs:
           DOCS_BASE_URL: /packages/overlock/
         run: pnpm --filter @overlock/docs build
 
-      - name: Mark the page-component bundle
-        run: node apps/docs/scripts/write-page-bundle.mjs
-
-      # The dist the aggregator composes into its shell. `docs-dist` is the
+      # The dist rxova.org publishes as built. `docs-dist` is the
       # fixed artifact name in the contract — the aggregator's ingest downloads
       # it by that name from this run — so it is not ours to rename. Pointing
       # `path` at the dist directory rather than its parent is what puts
@@ -90,13 +87,13 @@ jobs:
         # failure would leave the site serving stale docs behind a green tick.
         env:
           GH_TOKEN: ${{ secrets.AGGREGATOR_DISPATCH_TOKEN }}
-        # `-F` only for schema, which the receiver compares as the number 2.
+        # `-F` only for schema, which the receiver compares as the number 1.
         # Everything else goes through `-f` so it stays a string, and an
         # all-digit ref or sha cannot arrive as a number.
         run: |
           gh api repos/rxova/rxova-website/dispatches \
             -f event_type=docs \
-            -F 'client_payload[schema]=2' \
+            -F 'client_payload[schema]=1' \
             -f 'client_payload[project]=overlock' \
             -f "client_payload[ref]=${GITHUB_REF_NAME}" \
             -f "client_payload[sha]=${GITHUB_SHA}" \

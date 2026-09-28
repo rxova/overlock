@@ -7,7 +7,8 @@ applies to the whole tree; `packages/overlock` is the published package.
 
 `overlock` reads a git diff and reports test-integrity findings. It is a
 deterministic CLI: no LLM calls, no network calls, no telemetry, and **zero
-runtime dependencies**.
+runtime dependencies**. The one exception is the opt-in model judge
+(`src/judge.ts`), which is off unless a repository or a flag enables it.
 
 The zero-dependency rule is a product constraint, not an accident. Something
 runs this on every agent turn, so each runtime dependency is a download paid on
@@ -24,6 +25,7 @@ add one. Dev dependencies are fine.
 | `packages/overlock/src/git.ts`          | Range resolution and every `git` invocation                             |
 | `packages/overlock/src/rules/`          | The eleven rules. Each is pure: `DiffFile[]` in, `Finding[]` out        |
 | `packages/overlock/src/rules/cases.ts`  | The diff grouped by test case, which several rules read                 |
+| `packages/overlock/src/judge.ts`        | The opt-in model judge (Jev); the only network call                     |
 | `packages/overlock/src/substitution.ts` | Rename and reformat inference                                           |
 | `packages/overlock/src/report.ts`       | Three views: full, `--json`, `compact`                                  |
 | `packages/overlock/src/hook.ts`         | The Claude Code `Stop` hook protocol                                    |
@@ -88,6 +90,14 @@ use makes the gate meaningless.
 
 **Rules are pure.** A rule takes `DiffFile[]` and returns `Finding[]`. It does
 not read the filesystem, shell out, or depend on the order the other rules ran.
+
+**The judge only adds, and never fails a run.** `JUDGED_WEAKENING` is the one
+finding not produced by a pure rule, so it lives in `src/judge.ts` rather than
+`src/rules/`. It runs after the rules, looks only at test cases they did not
+flag, and swallows every failure into `report.judge.error`. The deterministic
+findings must be identical with the judge off, unreachable or unkeyed. Its key
+comes from the environment and its endpoint is fixed: a config file is
+untrusted input and must never choose where a diff is sent.
 
 ## Conventions
 

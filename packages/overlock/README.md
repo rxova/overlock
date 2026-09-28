@@ -100,7 +100,7 @@ the Claude Code hook, it cannot stop a turn.
 
 ## Rules
 
-Thirteen rules, all scoped to the patch.
+Thirteen rules and one opt-in judgement, all scoped to the patch.
 
 | Rule                         | Severity      | Fires when                                                                                                                                                               |
 | ---------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -117,6 +117,7 @@ Thirteen rules, all scoped to the patch.
 | `SNAPSHOT_UPDATED_WITH_CODE` | medium        | A snapshot was regenerated in the same patch as the code it snapshots                                                                                                    |
 | `TEST_TIMEOUT_RAISED`        | low           | A timeout or retry count went up, or appeared                                                                                                                            |
 | `TEST_AND_IMPL_TOGETHER`     | low           | A test changed alongside the implementation it is named after                                                                                                            |
+| `JUDGED_WEAKENING`           | medium        | Opt-in (`--judge`): a model judged a changed test case to verify less than before, where no rule above already fired on it                                               |
 
 Only `high` fails a run by default. `medium` findings are reported for review.
 `low` findings are context: `TEST_AND_IMPL_TOGETHER` in particular fires on
@@ -490,6 +491,45 @@ overlock: /repo/overlock.config.json
   baseMode = "fork-point"  (default)
   failOn = "low"  (flag)
 ```
+
+## Model judge (opt-in)
+
+The rules only fire on edits they can recognise by pattern. Some weakening has
+no pattern: a mock rewritten to return whatever the assertion expects, a test
+that no longer reaches the failing branch, one exact expectation replaced by
+three looser ones. The judge sends those edits to
+[Jev](https://docs.typesafe.ai/api), TypeSafe AI's decision model, and reports
+`JUDGED_WEAKENING` when it is confident the case now checks less.
+
+It is **off** unless you enable it, with `--judge` or in the config file:
+
+```json
+{ "judge": { "model": "jev-1.13.0", "threshold": 0.8, "maxCases": 12, "timeoutMs": 4000 } }
+```
+
+`"judge": true` enables it with those defaults. The key is read from
+`TYPESAFE_API_KEY` and never from a file. The endpoint is fixed, so a config
+file cannot send your key or your diff anywhere else. `--no-judge` or
+`OVERLOCK_NO_JUDGE=1` turns it off for one run.
+
+- **It only adds findings.** The rules run first and their findings stand. The
+  judge looks only at changed test cases that lost a line and that no rule
+  flagged at medium or above.
+- **Two answers must agree.** A finding needs both the probability that a bug
+  the case used to catch would now pass (at least `threshold`) and the
+  classification `weakened`, rather than refactor, strengthened or behaviour
+  change.
+- **It is graded `medium`, so it does not block by default.**
+  `"severity": { "JUDGED_WEAKENING": "high" }` makes it block. Suppressions and
+  `Overlock-Allow:` trailers apply to it exactly as to the rules.
+- **It never fails a run.** A missing key, a timeout or an error response
+  leaves the deterministic report as it was, and the report's `judge` field
+  records what happened: `cases`, `answered`, `flagged`, and an `error` when
+  nothing was answered.
+- **What leaves the machine:** the path, the case name, and the removed and
+  added lines of the changed test cases (at most `maxCases` of them, 60 lines
+  each). No source files and no unchanged lines. Check your TypeSafe plan's
+  data retention before enabling it on private code.
 
 ## JSON output
 

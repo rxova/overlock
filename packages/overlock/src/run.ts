@@ -13,6 +13,7 @@ import {
   type EvaluationRun,
 } from './evaluation-record.js';
 import { analyze } from './analyze.js';
+import type { Judge } from './judge.js';
 import { readFileSync } from 'node:fs';
 import {
   type BaseMode,
@@ -72,6 +73,8 @@ export interface RunOptions {
    * asked it to touch.
    */
   stageRecord?: boolean | undefined;
+  /** The opt-in model judge, when the caller enabled one. */
+  judge?: Judge | undefined;
 }
 
 export interface RunResult {
@@ -190,6 +193,7 @@ export function run(options: RunOptions): RunResult {
       failOn,
       severities,
       allowText,
+      ...(options.judge ? { judge: options.judge } : {}),
       onFindings: (findings) => {
         produced = findings;
       },

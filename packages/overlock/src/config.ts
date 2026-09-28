@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import type { BaseMode } from './git.js';
 import type { EvaluationConfig } from './evaluation-record.js';
+import type { JudgeSettings } from './judge.js';
 import { RULE_IDS, type Grade, type RuleId, type Severity } from './types.js';
 
 export class ConfigError extends Error {}
@@ -35,6 +36,8 @@ export interface OverlockConfig {
   /** Repository-root-relative paths left out of the patch, normalised. */
   exclude?: string[];
   evaluation?: EvaluationConfig;
+  /** The opt-in model judge. Absent is off; `true` is on with the defaults. */
+  judge?: JudgeSettings;
 }
 
 export interface LoadedConfig {
@@ -58,6 +61,7 @@ const KEYS = [
   'untracked',
   'exclude',
   'evaluation',
+  'judge',
 ];
 const LEVELS = ['high', 'medium', 'low'];
 /**
@@ -148,6 +152,10 @@ export function parseConfig(value: unknown, where: string): OverlockConfig {
     if (typeof entry.captureDiff === 'boolean') config.evaluation.captureDiff = entry.captureDiff;
   }
 
+  if (value.judge !== undefined && value.judge !== false) {
+    config.judge = parseJudge(value.judge, where);
+  }
+
   if (value.base !== undefined) {
     if (typeof value.base !== 'string' || value.base === '') {
       throw new ConfigError(`${where}: base must be a non-empty string`);
@@ -234,6 +242,47 @@ export function parseConfig(value: unknown, where: string): OverlockConfig {
   }
 
   return config;
+}
+
+const JUDGE_NUMBERS: Record<string, (n: number) => boolean> = {
+  threshold: (n) => n > 0 && n <= 1,
+  maxCases: (n) => Number.isInteger(n) && n >= 1 && n <= 100,
+  timeoutMs: (n) => Number.isInteger(n) && n >= 100 && n <= 30000,
+};
+
+/**
+ * `endpoint` is refused by name rather than as just another unknown key, so
+ * whoever tried it learns why: see `judgeFor`.
+ */
+function parseJudge(value: unknown, where: string): JudgeSettings {
+  if (value === true) return {};
+  if (!isObject(value)) {
+    throw new ConfigError(`${where}: judge must be true, false, or an object of settings`);
+  }
+  const settings: JudgeSettings = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (key === 'endpoint') {
+      throw new ConfigError(`${where}: judge.endpoint cannot be set from a config file`);
+    }
+    if (key === 'model') {
+      if (typeof entry !== 'string' || !/^[\w.-]+$/.test(entry)) {
+        throw new ConfigError(`${where}: judge.model must be a model name, e.g. "jev-1.13.0"`);
+      }
+      settings.model = entry;
+      continue;
+    }
+    const valid = JUDGE_NUMBERS[key];
+    if (valid === undefined) {
+      throw new ConfigError(
+        `${where}: unknown judge setting ${JSON.stringify(key)}. Known: model, ${Object.keys(JUDGE_NUMBERS).join(', ')}`,
+      );
+    }
+    if (typeof entry !== 'number' || !valid(entry)) {
+      throw new ConfigError(`${where}: judge.${key} is out of range`);
+    }
+    (settings as Record<string, number>)[key] = entry;
+  }
+  return settings;
 }
 
 const readJson = (file: string): unknown => {

@@ -22,6 +22,7 @@ import {
 } from './init.js';
 import { compact, human, json, summaryText, useColor } from './report.js';
 import { run } from './run.js';
+import { JUDGE_KEY_ENV, judgeFor, type JudgeSettings } from './judge.js';
 import { ledgerPath } from './ledger.js';
 import { readLedger, summarize } from './summary.js';
 import { MessageBuffer, handleMessage } from './mcp.js';
@@ -65,6 +66,8 @@ CHECK OPTIONS
   --no-untracked     Skip files git does not track yet (they are included by default)
   --no-ledger        Do not record in the legacy home ledger
   --no-evaluation    Do not write repository evaluation records
+  --judge            Also ask a model (Jev) about changed test cases; needs ${JUDGE_KEY_ENV}
+  --no-judge         Do not, even when the config enables it
   --stage-record     Stage the evaluation evidence this run writes, so the
                      commit being built carries the record of the run that
                      judged it. For a pre-commit hook; the one write this tool
@@ -150,6 +153,9 @@ export interface ParsedArgs {
   ledger: boolean;
   evaluation?: EvaluationConfig;
   noEvaluation?: boolean;
+  /** Undefined is off. */
+  judge?: JudgeSettings;
+  noJudge?: boolean;
   stageRecord: boolean;
   build?: string;
   untracked: boolean;
@@ -248,6 +254,12 @@ export function parseArgs(argv: string[], cwd = process.cwd()): ParsedArgs {
         break;
       case '--build':
         parsed.build = value('--build');
+        break;
+      case '--judge':
+        parsed.judge = parsed.judge ?? {};
+        break;
+      case '--no-judge':
+        parsed.noJudge = true;
         break;
       case '--no-ledger':
         parsed.ledger = false;
@@ -368,6 +380,7 @@ export function applyConfig(args: ParsedArgs, config: OverlockConfig): ParsedArg
   }
 
   if (config.evaluation && !args.noEvaluation) args.evaluation = config.evaluation;
+  if (config.judge && !args.noJudge) args.judge = { ...config.judge, ...args.judge };
   return args;
 }
 
@@ -490,6 +503,7 @@ export function main(argv: string[], io: Io): number {
       warn: io.stderr,
       untracked: args.untracked,
       exclude: args.exclude,
+      judge: args.noJudge ? undefined : judgeFor(args.judge, io.env),
     });
 
     if (args.explainBase) {
@@ -564,6 +578,7 @@ function runMcp(args: ParsedArgs, io: Io): number {
         warn: io.stderr,
         untracked: args.untracked,
         exclude: args.exclude,
+        judge: args.noJudge ? undefined : judgeFor(args.judge, io.env),
       }).report,
     report: (call: { days?: number }) =>
       summarize(readLedger(ledgerPath(io.env)), { days: call.days ?? args.days }),
@@ -599,6 +614,7 @@ function runConfig(args: ParsedArgs, config: OverlockConfig, path: string | null
     untracked: args.untracked,
     exclude: args.exclude,
     evaluation: args.evaluation ?? null,
+    judge: args.noJudge ? null : (args.judge ?? null),
   };
 
   /** The flag that would set each setting, so each line can say who won. */
@@ -611,6 +627,7 @@ function runConfig(args: ParsedArgs, config: OverlockConfig, path: string | null
     testGlob: '--test-glob',
     untracked: '--no-untracked',
     evaluation: '--no-evaluation',
+    judge: args.explicit.has('--no-judge') ? '--no-judge' : '--judge',
   };
 
   const origin = (key: string): 'flag' | 'config' | 'default' => {

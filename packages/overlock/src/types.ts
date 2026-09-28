@@ -62,6 +62,7 @@ export const RULE_IDS = [
   'TEST_AND_IMPL_TOGETHER',
   'TEST_GATE_DISABLED',
   'SUITE_SCOPE_NARROWED',
+  'JUDGED_WEAKENING',
 ] as const;
 
 export type RuleId = (typeof RULE_IDS)[number];
@@ -197,6 +198,14 @@ export interface Report {
    */
   allowances_unused: { rule: RuleId; target: string | null; reason: string }[];
   /** What the new directives claimed, so a human can judge the claim. */
+  /**
+   * What the opt-in model judge did, when it ran.
+   *
+   * Absent when it was not enabled. Present with an `error` when it was and
+   * could not answer — a second opinion that silently did not happen reads the
+   * same as one that found nothing, and they are not the same.
+   */
+  judge?: JudgeSummary;
   suppressions_new: {
     rule: RuleId;
     file: string;
@@ -205,6 +214,18 @@ export interface Report {
     target: string | null;
     reason: string;
   }[];
+}
+
+export interface JudgeSummary {
+  model: string;
+  /** Test cases sent to the model. */
+  cases: number;
+  /** Of those, the ones it answered. */
+  answered: number;
+  /** JUDGED_WEAKENING findings produced, before suppressions. */
+  flagged: number;
+  /** Why no case was judged, when none was. */
+  error?: string;
 }
 
 type DiffLineKind = 'add' | 'del' | 'ctx';

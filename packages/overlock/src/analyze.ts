@@ -1,6 +1,7 @@
 import { applyAllowances, collectAllowances } from './allow.js';
 import { parseDiff } from './diff.js';
 import { explainPatch, type PatchExplanation } from './substitution.js';
+import type { Judge } from './judge.js';
 import { isTestFile } from './paths.js';
 import { RULES } from './rules/index.js';
 import { sanitize } from './rules/shared.js';
@@ -41,6 +42,11 @@ export interface AnalyzeOptions {
   allowText?: string;
   /** Observe detections before policy and suppressions, for opt-in evaluation. */
   onFindings?: (findings: Finding[]) => void;
+  /**
+   * The opt-in model judge. Its findings join the rules' before any policy is
+   * applied, so a grade, a suppression or an allowance treats them the same.
+   */
+  judge?: Judge;
 }
 
 /**
@@ -67,6 +73,8 @@ export function analyze(options: AnalyzeOptions): Report {
   };
 
   const produced = RULES.flatMap((rule) => rule.run(ctx));
+  const judged = options.judge?.(files, ctx.isTest, produced);
+  if (judged) produced.push(...judged.findings);
   options.onFindings?.(produced);
   const silenced = produced.filter((f) => severities[f.rule] === 'off');
   const raw = produced
@@ -112,6 +120,7 @@ export function analyze(options: AnalyzeOptions): Report {
     // mechanism that silenced it does not change that.
     suppressed: suppressed.length + allowed.length,
     suppressed_new: freshlyAdded.length,
+    ...(judged ? { judge: judged.summary } : {}),
     suppressions_new: freshlyAdded.map((s) => ({
       rule: s.rule,
       file: s.file,
@@ -196,7 +205,11 @@ function dedupe(findings: Finding[]): Finding[] {
 }
 
 /** Registry position per rule. A total record, so lookup needs no fallback. */
-const RULE_ORDER = Object.fromEntries(RULES.map((r, i) => [r.rule, i])) as Record<RuleId, number>;
+const RULE_ORDER = Object.fromEntries([
+  ...RULES.map((r, i) => [r.rule, i]),
+  // Not a registered rule — it is not pure — and reported after the ones that are.
+  ['JUDGED_WEAKENING', RULES.length],
+]) as Record<RuleId, number>;
 
 function sortFindings(findings: Finding[]): Finding[] {
   return [...findings].sort((a, b) => {

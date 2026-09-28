@@ -3,7 +3,8 @@
 > Deterministic gate on test integrity in a git patch. Answers one question:
 > did this change make the tests pass by weakening the tests?
 
-Zero runtime dependencies. No network calls, no LLM calls, no telemetry. Reads
+Zero runtime dependencies. No network calls, no LLM calls, no telemetry — unless
+the opt-in judge (`--judge`) is enabled; see JUDGED_WEAKENING below. Reads
 the diff; never edits code, never writes to the git index, and never follows a
 symlink out of the repository.
 
@@ -98,6 +99,7 @@ is a minor release, changing what an existing ID means is breaking.
 | `SNAPSHOT_UPDATED_WITH_CODE` | medium | A snapshot regenerated in the same patch as the code it snapshots |
 | `TEST_TIMEOUT_RAISED` | low | A timeout or retry count went up, or appeared |
 | `TEST_AND_IMPL_TOGETHER` | low | A test changed alongside the implementation it is named after |
+| `JUDGED_WEAKENING` | medium | Only with `--judge` or `"judge"` in the config, and a TypeSafe API key in the environment: a model (Jev) judged a changed test case to verify less than before, where no rule already fired. A model's opinion, not a pattern match — read the case and decide. The repair is the same as for any weakening: restore what the case verified, or make the code meet it. If the edit is deliberate, `overlock-ignore JUDGED_WEAKENING -- reason` |
 
 Only **high** blocks by default. Low findings are context — `TEST_AND_IMPL_TOGETHER`
 is what ordinary test-driven work looks like and is not a problem.

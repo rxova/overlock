@@ -301,3 +301,41 @@ describe('applyConfig', () => {
     expect(applied.severities).toEqual({});
   });
 });
+
+describe('judge', () => {
+  it('is off when absent or false, on with defaults when true', () => {
+    expect(parseConfig({ judge: false }, 'test')).toEqual({});
+    expect(parseConfig({ judge: true }, 'test')).toEqual({ judge: {} });
+  });
+
+  it('accepts a model and bounded numbers', () => {
+    const settings = { model: 'jev-latest', threshold: 0.9, maxCases: 5, timeoutMs: 2000 };
+    expect(parseConfig({ judge: settings }, 'test')).toEqual({ judge: settings });
+  });
+
+  it('refuses the endpoint by name: a repository must not choose where the key goes', () => {
+    expect(() => parseConfig({ judge: { endpoint: 'https://example.test' } }, 'test')).toThrow(
+      /judge.endpoint cannot be set/,
+    );
+  });
+
+  it('refuses anything else it does not understand', () => {
+    expect(() => parseConfig({ judge: 'yes' }, 'test')).toThrow(/judge must be/);
+    expect(() => parseConfig({ judge: { model: 'a b' } }, 'test')).toThrow(/judge.model/);
+    expect(() => parseConfig({ judge: { model: 3 } }, 'test')).toThrow(/judge.model/);
+    expect(() => parseConfig({ judge: { temperature: 1 } }, 'test')).toThrow(
+      /unknown judge setting/,
+    );
+    expect(() => parseConfig({ judge: { threshold: 0 } }, 'test')).toThrow(/out of range/);
+    expect(() => parseConfig({ judge: { maxCases: 1.5 } }, 'test')).toThrow(/out of range/);
+    expect(() => parseConfig({ judge: { timeoutMs: '1000' } }, 'test')).toThrow(/out of range/);
+  });
+
+  it('lets --no-judge win over the file and --judge enable it without one', () => {
+    expect(applyConfig(parseArgs(['--no-judge']), { judge: {} }).judge).toBeUndefined();
+    expect(applyConfig(parseArgs([]), { judge: { threshold: 0.9 } }).judge).toEqual({
+      threshold: 0.9,
+    });
+    expect(applyConfig(parseArgs(['--judge']), {}).judge).toEqual({});
+  });
+});

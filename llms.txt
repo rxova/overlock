@@ -4,7 +4,8 @@
 > the edits that make a test suite ask less than it did — skipped tests, removed
 > or weakened assertions, lowered coverage thresholds, narrowed test data. It
 > answers one question about a change: did this make the tests pass by weakening
-> the tests? No LLM calls, no network calls, no telemetry, and zero runtime
+> the tests? No LLM calls, no network calls, no telemetry by default (an opt-in
+> model judge is the one exception), and zero runtime
 > dependencies. Node >= 20.11. MIT. Ships ESM.
 
 This file is the map, not the manual. It exists because an agent that reaches

@@ -16,22 +16,22 @@ add one. Dev dependencies are fine.
 
 ## Layout
 
-| Path                                    | What it holds                                                        |
-| --------------------------------------- | -------------------------------------------------------------------- |
-| `packages/overlock/src/cli.ts`          | Argument parsing, usage text, exit codes                             |
-| `packages/overlock/src/run.ts`          | Acquires the diff, applies the rules, records the run                |
-| `packages/overlock/src/diff.ts`         | Unified diff parser, hand-written for the zero-dependency rule       |
-| `packages/overlock/src/git.ts`          | Range resolution and every `git` invocation                          |
-| `packages/overlock/src/rules/`          | The eleven rules. Each is pure: `DiffFile[]` in, `Finding[]` out     |
-| `packages/overlock/src/rules/cases.ts`  | The diff grouped by test case, which several rules read              |
-| `packages/overlock/src/substitution.ts` | Rename and reformat inference                                        |
-| `packages/overlock/src/report.ts`       | Three views: full, `--json`, `compact`                               |
-| `packages/overlock/src/hook.ts`         | The Claude Code `Stop` hook protocol                                 |
-| `packages/overlock/src/mcp.ts`          | MCP over stdio, spoken directly                                      |
-| `packages/overlock/src/types.ts`        | The wire contract, including the frozen rule IDs                     |
-| `packages/overlock/llms.txt`            | What an agent reads to decide how to use the tool                    |
-| `packages/tooling/`                     | Repo scripts specific to overlock: pack smoke test, `llms.txt` check |
-| `action.yml`                            | The GitHub Action, a composite action at the repo root               |
+| Path                                    | What it holds                                                    |
+| --------------------------------------- | ---------------------------------------------------------------- |
+| `packages/overlock/src/cli.ts`          | Argument parsing, usage text, exit codes                         |
+| `packages/overlock/src/run.ts`          | Acquires the diff, applies the rules, records the run            |
+| `packages/overlock/src/diff.ts`         | Unified diff parser, hand-written for the zero-dependency rule   |
+| `packages/overlock/src/git.ts`          | Range resolution and every `git` invocation                      |
+| `packages/overlock/src/rules/`          | The eleven rules. Each is pure: `DiffFile[]` in, `Finding[]` out |
+| `packages/overlock/src/rules/cases.ts`  | The diff grouped by test case, which several rules read          |
+| `packages/overlock/src/substitution.ts` | Rename and reformat inference                                    |
+| `packages/overlock/src/report.ts`       | Three views: full, `--json`, `compact`                           |
+| `packages/overlock/src/hook.ts`         | The Claude Code `Stop` hook protocol                             |
+| `packages/overlock/src/mcp.ts`          | MCP over stdio, spoken directly                                  |
+| `packages/overlock/src/types.ts`        | The wire contract, including the frozen rule IDs                 |
+| `packages/overlock/llms.txt`            | What an agent reads to decide how to use the tool                |
+| `packages/tooling/`                     | Repo scripts specific to overlock: the `llms.txt` check          |
+| `action.yml`                            | The GitHub Action, a composite action at the repo root           |
 
 ## Commands
 

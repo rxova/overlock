@@ -28,16 +28,14 @@
       "outputs": [],
       "outputLogs": "new-only"
     },
-    // Packs the real tarball, installs it into a scratch project and runs the
-    // published bin — the only check that catches a `files` entry that dropped
-    // dist, or a bin that is not executable once npm has unpacked it.
-    //
-    // Keyed on the shared script as well as the package, so editing the checker
-    // invalidates the cache instead of replaying an old pass.
+    // Packs the real tarball, installs it into a scratch project, imports it and
+    // runs the published bin (`rxova-repo-config pack-smoke`) — the only check
+    // that catches a `files` entry that dropped dist, or a bin that is not
+    // executable once npm has unpacked it. The checker is a dev dependency of the
+    // package, so bumping it changes the lockfile entry Turbo already hashes.
     "pack:smoke": {
       "dependsOn": ["build"],
       "outputs": [],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/tooling/pack-smoke.ts"],
       "outputLogs": "new-only"
     },
     // Not a Turbo task by omission elsewhere, but listed here so the root

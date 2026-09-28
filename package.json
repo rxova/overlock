@@ -30,9 +30,59 @@
     "docs": "pnpm --filter @overlock/docs dev",
     "docs:build": "pnpm --filter @overlock/docs build",
     "e2e": "turbo run build --filter=overlock && pnpm --filter overlock run e2e",
-    "verify": "node --import tsx ./packages/tooling/verify.ts",
+    "verify": "rxova-repo-config verify",
     "release": "turbo run build --filter=overlock && changeset publish",
     "prepare": "husky"
+  },
+  "repoConfig": {
+    "verify": {
+      "steps": [
+        {
+          "name": "lint",
+          "command": "pnpm lint"
+        },
+        {
+          "name": "format",
+          "command": "pnpm format:check"
+        },
+        {
+          "name": "build",
+          "command": "pnpm exec turbo run build"
+        },
+        {
+          "name": "typecheck",
+          "command": "pnpm exec turbo run typecheck"
+        },
+        {
+          "name": "unit tests",
+          "command": "pnpm exec turbo run test"
+        },
+        {
+          "name": "package exports",
+          "command": "pnpm run check:exports"
+        },
+        {
+          "name": "llms.txt",
+          "command": "pnpm run check:llms"
+        },
+        {
+          "name": "dependency versions",
+          "command": "pnpm run sherif:check"
+        },
+        {
+          "name": "unused files, exports and dependencies",
+          "command": "pnpm run knip:check"
+        },
+        {
+          "name": "audit",
+          "command": "pnpm run audit:check"
+        },
+        {
+          "name": "dependency dedupe",
+          "command": "pnpm run dedupe:check"
+        }
+      ]
+    }
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs}": [
@@ -47,6 +97,7 @@
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
     "@eslint/js": "^10.0.1",
+    "@rxova/repo-config": "^0.1.0",
     "@types/node": "^26.6.1",
     "@vitest/coverage-v8": "^5.0.1",
     "eslint": "^10.10.0",

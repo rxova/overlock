@@ -1,22 +1,5 @@
 {
-  "compilerOptions": {
-    "target": "ES2023",
-    // ES2022.Error for `new Error(msg, { cause })`: every git and filesystem
-    // failure in this tool is re-thrown with the underlying error attached, and
-    // without this the `cause` option does not typecheck.
-    "lib": ["ES2023", "ES2022.Error"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "noFallthroughCasesInSwitch": true,
-    "exactOptionalPropertyTypes": true,
-    "resolveJsonModule": true,
-    "verbatimModuleSyntax": true,
-    "isolatedModules": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "noEmit": true
-  }
+  // The rxova strict preset. Kept as a file of its own so each package extends
+  // one local path, and so turbo can key every task on it.
+  "extends": "@rxova/repo-config/tsconfig.base.json"
 }

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { errorMessage } from '@rxova/ts-utils';
 import {
   evaluationSummary,
   evaluationMarkdown,
@@ -386,7 +387,7 @@ export function main(argv: string[], io: Io): number {
   try {
     args = parseArgs(argv);
   } catch (error) {
-    io.stderr(`${error instanceof Error ? error.message : String(error)}\n\n${USAGE}\n`);
+    io.stderr(`${errorMessage(error)}\n\n${USAGE}\n`);
     return 2;
   }
 
@@ -412,7 +413,7 @@ export function main(argv: string[], io: Io): number {
     // A declared policy that cannot be read is not a policy. Failing here is
     // the whole point: silently running with the built-in defaults is how the
     // three surfaces drifted apart in the first place.
-    io.stderr(`overlock: ${error instanceof Error ? error.message : String(error)}\n`);
+    io.stderr(`overlock: ${errorMessage(error)}\n`);
     return 2;
   }
 
@@ -520,7 +521,7 @@ export function main(argv: string[], io: Io): number {
       io.stderr(`overlock: ${error.message}${error.hint ? `. ${error.hint}` : ''}\n`);
       return 2;
     }
-    io.stderr(`overlock: ${error instanceof Error ? error.message : String(error)}\n`);
+    io.stderr(`overlock: ${errorMessage(error)}\n`);
     return 2;
   }
 }

@@ -1,4 +1,5 @@
 import { statSync } from 'node:fs';
+import { isObjectLike } from '@rxova/ts-utils';
 import { patchClaims, type SuppressionMemory } from './announced.js';
 import { commitBefore } from './git.js';
 import { compact } from './report.js';
@@ -117,7 +118,7 @@ export function parseStopPayload(raw: string): StopPayload {
   if (!raw.trim()) return {};
   try {
     const parsed: unknown = JSON.parse(raw);
-    return typeof parsed === 'object' && parsed !== null ? (parsed as StopPayload) : {};
+    return isObjectLike(parsed) ? (parsed as StopPayload) : {};
   } catch {
     // A hook that cannot parse its input still has a job to do. The payload
     // only carries the loop guard; everything else comes from git.

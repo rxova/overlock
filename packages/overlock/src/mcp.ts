@@ -1,3 +1,4 @@
+import { errorMessage, isObjectLike } from '@rxova/ts-utils';
 import type { Report } from './types.js';
 import type { Summary } from './summary.js';
 import { compact, json } from './report.js';
@@ -228,11 +229,7 @@ function callTool(
     // A tool that could not run is reported inside the result, not as a
     // protocol error, so the agent can read it and react rather than seeing the
     // transport fail.
-    return content(
-      id,
-      [`overlock could not run: ${error instanceof Error ? error.message : String(error)}`],
-      true,
-    );
+    return content(id, [`overlock could not run: ${errorMessage(error)}`], true);
   }
 }
 
@@ -267,7 +264,7 @@ export class MessageBuffer {
       if (!line.trim()) continue;
       try {
         const parsed: unknown = JSON.parse(line);
-        if (typeof parsed === 'object' && parsed !== null && 'method' in parsed) {
+        if (isObjectLike(parsed) && 'method' in parsed) {
           messages.push(parsed as JsonRpcRequest);
         }
       } catch {

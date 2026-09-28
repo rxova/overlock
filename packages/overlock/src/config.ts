@@ -18,6 +18,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { isRecord } from '@rxova/ts-utils';
 import type { BaseMode } from './git.js';
 import type { EvaluationConfig } from './evaluation-record.js';
 import { RULE_IDS, type Grade, type RuleId, type Severity } from './types.js';
@@ -109,9 +110,6 @@ function excludeEntry(entry: unknown): string | { refused: string } {
   return path;
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
 /**
  * Validates a parsed object into a config, naming the file in every message.
  *
@@ -120,7 +118,7 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
  * it on exactly the same terms.
  */
 export function parseConfig(value: unknown, where: string): OverlockConfig {
-  if (!isObject(value)) throw new ConfigError(`${where}: expected an object`);
+  if (!isRecord(value)) throw new ConfigError(`${where}: expected an object`);
 
   for (const key of Object.keys(value)) {
     if (!KEYS.includes(key)) {
@@ -134,7 +132,7 @@ export function parseConfig(value: unknown, where: string): OverlockConfig {
   if (value.evaluation !== undefined) {
     const entry = value.evaluation;
     if (
-      !isObject(entry) ||
+      !isRecord(entry) ||
       Object.keys(entry).some((k) => k !== 'repository' && k !== 'captureDiff') ||
       (entry.captureDiff !== undefined && typeof entry.captureDiff !== 'boolean') ||
       typeof entry.repository !== 'string' ||
@@ -201,7 +199,7 @@ export function parseConfig(value: unknown, where: string): OverlockConfig {
   }
 
   if (value.severity !== undefined) {
-    if (!isObject(value.severity)) {
+    if (!isRecord(value.severity)) {
       throw new ConfigError(`${where}: severity must be an object of RULE_ID to level`);
     }
     const severity: Partial<Record<RuleId, Grade>> = {};
@@ -285,7 +283,7 @@ export function loadConfig(options: {
     const manifest = join(dir, 'package.json');
     try {
       const raw = readJson(manifest);
-      if (isObject(raw) && raw[CONFIG_KEY] !== undefined) {
+      if (isRecord(raw) && raw[CONFIG_KEY] !== undefined) {
         return {
           config: parseConfig(raw[CONFIG_KEY], `${manifest} (${CONFIG_KEY})`),
           path: manifest,

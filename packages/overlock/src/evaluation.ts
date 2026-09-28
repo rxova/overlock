@@ -7,6 +7,7 @@ import {
   mkdirSync,
 } from 'node:fs';
 import { basename, dirname, join, relative, resolve, isAbsolute } from 'node:path';
+import { isRecord } from '@rxova/ts-utils';
 import { analyze } from './analyze.js';
 import { BUILD, VERSION, fingerprint, type EvaluationRun } from './evaluation-record.js';
 import { RULE_IDS, type RuleId } from './types.js';
@@ -24,9 +25,6 @@ export interface EvaluationReview {
   duplicate_of?: string;
 }
 
-function object(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 function nonempty(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '';
 }
@@ -39,7 +37,7 @@ function jsonFile(path: string): unknown {
 
 export function parseEvaluationRun(value: unknown): EvaluationRun {
   check(
-    object(value) &&
+    isRecord(value) &&
       value.schema === 2 &&
       nonempty(value.run_id) &&
       nonempty(value.repository) &&
@@ -63,20 +61,20 @@ export function parseEvaluationRun(value: unknown): EvaluationRun {
       Number.isInteger(value.exit_code) &&
       typeof value.duration_ms === 'number' &&
       value.duration_ms >= 0 &&
-      object(value.settings) &&
+      isRecord(value.settings) &&
       Array.isArray(value.findings),
     'Invalid schema-2 evaluation run',
   );
   for (const item of value.findings) {
     check(
-      object(item) &&
+      isRecord(item) &&
         nonempty(item.key) &&
         ['standing', 'suppressed', 'off'].includes(String(item.disposition)) &&
-        object(item.finding) &&
+        isRecord(item.finding) &&
         RULE_IDS.includes(item.finding.rule as RuleId) &&
         ['high', 'medium', 'low'].includes(String(item.finding.severity)) &&
         nonempty(item.finding.file) &&
-        object(item.finding.evidence),
+        isRecord(item.finding.evidence),
       'Invalid evaluation finding',
     );
   }
@@ -85,7 +83,7 @@ export function parseEvaluationRun(value: unknown): EvaluationRun {
 
 export function parseEvaluationReview(value: unknown): EvaluationReview {
   check(
-    object(value) &&
+    isRecord(value) &&
       value.schema === 1 &&
       nonempty(value.finding) &&
       ['useful_correction', 'legitimate_change', 'false_alarm', 'missed'].includes(
@@ -308,12 +306,15 @@ export function evaluationMarkdown(summary: ReturnType<typeof evaluationSummary>
 /** A corpus carries explicit oracles; unlabeled history is never scored as clean. */
 export function replay(manifest: string) {
   const data = jsonFile(manifest);
-  check(object(data) && data.schema === 1 && Array.isArray(data.cases), 'Invalid replay manifest');
+  check(
+    isRecord(data) && data.schema === 1 && Array.isArray(data.cases),
+    'Invalid replay manifest',
+  );
   const root = realpathSync(dirname(resolve(manifest)));
   const ids = new Set<string>();
   const results = data.cases.map((entry: unknown) => {
     check(
-      object(entry) &&
+      isRecord(entry) &&
         nonempty(entry.id) &&
         nonempty(entry.diff) &&
         ['probe', 'historical'].includes(String(entry.kind)) &&

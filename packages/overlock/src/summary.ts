@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { isObjectLike } from '@rxova/ts-utils';
 import type { LedgerEntry } from './ledger.js';
 import type { RuleId, Severity } from './types.js';
 
@@ -30,7 +31,7 @@ export function readLedger(path: string): LedgerEntry[] {
     if (!line.trim()) continue;
     try {
       const parsed: unknown = JSON.parse(line);
-      if (typeof parsed === 'object' && parsed !== null && 'ts' in parsed) {
+      if (isObjectLike(parsed) && 'ts' in parsed) {
         entries.push(parsed as LedgerEntry);
       }
     } catch {

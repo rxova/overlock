@@ -62,7 +62,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
-    "@rxova/repo-config": "^0.1.0",
+    "@rxova/repo-config": "^0.2.0",
     "@rxova/ts-utils": "^0.1.0",
     "publint": "^0.3.21",
     "tsdown": "^0.23.0",

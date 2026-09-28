@@ -98,6 +98,7 @@
     "@commitlint/config-conventional": "^21.2.0",
     "@eslint/js": "^10.0.1",
     "@rxova/repo-config": "^0.2.0",
+    "@rxova/ts-utils": "^0.1.0",
     "@types/node": "^26.6.1",
     "@vitest/coverage-v8": "^5.0.1",
     "eslint": "^10.10.0",

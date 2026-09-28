@@ -99,7 +99,8 @@ not read the filesystem, shell out, or depend on the order the other rules ran.
   rules, the prettier settings, the tsconfig base and the tsdown base come from
   `@rxova/repo-config`; the gate's steps are listed in `package.json#repoConfig`.
   Runtime helpers such as `isRecord` and `errorMessage` come from
-  `@rxova/ts-utils`, a dev dependency the build inlines.
+  `@rxova/ts-utils`, which the build inlines. Both are declared once, as root
+  dev dependencies, never in a workspace package.
 - Tests are colocated as `*.test.ts` next to the code they cover. Diff fixtures
   in `src/__fixtures__/` are real `git diff` output, not hand-shaped objects, so
   that a parser bug and a rule bug cannot cancel out.

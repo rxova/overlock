@@ -181,6 +181,9 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))
+      '@rxova/repo-config':
+        specifier: ^0.1.0
+        version: 0.1.0(@commitlint/config-conventional@21.2.2)(@eslint/js@10.0.1(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2)))(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(globals@17.12.0)(tsdown@0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(oxc-resolver@11.24.2)(publint@0.3.24)(tsx@4.23.13)(typescript@6.0.3))(typescript-eslint@8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(typescript@6.0.3)(vitest@5.0.1)
       '@types/node':
         specifier: ^26.6.1
         version: 26.6.1
@@ -261,26 +264,17 @@ importers:
         specifier: ^5.0.1
         version: 5.0.1(@types/node@26.6.1)(@vitest/coverage-v8@5.0.1)(vite@8.3.0(@types/node@26.6.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.1))
 
-  packages/config:
-    devDependencies:
-      '@types/node':
-        specifier: ^26.6.1
-        version: 26.6.1
-      tsdown:
-        specifier: ^0.23.0
-        version: 0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(oxc-resolver@11.24.2)(publint@0.3.24)(tsx@4.23.13)(typescript@6.0.3)
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-
   packages/overlock:
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: ^0.18.5
         version: 0.18.5
-      '@repo/config':
-        specifier: workspace:*
-        version: link:../config
+      '@rxova/repo-config':
+        specifier: ^0.1.0
+        version: 0.1.0(@commitlint/config-conventional@21.2.2)(@eslint/js@10.0.1(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2)))(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(globals@17.12.0)(tsdown@0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(oxc-resolver@11.24.2)(publint@0.3.24)(tsx@4.23.13)(typescript@6.0.3))(typescript-eslint@8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(typescript@6.0.3)(vitest@5.0.1)
+      '@rxova/ts-utils':
+        specifier: ^0.1.0
+        version: 0.1.0
       publint:
         specifier: ^0.3.21
         version: 0.3.24
@@ -1569,6 +1563,46 @@ packages:
   '@rxova/brand@1.2.0':
     resolution: {integrity: sha512-Skh3CUlljjKhZ6RHCZsEpTJjrYcNaYJYEW5Pi2PP0r91Tf0E3qD05SsiMifp/a2Vum+Lkn2rQW8WcX1DxorhBw==}
     engines: {node: '>=24.0.0'}
+
+  '@rxova/repo-config@0.1.0':
+    resolution: {integrity: sha512-En6AotdRBXVgHuGXEtPKbB8EKpNwKDhKteaPV0k0dC98zG7V2HfhBCdmUUl9cEaRAvs2b3Oee3AT2HtJHVbHZg==}
+    engines: {node: '>=22.13'}
+    hasBin: true
+    peerDependencies:
+      '@commitlint/config-conventional': '>=19'
+      '@eslint/js': '>=9'
+      eslint: '>=9'
+      globals: '>=15'
+      tsdown: '>=0.15'
+      typescript: '>=5.5'
+      typescript-eslint: '>=8'
+      vitest: '>=3'
+    peerDependenciesMeta:
+      '@commitlint/config-conventional':
+        optional: true
+      '@eslint/js':
+        optional: true
+      eslint:
+        optional: true
+      globals:
+        optional: true
+      tsdown:
+        optional: true
+      typescript:
+        optional: true
+      typescript-eslint:
+        optional: true
+      vitest:
+        optional: true
+
+  '@rxova/ts-utils@0.1.0':
+    resolution: {integrity: sha512-LQEz0XF5xXkFWnNMu2R487/fahNyHAUPBJ552d9wagLBESfGR42zki4T3Rco92DDhaPc6L/rtyd9iN2Wbzn8CQ==}
+    engines: {node: '>=22.13'}
+    peerDependencies:
+      react: '>=18'
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   '@shikijs/core@4.4.3':
     resolution: {integrity: sha512-QCR4q2ZO/ILJEuwiBMel4wdcTDb1JGwfjKTxPDF6x8ixOaluPrVqIn06C99AcRPhmYlBR56d/Fb+GN58GzExpg==}
@@ -5413,6 +5447,19 @@ snapshots:
     dependencies:
       '@fontsource/ibm-plex-mono': 5.3.0
       '@fontsource/space-grotesk': 5.3.0
+
+  '@rxova/repo-config@0.1.0(@commitlint/config-conventional@21.2.2)(@eslint/js@10.0.1(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2)))(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(globals@17.12.0)(tsdown@0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(oxc-resolver@11.24.2)(publint@0.3.24)(tsx@4.23.13)(typescript@6.0.3))(typescript-eslint@8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(typescript@6.0.3)(vitest@5.0.1)':
+    optionalDependencies:
+      '@commitlint/config-conventional': 21.2.2
+      '@eslint/js': 10.0.1(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))
+      eslint: 10.10.0(jiti@2.7.0)(supports-color@10.2.2)
+      globals: 17.12.0
+      tsdown: 0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(oxc-resolver@11.24.2)(publint@0.3.24)(tsx@4.23.13)(typescript@6.0.3)
+      typescript: 6.0.3
+      typescript-eslint: 8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
+      vitest: 5.0.1(@types/node@26.6.1)(@vitest/coverage-v8@5.0.1)(vite@8.3.0(@types/node@26.6.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.1))
+
+  '@rxova/ts-utils@0.1.0': {}
 
   '@shikijs/core@4.4.3':
     dependencies:

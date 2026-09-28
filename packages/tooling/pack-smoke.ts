@@ -16,7 +16,7 @@ import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { RULE_IDS } from '../overlock/src/types.js';
-import { isEntry } from './entry.js';
+import { isEntry } from '@rxova/repo-config';
 
 /**
  * How many rules the published library is expected to export, read from the

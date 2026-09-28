@@ -70,7 +70,7 @@ jobs:
           HEAD_SHA: >-
             ${{ github.event_name == 'pull_request'
             && github.event.pull_request.head.sha || github.sha }}
-        run: node --import tsx ./packages/tooling/check-scope.ts
+        run: pnpm exec rxova-repo-config check-scope
 
       - name: Lint the branch commits
         if: github.event_name == 'pull_request'
@@ -362,7 +362,7 @@ jobs:
           # The job still runs and still reports, rather than being skipped by an
           # `if:`, so that honouring the label is visible in a log somebody can read.
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-        run: node --import tsx ./packages/tooling/check-changeset.ts
+        run: pnpm exec rxova-repo-config check-changeset
 
   # The single context branch protection requires, and the only job here that
   # never skips.

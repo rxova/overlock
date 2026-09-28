@@ -16,13 +16,15 @@ fetchRetries: 1
 fetchRetryMintimeout: 5000
 fetchRetryMaxtimeout: 10000
 # pnpm holds back releases younger than a day, which is the right default for a
-# supply chain and the wrong one for our own packages: @rxova/brand and
-# @rxova/astro-ui are published from a repository next door, and waiting a day to
-# consume a version we just cut only means the docs build here and the brand it
-# renders drift for a day.
+# supply chain and the wrong one for our own packages: @rxova/brand,
+# @rxova/astro-ui, @rxova/ts-utils and @rxova/repo-config are published from
+# repositories next door, and waiting a day to consume a version we just cut only
+# means this repository and the code it shares drift for a day.
 #
 # By name rather than by version, matching the sibling repos: an exact version
 # means nothing a day after it is published and has to be renewed at every bump.
 minimumReleaseAgeExclude:
   - '@rxova/brand'
   - '@rxova/astro-ui'
+  - '@rxova/repo-config'
+  - '@rxova/ts-utils'

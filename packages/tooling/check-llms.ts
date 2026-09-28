@@ -7,7 +7,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { RULE_IDS } from '../overlock/src/types.js';
-import { isEntry } from './entry.js';
+import { isEntry } from '@rxova/repo-config';
 
 /** Every command the file is required to document. */
 export const COMMANDS = [

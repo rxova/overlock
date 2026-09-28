@@ -37,7 +37,9 @@ pnpm exec turbo run typecheck
 
 `pnpm run verify` runs the same ordered list CI runs and is what the pre-push
 hook calls. Run it before pushing; a green verify means a green pipeline. E2E is
-not part of it and runs as its own CI job.
+not part of it and runs as its own CI job. The runner is `rxova-repo-config
+verify` from `@rxova/repo-config`; the steps are listed in
+`package.json#repoConfig.verify.steps`.
 
 To run a single test file:
 

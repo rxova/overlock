@@ -16,22 +16,22 @@ add one. Dev dependencies are fine.
 
 ## Layout
 
-| Path                                    | What it holds                                                           |
-| --------------------------------------- | ----------------------------------------------------------------------- |
-| `packages/overlock/src/cli.ts`          | Argument parsing, usage text, exit codes                                |
-| `packages/overlock/src/run.ts`          | Acquires the diff, applies the rules, records the run                   |
-| `packages/overlock/src/diff.ts`         | Unified diff parser, hand-written for the zero-dependency rule          |
-| `packages/overlock/src/git.ts`          | Range resolution and every `git` invocation                             |
-| `packages/overlock/src/rules/`          | The eleven rules. Each is pure: `DiffFile[]` in, `Finding[]` out        |
-| `packages/overlock/src/rules/cases.ts`  | The diff grouped by test case, which several rules read                 |
-| `packages/overlock/src/substitution.ts` | Rename and reformat inference                                           |
-| `packages/overlock/src/report.ts`       | Three views: full, `--json`, `compact`                                  |
-| `packages/overlock/src/hook.ts`         | The Claude Code `Stop` hook protocol                                    |
-| `packages/overlock/src/mcp.ts`          | MCP over stdio, spoken directly                                         |
-| `packages/overlock/src/types.ts`        | The wire contract, including the frozen rule IDs                        |
-| `packages/overlock/llms.txt`            | What an agent reads to decide how to use the tool                       |
-| `packages/tooling/`                     | Repo scripts: pack smoke test, pre-push gate, changeset and scope gates |
-| `action.yml`                            | The GitHub Action, a composite action at the repo root                  |
+| Path                                    | What it holds                                                        |
+| --------------------------------------- | -------------------------------------------------------------------- |
+| `packages/overlock/src/cli.ts`          | Argument parsing, usage text, exit codes                             |
+| `packages/overlock/src/run.ts`          | Acquires the diff, applies the rules, records the run                |
+| `packages/overlock/src/diff.ts`         | Unified diff parser, hand-written for the zero-dependency rule       |
+| `packages/overlock/src/git.ts`          | Range resolution and every `git` invocation                          |
+| `packages/overlock/src/rules/`          | The eleven rules. Each is pure: `DiffFile[]` in, `Finding[]` out     |
+| `packages/overlock/src/rules/cases.ts`  | The diff grouped by test case, which several rules read              |
+| `packages/overlock/src/substitution.ts` | Rename and reformat inference                                        |
+| `packages/overlock/src/report.ts`       | Three views: full, `--json`, `compact`                               |
+| `packages/overlock/src/hook.ts`         | The Claude Code `Stop` hook protocol                                 |
+| `packages/overlock/src/mcp.ts`          | MCP over stdio, spoken directly                                      |
+| `packages/overlock/src/types.ts`        | The wire contract, including the frozen rule IDs                     |
+| `packages/overlock/llms.txt`            | What an agent reads to decide how to use the tool                    |
+| `packages/tooling/`                     | Repo scripts specific to overlock: pack smoke test, `llms.txt` check |
+| `action.yml`                            | The GitHub Action, a composite action at the repo root               |
 
 ## Commands
 
@@ -95,6 +95,11 @@ not read the filesystem, shell out, or depend on the order the other rules ran.
 - Comments explain _why_, not _what_. If a line's purpose is obvious from the
   code, it does not need a comment.
 - Prettier settings live in `.prettierrc`; do not hand-format around them.
+- The pre-push gate, the changeset and release-scope gates, the commitlint
+  rules, the prettier settings, the tsconfig base and the tsdown base come from
+  `@rxova/repo-config`; the gate's steps are listed in `package.json#repoConfig`.
+  Runtime helpers such as `isRecord` and `errorMessage` come from
+  `@rxova/ts-utils`, a dev dependency the build inlines.
 - Tests are colocated as `*.test.ts` next to the code they cover. Diff fixtures
   in `src/__fixtures__/` are real `git diff` output, not hand-shaped objects, so
   that a parser bug and a rule bug cannot cancel out.

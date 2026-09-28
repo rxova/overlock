@@ -58,7 +58,7 @@
     "e2e": "vitest run --config vitest.e2e.config.ts",
     "typecheck": "tsc --noEmit",
     "check:exports": "publint --strict && attw --pack . --profile esm-only",
-    "pack:smoke": "node --import tsx ../tooling/pack-smoke.ts"
+    "pack:smoke": "rxova-repo-config pack-smoke"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",

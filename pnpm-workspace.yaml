@@ -28,3 +28,10 @@ minimumReleaseAgeExclude:
   - '@rxova/astro-ui'
   - '@rxova/repo-config'
   - '@rxova/ts-utils'
+
+overrides:
+  # GHSA-qw65-cvwx-89v3 (<3.1.7) and GHSA-58mr-gqgx-xq4g (=3.1.6): host confusion
+  # in fast-uri, reached only through ajv in the docs site's `astro check`
+  # language server — dev-only, but `audit:check` gates on high. Held to 3.x
+  # because ajv expects that major. Drop once ajv resolves >=3.1.7 on its own.
+  fast-uri: '>=3.1.7 <4'

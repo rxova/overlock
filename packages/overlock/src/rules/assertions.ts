@@ -2,6 +2,7 @@ import { addedLines, changeBlocks, removedLines } from '../diff.js';
 import type { DiffFile, DiffLine, Finding, Severity } from '../types.js';
 import { byCase, squash, type CaseDelta } from './cases.js';
 import {
+  canonicalQuotes,
   countAssertions,
   expectSubject,
   finding,
@@ -108,10 +109,10 @@ function postImage(file: DiffFile, renamed: (text: string) => string): Set<strin
   for (const hunk of file.hunks) {
     for (const line of hunk.lines) {
       if (line.kind === 'del') continue;
-      kept.add(squash(line.text));
+      kept.add(squash(canonicalQuotes(line.text)));
       // A removal is compared under the patch's inferred rename, so the
       // post-image has to be readable on the same terms.
-      kept.add(squash(renamed(line.text)));
+      kept.add(squash(canonicalQuotes(renamed(line.text))));
     }
   }
   return kept;
@@ -168,8 +169,9 @@ function answerFor(
 ): { index: number; line: DiffLine; verdict: Verdict } | null {
   for (const [index, line] of adds.entries()) {
     if (claimed.has(index)) continue;
-    const target = expectSubject(line.text);
-    if (target === null) continue;
+    const written = expectSubject(line.text);
+    if (written === null) continue;
+    const target = canonicalQuotes(written);
 
     if (target === subject) {
       const checks = loosens(before, line.text);
@@ -339,13 +341,14 @@ function looseningFindings(ctx: RuleContext): Finding[] {
           if (!isExact(before)) continue;
 
           // Still there, further down the file: the assertion moved.
-          if (kept.has(squash(before))) continue;
+          if (kept.has(squash(canonicalQuotes(before)))) continue;
 
           // Pairing on the `expect(...)` subject is what keeps this precise:
           // an unrelated strict assertion removed in the same block as an
           // unrelated loose one added is not a weakening.
-          const subject = expectSubject(before);
-          if (subject === null) continue;
+          const written = expectSubject(before);
+          if (written === null) continue;
+          const subject = canonicalQuotes(written);
 
           const pair = answerFor(adds, claimed, subject, before);
           if (pair === null) continue;
@@ -404,6 +407,22 @@ export const expectedValueChanged: Rule = {
           // edit, and the shapes only match once the rename is applied.
           const shape = normalizeLiterals(ctx.renamed(del.text));
 
+          // The line itself, rewritten only by a formatter, answers for this
+          // removal before any neighbour of the same shape can: otherwise two
+          // same-shaped assertions whose quotes changed cross-pair, and each is
+          // reported as having taken the other's values.
+          const values = literalsOf(canonicalQuotes(del.text)).join(', ');
+          const itself = adds.findIndex(
+            (add, i) =>
+              !claimed.has(i) &&
+              normalizeLiterals(add.text) === shape &&
+              literalsOf(canonicalQuotes(add.text)).join(', ') === values,
+          );
+          if (itself !== -1) {
+            claimed.add(itself);
+            continue;
+          }
+
           for (const [i, add] of adds.entries()) {
             if (claimed.has(i)) continue;
             // Same line, same structure, different literal: the assertion was
@@ -413,7 +432,6 @@ export const expectedValueChanged: Rule = {
 
             const before = literalsOf(del.text).join(', ');
             const after = literalsOf(add.text).join(', ');
-            if (before === after) continue;
 
             claimed.add(i);
             findings.push(

@@ -12,12 +12,12 @@ import { rehypeMdLinks } from './src/lib/rehype-md-links.mjs';
 /**
  * The defaults keep a standalone build working — `pnpm --filter @overlock/docs dev`
  * serves the site at the root. CI overrides both so the dist is built for the
- * path rxova.org actually mounts it at, `/packages/overlock/`. An absolute
+ * path rxova.dev actually mounts it at, `/packages/overlock/`. An absolute
  * reference that only resolves at a domain root is invisible in a root build and
  * breaks the moment it is mounted, which is why the published build never uses
  * these values.
  */
-const site = process.env.DOCS_URL ?? 'https://rxova.org';
+const site = process.env.DOCS_URL ?? 'https://rxova.dev';
 const base = process.env.DOCS_BASE_URL ?? '/';
 
 export default defineConfig({
@@ -48,7 +48,7 @@ export default defineConfig({
     // Emitted at the mount rather than the domain root: under the aggregator the
     // file lands at <base>sitemap-index.xml and lists only URLs beneath that
     // prefix, which is the scope a sitemap at a subpath is allowed to claim.
-    // rxova.org's root robots.txt is what points at it — this build never owns a
+    // rxova.dev's root robots.txt is what points at it — this build never owns a
     // robots.txt, because crawlers only read one from the origin root.
     sitemap({
       // The canonical HTML pages only. Every one of them also has a `.md` twin,

@@ -1,4 +1,4 @@
-// https://rxova.org/packages/overlock/llms.txt — the agent-facing index.
+// https://rxova.dev/packages/overlock/llms.txt — the agent-facing index.
 //
 // See src/lib/llms.mjs for the document's shape. This is the adapter: read the
 // pages, serve the text.

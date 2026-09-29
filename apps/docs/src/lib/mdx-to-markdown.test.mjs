@@ -11,7 +11,7 @@ import {
   unwrapStarlightComponents,
 } from './mdx-to-markdown.mjs';
 
-const at = { origin: 'https://rxova.org', base: '/packages/overlock/' };
+const at = { origin: 'https://rxova.dev', base: '/packages/overlock/' };
 
 describe('mapUnfenced', () => {
   it('leaves fenced content alone', () => {
@@ -98,7 +98,7 @@ describe('resolveRelativeLinks', () => {
         ...at,
         fromRoute: '/learn/false-positives.md',
       }),
-    ).toBe('See [severity](https://rxova.org/packages/overlock/learn/severity.md).');
+    ).toBe('See [severity](https://rxova.dev/packages/overlock/learn/severity.md).');
   });
 
   it('carries the fragment through', () => {
@@ -107,7 +107,7 @@ describe('resolveRelativeLinks', () => {
         ...at,
         fromRoute: '/learn/severity.md',
       }),
-    ).toBe('[the table](https://rxova.org/packages/overlock/rules/overview.md#the-eleven)');
+    ).toBe('[the table](https://rxova.dev/packages/overlock/rules/overview.md#the-eleven)');
   });
 
   it('leaves a link to a non-markdown target alone', () => {
@@ -120,7 +120,7 @@ describe('resolveRelativeLinks', () => {
 describe('absolutizeUrls', () => {
   it('absolutizes a root-relative link through the mount base', () => {
     expect(absolutizeUrls('[cli](/reference/cli/)', at)).toBe(
-      '[cli](https://rxova.org/packages/overlock/reference/cli/)',
+      '[cli](https://rxova.dev/packages/overlock/reference/cli/)',
     );
   });
 
@@ -130,7 +130,7 @@ describe('absolutizeUrls', () => {
 
   it('resolves a BASE_URL expression attribute', () => {
     expect(absolutizeUrls('<img src={`${import.meta.env.BASE_URL}favicon.svg`} />', at)).toContain(
-      'src="https://rxova.org/packages/overlock/favicon.svg"',
+      'src="https://rxova.dev/packages/overlock/favicon.svg"',
     );
   });
 });
@@ -150,7 +150,7 @@ describe('mdxToMarkdown', () => {
 
     const out = mdxToMarkdown(source, { ...at, fromRoute: '/learn/severity.md' });
 
-    expect(out).toContain('[the rules](https://rxova.org/packages/overlock/rules/overview.md)');
+    expect(out).toContain('[the rules](https://rxova.dev/packages/overlock/rules/overview.md)');
     expect(out).toContain('# ](/not-a-link) and an import line, both verbatim');
     expect(out.match(/import \{ Tabs \}/g)).toHaveLength(1);
   });
@@ -164,8 +164,8 @@ describe('mdxToMarkdown', () => {
     });
 
     expect(out).toBe(
-      '[a](https://rxova.org/packages/overlock/rules/overview.md) ' +
-        '[b](https://rxova.org/packages/overlock/reference/cli/)',
+      '[a](https://rxova.dev/packages/overlock/rules/overview.md) ' +
+        '[b](https://rxova.dev/packages/overlock/reference/cli/)',
     );
   });
 

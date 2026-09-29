@@ -17,7 +17,7 @@ async function dist(files) {
   return dir;
 }
 
-const PREFIX = 'https://rxova.org/packages/overlock';
+const PREFIX = 'https://rxova.dev/packages/overlock';
 
 /** A twin whose `source:` frontmatter pins the site prefix the checker reads back. */
 const twin = (route, body = 'Body.') =>

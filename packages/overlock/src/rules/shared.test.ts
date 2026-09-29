@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { withoutStringContents } from './shared.js';
+import { canonicalQuotes, withoutStringContents } from './shared.js';
 
 /** The pattern the scanner replaced, kept as the specification it has to meet. */
 const byRegex = (text: string): string => text.replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, '$1$1');
@@ -57,5 +57,33 @@ describe('withoutStringContents', () => {
   it('reads a literal of escaped quotes that never closes in linear time', () => {
     const text = `"${'\\"'.repeat(100_000)}`;
     expect(withoutStringContents(text)).toBe(text);
+  });
+});
+
+describe('canonicalQuotes', () => {
+  it('writes a single- and a double-quoted literal the same way', () => {
+    expect(canonicalQuotes(`expect(x).toBe('high');`)).toBe(
+      canonicalQuotes(`expect(x).toBe("high");`),
+    );
+  });
+
+  it('treats an escaped quote and a bare one as the same character', () => {
+    expect(canonicalQuotes(`t('it\\'s')`)).toBe(canonicalQuotes(`t("it's")`));
+    expect(canonicalQuotes(`t('say "hi"')`)).toBe(canonicalQuotes(`t("say \\"hi\\"")`));
+  });
+
+  it('keeps literals that hold different characters apart', () => {
+    expect(canonicalQuotes(`toBe('a')`)).not.toBe(canonicalQuotes(`toBe("b")`));
+    expect(canonicalQuotes(`toBe('a\\\\')`)).not.toBe(canonicalQuotes(`toBe("a")`));
+    expect(canonicalQuotes(`toBe('\\n')`)).not.toBe(canonicalQuotes(`toBe("n")`));
+  });
+
+  it('leaves template literals and text outside literals alone', () => {
+    expect(canonicalQuotes('toBe(`high`)')).toBe('toBe(`high`)');
+    expect(canonicalQuotes('toBe(42)')).toBe('toBe(42)');
+  });
+
+  it('stops rewriting at a literal that never closes', () => {
+    expect(canonicalQuotes(`a('x') + 'open`)).toBe(`a("x") + 'open`);
   });
 });

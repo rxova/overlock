@@ -177,6 +177,57 @@ export function expectSubject(text: string): string | null {
   return m?.[1]?.trim() ?? null;
 }
 
+/**
+ * The line with every single- or double-quoted string literal written one way.
+ *
+ * `'high'` and `"high"` are the same value, and a formatter switching quote
+ * style rewrites every one of them in a patch. Compared as written, each such
+ * line reads as a changed expected value, and an assertion whose only change is
+ * its quotes reads as removed — which then pairs with whatever assertion sits
+ * next to it and is reported as a weakening it never was.
+ *
+ * Only for comparison: evidence and messages keep the line as the patch wrote
+ * it. Template literals are left alone, since a backtick is not interchangeable
+ * with a quote. Escapes other than a quote are kept verbatim, so two literals
+ * are equal here exactly when they hold the same characters.
+ */
+export function canonicalQuotes(text: string): string {
+  let out = '';
+  let i = 0;
+
+  while (i < text.length) {
+    const quote = text[i] as string;
+    if (quote !== "'" && quote !== '"') {
+      out += quote;
+      i += 1;
+      continue;
+    }
+
+    const close = closingQuote(text, i);
+    if (text[close] !== quote) {
+      // Never closes on this line: not a literal this can rewrite safely.
+      out += text.slice(i);
+      break;
+    }
+
+    let body = '';
+    for (let j = i + 1; j < close; j += 1) {
+      const char = text[j] as string;
+      if (char === '\\') {
+        const escaped = text[j + 1] as string;
+        body += escaped === "'" ? "'" : escaped === '"' ? '\\"' : `\\${escaped}`;
+        j += 1;
+      } else {
+        body += char === '"' ? '\\"' : char;
+      }
+    }
+    out += `"${body}"`;
+    i = close + 1;
+  }
+
+  return out;
+}
+
 /** Numeric and string literals, replaced by a placeholder, for shape comparison. */
 export function normalizeLiterals(text: string): string {
   return text

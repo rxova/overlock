@@ -1,4 +1,5 @@
 import type { DiffFile, DiffLine } from '../types.js';
+import { canonicalQuotes } from './shared.js';
 
 /**
  * Where a test case begins and ends, as far as a diff can tell.
@@ -83,7 +84,7 @@ export function bodies(lines: DiffLine[]): CaseBody[] {
       continue;
     }
     if (current === null) continue;
-    const text = squash(line.text);
+    const text = squash(canonicalQuotes(line.text));
     if (text === '' || isStructural(text)) continue;
     current.lines.add(text);
   }

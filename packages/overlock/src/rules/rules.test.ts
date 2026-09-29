@@ -1335,3 +1335,73 @@ describe('SUITE_SCOPE_NARROWED', () => {
     expect(rulesFor(diff)).not.toContain('SUITE_SCOPE_NARROWED');
   });
 });
+
+// A formatter switching quote style rewrites every string literal in a patch.
+// That is not an edit to any expectation, and it must not become one by way of
+// a line that now pairs with its neighbour instead of with itself.
+describe('a quote-style reformat', () => {
+  it('is not a changed expected value', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(["-  expect(level).toBe('high');", '+  expect(level).toBe("high");'].join('\n')),
+    );
+    expect(rulesFor(diff)).toEqual([]);
+  });
+
+  it('still reports a value that changed along with its quotes, as written', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(["-  expect(level).toBe('high');", '+  expect(level).toBe("low");'].join('\n')),
+    );
+    const [found] = findingsOf(diff, 'EXPECTED_VALUE_CHANGED');
+    expect(found?.message).toBe(`Expected value changed: 'high' → "low"`);
+  });
+
+  it('does not pair an unchanged assertion with its neighbour as a narrowing', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          "-    expect(steps[0]).toBe('auto');",
+          "-    expect(steps).toContain('nothing uncommitted');",
+          '+    expect(steps[0]).toBe("auto");',
+          '+    expect(steps).toContain("nothing uncommitted");',
+        ].join('\n'),
+      ),
+    );
+    expect(rulesFor(diff)).toEqual([]);
+  });
+
+  it('does not read a case whose only change is its quotes as removed', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          "-it('adds', () => {",
+          "-  expect(add('1', '2')).toBe('3');",
+          "-  expect(add('2', '2')).toBe('4');",
+          '+it("adds", () => {',
+          '+  expect(add("1", "2")).toBe("3");',
+          '+  expect(add("2", "2")).toBe("4");',
+          ' });',
+        ].join('\n'),
+      ),
+    );
+    expect(rulesFor(diff)).toEqual([]);
+  });
+
+  it('still reports a weakening made inside the same reformat', () => {
+    const diff = diffOf(
+      'src/a.test.ts',
+      hunk(
+        [
+          "-    expect(steps[0]).toBe('auto');",
+          "-    expect(total('cart')).toBe('42');",
+          '+    expect(steps[0]).toBe("auto");',
+          '+    expect(total("cart")).toBeDefined();',
+        ].join('\n'),
+      ),
+    );
+    expect(rulesFor(diff)).toEqual(['ASSERTION_WEAKENED']);
+  });
+});

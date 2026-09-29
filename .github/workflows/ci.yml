@@ -57,19 +57,41 @@ jobs:
     needs: [commitlint]
     if: needs.commitlint.outputs.code-changed == 'true'
     uses: rxova/shared/.github/workflows/unit-tests.yml@main
+    with:
+      # The shared default, named so the suite's invocation stays visible here.
+      test-command: pnpm test
+      # Linux only, as before: the e2e job below runs the CLI on macOS and
+      # Windows against real repositories. The unit suite has not been made
+      # path-portable yet (it hard-codes `/` separators and POSIX home paths).
+      operating-systems: '["ubuntu-latest"]'
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-  # `engines` promises Node 20.11 while everything else runs on .nvmrc. The
-  # floor is read from the manifest; the probe then runs the CLI itself there
-  # against a real repository.
+  # `engines` promises Node 20.11 while everything else runs on .nvmrc. Not the
+  # shared node-floor-smoke.yml: its pack smoke also `require()`s the package,
+  # which Node 20.11 cannot do for an ESM-only one. The probe packs the tarball,
+  # installs it as a consumer would, loads the library entry and runs the CLI
+  # against a real repository, all on the floor.
   compat:
-    name: published package on its oldest node
+    name: published package on node 20
     needs: [commitlint]
     if: needs.commitlint.outputs.code-changed == 'true'
-    uses: rxova/shared/.github/workflows/node-floor-smoke.yml@main
-    with:
-      extra-command: bash scripts/node-floor-probe.sh
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: rxova/shared/actions/setup-pnpm@main
+      - uses: rxova/shared/actions/turbo-cache@main
+        with:
+          key: compat
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec turbo run build --filter=overlock
+      - name: Switch to Node 20.11
+        uses: actions/setup-node@v7
+        with:
+          node-version: "20.11"
+      - name: Install the tarball and run it as a consumer would
+        run: bash scripts/node-floor-probe.sh
 
   e2e:
     name: e2e (real git repositories)

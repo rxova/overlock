@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Runs on the engines floor (Node 20.11) after rxova-repo-config pack-smoke, as
-# node-floor-smoke.yml's `extra-command`. pack-smoke proves the package imports;
-# this proves the CLI — the product — runs there, against a real repository.
+# Runs on the engines floor (Node 20.11), as CI's compat job. pack-smoke runs
+# on the current Node in the package-contract job; this proves the package
+# and the CLI — the product — run on the floor, against a real repository.
 set -euo pipefail
 
 work=$(mktemp -d)

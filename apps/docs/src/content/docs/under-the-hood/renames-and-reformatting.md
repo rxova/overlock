@@ -46,6 +46,8 @@ This is the sentence the whole feature exists to produce. You have a 607-file pa
 
 The same machinery recognises pure reformatting. A file whose only delta is whitespace produces no findings at all.
 
+Quote style is not inferred at all, because it is not a guess: `'high'` and `"high"` hold the same characters, so the assertion rules compare string literals by what they hold, not by which quote wraps them. A formatter switching every `'` to `"` changes no expected value and removes no assertion, and it produces no findings. A value that changed along with its quotes, `'high'` becoming `"low"`, is still `EXPECTED_VALUE_CHANGED`, quoted as written. Template literals are compared as written, since a backtick is not interchangeable with a quote.
+
 And a shortened name that let a formatter re-join a wrapped import is still read as one substitution — which is the case that would otherwise be maddening, because the rename changed one identifier and the formatter changed the shape of forty lines around it.
 
 ## Inference never changes a verdict

@@ -99,7 +99,7 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
       # The docs app is excluded on purpose: it is built in docs.yml, at the base
-      # path rxova.org actually mounts it on, which is the build whose output
+      # path rxova.dev actually mounts it on, which is the build whose output
       # ships. Building it here as well would spend every pull request
       # re-checking a dist nobody publishes.
       - name: Build

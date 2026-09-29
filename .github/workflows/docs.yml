@@ -1,10 +1,10 @@
 name: Docs
 
-# The docs are published as part of rxova.org (the rxova/rxova-website
+# The docs are published as part of rxova.dev (the rxova/rxova-website
 # aggregator), not from this repository. The aggregator does not build them:
 # this workflow builds the dist for /packages/overlock/, uploads it as the
 # `docs-dist` artifact, and dispatches a `docs` event naming this run — gate 1
-# of the contract in rxova/rxova-website docs/INPUTS-CONTRACT.md. rxova.org
+# of the contract in rxova/rxova-website docs/INPUTS-CONTRACT.md. rxova.dev
 # validates what arrives, persists it and republishes; a rejection leaves the
 # live site untouched.
 #
@@ -15,7 +15,7 @@ on:
   push:
     branches: [main]
   # Docs breakage should fail the pull request that causes it, not the
-  # aggregator deploy that ships it — a red rxova.org build blocks every project
+  # aggregator deploy that ships it — a red rxova.dev build blocks every project
   # on the site.
   pull_request:
     paths:
@@ -29,7 +29,7 @@ permissions:
 # `cancel-in-progress` on pull requests only, and the distinction is
 # load-bearing. Superseding a docs build for a branch still under review only
 # saves a build nobody will read. On main the same run is also the publish —
-# `notify-website` below hands rxova.org this run's artifact — so cancelling one
+# `notify-website` below hands rxova.dev this run's artifact — so cancelling one
 # mid-flight risks the site keeping stale docs if the run that replaced it then
 # fails. Queueing is the right behaviour there.
 concurrency:
@@ -53,11 +53,11 @@ jobs:
       # internal link or an untwinned page fails here.
       - name: Build the docs at the aggregator base path
         env:
-          DOCS_URL: https://rxova.org
+          DOCS_URL: https://rxova.dev
           DOCS_BASE_URL: /packages/overlock/
         run: pnpm --filter @overlock/docs build
 
-      # The dist rxova.org publishes as built. `docs-dist` is the
+      # The dist rxova.dev publishes as built. `docs-dist` is the
       # fixed artifact name in the contract — the aggregator's ingest downloads
       # it by that name from this run — so it is not ours to rename. Pointing
       # `path` at the dist directory rather than its parent is what puts
@@ -72,7 +72,7 @@ jobs:
           path: apps/docs/dist
           if-no-files-found: error
 
-  # Gate 1 of the docs pipeline: tell rxova.org that this run holds a dist built
+  # Gate 1 of the docs pipeline: tell rxova.dev that this run holds a dist built
   # for /packages/overlock/. The aggregator validates the payload, downloads the
   # artifact above, and persists and publishes it — it never builds these docs
   # itself. Contract: rxova/rxova-website docs/INPUTS-CONTRACT.md.
@@ -82,7 +82,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Dispatch the docs ingest to rxova.org
+      - name: Dispatch the docs ingest to rxova.dev
         # No continue-on-error: the dispatch *is* the publish, so swallowing a
         # failure would leave the site serving stale docs behind a green tick.
         env:

@@ -91,7 +91,7 @@ describe('renderMarkdown', () => {
   const page = {
     title: 'TEST_SKIPPED_ADDED',
     description: 'A test stopped running.',
-    htmlUrl: 'https://rxova.org/rules/test-skipped-added/',
+    htmlUrl: 'https://rxova.dev/rules/test-skipped-added/',
     body: 'Body text.',
   };
 
@@ -101,7 +101,7 @@ describe('renderMarkdown', () => {
         '---',
         'title: "TEST_SKIPPED_ADDED"',
         'description: "A test stopped running."',
-        'source: https://rxova.org/rules/test-skipped-added/',
+        'source: https://rxova.dev/rules/test-skipped-added/',
         '---',
         '',
         '# TEST_SKIPPED_ADDED',

@@ -25,9 +25,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/setup-pnpm
+      - uses: rxova/shared/actions/setup-pnpm@main
         with:
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
       - run: pnpm install --frozen-lockfile
 
       # Everything CI runs, before anything is published. A release that skipped
@@ -49,8 +49,8 @@ jobs:
         with:
           version-script: pnpm exec changeset version
           publish-script: pnpm run release
-          commit-message: 'chore: version packages'
-          pr-title: 'chore: version packages'
+          commit-message: "chore: version packages"
+          pr-title: "chore: version packages"
           create-github-releases: false
           push-git-tags: false
         env:

@@ -57,7 +57,7 @@
     "test": "vitest run --coverage",
     "e2e": "vitest run --config vitest.e2e.config.ts",
     "typecheck": "tsc --noEmit",
-    "check:exports": "publint --strict && attw --pack . --profile esm-only",
+    "check:exports": "rxova-repo-config check-exports",
     "pack:smoke": "rxova-repo-config pack-smoke"
   },
   "devDependencies": {
@@ -65,5 +65,26 @@
     "publint": "^0.3.21",
     "tsdown": "^0.23.0",
     "typescript": "^6.0.3"
+  },
+  "repoConfig": {
+    "exports": {
+      "profile": "esm-only"
+    },
+    "llms": {
+      "api": "none",
+      "idsFrom": "packages/overlock/src/types.ts#RULE_IDS",
+      "idPattern": "\\b[A-Z][A-Z_]{6,}\\b",
+      "requiredTerms": [
+        "overlock check",
+        "overlock hook claude",
+        "overlock init",
+        "overlock report",
+        "overlock mcp",
+        "overlock config",
+        "overlock evaluate",
+        "overlock replay",
+        "overlock import"
+      ]
+    }
   }
 }

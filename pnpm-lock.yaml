@@ -184,12 +184,15 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))
+      '@rxova/docs-kit':
+        specifier: ^0.1.1
+        version: 0.1.1
       '@rxova/repo-config':
-        specifier: ^0.2.0
-        version: 0.2.0(@commitlint/config-conventional@21.2.2)(@eslint/js@10.0.1(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2)))(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(globals@17.12.0)(tsdown@0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(oxc-resolver@11.24.2)(publint@0.3.24)(tsx@4.23.13)(typescript@6.0.3))(typescript-eslint@8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(typescript@6.0.3)(vitest@5.0.1)
+        specifier: ^0.5.0
+        version: 0.5.0(@arethetypeswrong/cli@0.18.5)(@changesets/changelog-github@1.0.1)(@commitlint/config-conventional@21.2.2)(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@eslint/js@10.0.1(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2)))(@vitest/coverage-v8@5.0.1)(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(globals@17.12.0)(knip@6.37.0)(prettier@3.9.8)(publint@0.3.24)(tsdown@0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(oxc-resolver@11.24.2)(publint@0.3.24)(tsx@4.23.13)(typescript@6.0.3))(typescript-eslint@8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(typescript@6.0.3)(vitest@5.0.1)
       '@rxova/ts-utils':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.1
+        version: 0.2.1
       '@types/node':
         specifier: ^26.6.1
         version: 26.6.1
@@ -217,9 +220,6 @@ importers:
       sherif:
         specifier: ^1.13.0
         version: 1.13.0
-      tsx:
-        specifier: ^4.23.13
-        version: 4.23.13
       turbo:
         specifier: ^2.10.13
         version: 2.10.13
@@ -262,13 +262,10 @@ importers:
     devDependencies:
       '@astrojs/check':
         specifier: ^0.9.9
-        version: 0.9.10(prettier@3.9.8)(typescript@6.0.3)
+        version: 0.9.10(prettier-plugin-astro@1.1.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(prettier@3.9.8))(prettier@3.9.8)(typescript@6.0.3)
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
-      vitest:
-        specifier: ^5.0.1
-        version: 5.0.1(@types/node@26.6.1)(@vitest/coverage-v8@5.0.1)(vite@8.3.0(@types/node@26.6.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.1))
 
   packages/overlock:
     devDependencies:
@@ -284,8 +281,6 @@ importers:
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
-
-  packages/tooling: {}
 
 packages:
 
@@ -1444,6 +1439,9 @@ packages:
     resolution: {integrity: sha512-pOr5+q1fLYKwFN3LAJuGZEnfXDcQ73zqgDHMtGy+K+uIoUqyY+6MeDCWFwfu+4EFuq76I5EPFofoNAI+Bmmq4A==}
     engines: {node: '>=22.13'}
 
+  '@prettier/parse-srcset@3.1.0':
+    resolution: {integrity: sha512-FIRv2rZotO9NP/r66taYqD1zICpPiBbrECqjKV/xqNotqDxF7fLzzUeK+1RSRx9Tenk0DajR/GcRmTJ2qtHaKQ==}
+
   '@publint/pack@0.1.7':
     resolution: {integrity: sha512-4EDEmvxWtgsCnnVeBvtFIFZtUhPPt1+bA9JrSwU4Sa//6oKtzCSlGGXYJr44OD9aGISymbieJ4mCKHUygUDU+g==}
     engines: {node: '>=18'}
@@ -1564,27 +1562,65 @@ packages:
     resolution: {integrity: sha512-0h744WyoTAg2T+Zx2AynsbAM1HBtZ/tLgMbPf0kxn/Q3DJyCsr3ZO8PAHbSYv24j69ogmX52NwYS5S6inMM+2A==}
     engines: {node: '>=24.0.0'}
 
-  '@rxova/repo-config@0.2.0':
-    resolution: {integrity: sha512-llDO6jnWIyWblDgSUFqzGDIrbKESaDT/nuoNUxanNOPMff7Q/i5yfIxzrhE4YVg4jPM496V+DyAy2Y+ja250pg==}
+  '@rxova/docs-kit@0.1.1':
+    resolution: {integrity: sha512-yizsZNcWGtDzH8NsGwy7oHxHn4bHqikGBturdEsrc576uA8fLFD45sni6BxDtm9IyQ6VLy6/Mem27BtboGIo1w==}
+    engines: {node: '>=22.13'}
+    hasBin: true
+
+  '@rxova/repo-config@0.5.0':
+    resolution: {integrity: sha512-D//pjQEfBZoB3OOfEKsBzbYt3Z/TaCJlNZmjyK6PdNRVuUqS7jIhU6DbZFZyfXj4v6AHmX4diGUBQlF5YLEzdA==}
     engines: {node: '>=22.13'}
     hasBin: true
     peerDependencies:
+      '@arethetypeswrong/cli': '>=0.17'
+      '@changesets/changelog-github': '>=0.5'
       '@commitlint/config-conventional': '>=19'
       '@eslint/js': '>=9'
+      '@playwright/test': '>=1.50'
+      '@vitest/coverage-v8': '>=3'
       eslint: '>=9'
+      eslint-plugin-astro: '>=3'
+      eslint-plugin-jsx-a11y: '>=6.10'
+      eslint-plugin-react: '>=7.37'
+      eslint-plugin-react-hooks: '>=7'
       globals: '>=15'
+      knip: '>=5'
+      prettier: '>=3.5'
+      publint: '>=0.3'
       tsdown: '>=0.15'
       typescript: '>=5.5'
       typescript-eslint: '>=8'
       vitest: '>=3'
     peerDependenciesMeta:
+      '@arethetypeswrong/cli':
+        optional: true
+      '@changesets/changelog-github':
+        optional: true
       '@commitlint/config-conventional':
         optional: true
       '@eslint/js':
         optional: true
+      '@playwright/test':
+        optional: true
+      '@vitest/coverage-v8':
+        optional: true
       eslint:
         optional: true
+      eslint-plugin-astro:
+        optional: true
+      eslint-plugin-jsx-a11y:
+        optional: true
+      eslint-plugin-react:
+        optional: true
+      eslint-plugin-react-hooks:
+        optional: true
       globals:
+        optional: true
+      knip:
+        optional: true
+      prettier:
+        optional: true
+      publint:
         optional: true
       tsdown:
         optional: true
@@ -1595,8 +1631,8 @@ packages:
       vitest:
         optional: true
 
-  '@rxova/ts-utils@0.1.0':
-    resolution: {integrity: sha512-LQEz0XF5xXkFWnNMu2R487/fahNyHAUPBJ552d9wagLBESfGR42zki4T3Rco92DDhaPc6L/rtyd9iN2Wbzn8CQ==}
+  '@rxova/ts-utils@0.2.1':
+    resolution: {integrity: sha512-iy7t/hN0HfJTijwHH/RYpP3mMCKb4WcIHAtfJkUmyAB/rT6idIYdEaNlNCdjAQ8EyMQlANsadkCXJd0Bz+4Htg==}
     engines: {node: '>=22.13'}
     peerDependencies:
       react: '>=18'
@@ -3352,6 +3388,12 @@ packages:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
 
+  prettier-plugin-astro@1.1.0:
+    resolution: {integrity: sha512-ujJ1VX+iin4eYJPHVCEbmXHzrEVsi1SaVehHtbAteTZv8VTrZyBiZPmYc6Ud6+fkr/UBMXuEu3N3+d49h7YfKw==}
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      prettier: ^3.5.3
+
   prettier@3.9.8:
     resolution: {integrity: sha512-WRFq3Wn3WId7LLROfMLdH7xaFr2jR62wU8nLO6rQUOLOxNZUviyJQs1M0iIhLexSFy+L+w0ch66wtoO2jRjG0A==}
     engines: {node: '>=14'}
@@ -3516,9 +3558,16 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
+  s.color@0.0.15:
+    resolution: {integrity: sha512-AUNrbEUHeKY8XsYr/DYpl+qk5+aM+DChopnWOPEzn8YKzOhv4l2zH6LzZms3tOZP3wwdOyc0RmTciyi46HLIuA==}
+
   sade@1.8.1:
     resolution: {integrity: sha512-xal3CZX1Xlo/k4ApwCFrHVACi9fBqJ7V+mwhBsuf/1IOKbBy098Fex+Wa/5QMubw09pSZ/u8EY8PWgevJsXp1A==}
     engines: {node: '>=6'}
+
+  sass-formatter@0.8.0:
+    resolution: {integrity: sha512-Nf4eMGE2O5vnJG7KPCRyksWS9gVKSYoUWtPeMXRRxwZSPVQhSGtL602xVYS65LvMkHmkvKa7xpauF0+/5pPwrg==}
+    hasBin: true
 
   satteri@0.10.5:
     resolution: {integrity: sha512-Ao1LKpAEa9Wdg0otgbVKViZHEq9ebdXe4DMrp3s9vQAU0HNIuHnFEuMuOcm0ZIXyV0Yzxj91NvhLpvXZJO/5ZQ==}
@@ -3684,6 +3733,9 @@ packages:
 
   style-to-object@1.0.14:
     resolution: {integrity: sha512-LIN7rULI0jBscWQYaSswptyderlarFkjQ+t79nzty8tcIAceVomEVlLzH5VP4Cmsv6MtKhs7qaAiwlcp+Mgaxw==}
+
+  suf-log@2.5.3:
+    resolution: {integrity: sha512-KvC8OPjzdNOe+xQ4XWJV2whQA0aM1kGVczMQ8+dStAO6KfEB140JEVQ9dE76ONZ0/Ylf67ni4tILPJB41U0eow==}
 
   supports-color@10.2.2:
     resolution: {integrity: sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g==}
@@ -4302,9 +4354,9 @@ snapshots:
       typescript: 5.6.1-rc
       validate-npm-package-name: 5.0.1
 
-  '@astrojs/check@0.9.10(prettier@3.9.8)(typescript@6.0.3)':
+  '@astrojs/check@0.9.10(prettier-plugin-astro@1.1.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(prettier@3.9.8))(prettier@3.9.8)(typescript@6.0.3)':
     dependencies:
-      '@astrojs/language-server': 2.16.16(prettier@3.9.8)(typescript@6.0.3)
+      '@astrojs/language-server': 2.16.16(prettier-plugin-astro@1.1.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(prettier@3.9.8))(prettier@3.9.8)(typescript@6.0.3)
       chokidar: 4.0.3
       kleur: 4.1.5
       typescript: 6.0.3
@@ -4384,7 +4436,7 @@ snapshots:
       smol-toml: 1.8.0
       unified: 11.0.5
 
-  '@astrojs/language-server@2.16.16(prettier@3.9.8)(typescript@6.0.3)':
+  '@astrojs/language-server@2.16.16(prettier-plugin-astro@1.1.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(prettier@3.9.8))(prettier@3.9.8)(typescript@6.0.3)':
     dependencies:
       '@astrojs/compiler': 2.13.1
       '@astrojs/yaml2ts': 0.2.4
@@ -4406,6 +4458,7 @@ snapshots:
       vscode-uri: 3.2.0
     optionalDependencies:
       prettier: 3.9.8
+      prettier-plugin-astro: 1.1.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(prettier@3.9.8)
     transitivePeerDependencies:
       - typescript
 
@@ -5380,6 +5433,8 @@ snapshots:
 
   '@pnpm/deps.graph-sequencer@1100.0.1': {}
 
+  '@prettier/parse-srcset@3.1.0': {}
+
   '@publint/pack@0.1.7':
     dependencies:
       tinyexec: 1.3.1
@@ -5448,18 +5503,31 @@ snapshots:
       '@fontsource/ibm-plex-mono': 5.3.0
       '@fontsource/space-grotesk': 5.3.0
 
-  '@rxova/repo-config@0.2.0(@commitlint/config-conventional@21.2.2)(@eslint/js@10.0.1(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2)))(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(globals@17.12.0)(tsdown@0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(oxc-resolver@11.24.2)(publint@0.3.24)(tsx@4.23.13)(typescript@6.0.3))(typescript-eslint@8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(typescript@6.0.3)(vitest@5.0.1)':
+  '@rxova/docs-kit@0.1.1': {}
+
+  '@rxova/repo-config@0.5.0(@arethetypeswrong/cli@0.18.5)(@changesets/changelog-github@1.0.1)(@commitlint/config-conventional@21.2.2)(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@eslint/js@10.0.1(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2)))(@vitest/coverage-v8@5.0.1)(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(globals@17.12.0)(knip@6.37.0)(prettier@3.9.8)(publint@0.3.24)(tsdown@0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(oxc-resolver@11.24.2)(publint@0.3.24)(tsx@4.23.13)(typescript@6.0.3))(typescript-eslint@8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(typescript@6.0.3)(vitest@5.0.1)':
+    dependencies:
+      prettier-plugin-astro: 1.1.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(prettier@3.9.8)
     optionalDependencies:
+      '@arethetypeswrong/cli': 0.18.5
+      '@changesets/changelog-github': 1.0.1
       '@commitlint/config-conventional': 21.2.2
       '@eslint/js': 10.0.1(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))
+      '@vitest/coverage-v8': 5.0.1(vitest@5.0.1)
       eslint: 10.10.0(jiti@2.7.0)(supports-color@10.2.2)
       globals: 17.12.0
+      knip: 6.37.0
+      prettier: 3.9.8
+      publint: 0.3.24
       tsdown: 0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(oxc-resolver@11.24.2)(publint@0.3.24)(tsx@4.23.13)(typescript@6.0.3)
       typescript: 6.0.3
       typescript-eslint: 8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
       vitest: 5.0.1(@types/node@26.6.1)(@vitest/coverage-v8@5.0.1)(vite@8.3.0(@types/node@26.6.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.1))
+    transitivePeerDependencies:
+      - '@emnapi/core'
+      - '@emnapi/runtime'
 
-  '@rxova/ts-utils@0.1.0': {}
+  '@rxova/ts-utils@0.2.1': {}
 
   '@shikijs/core@4.4.3':
     dependencies:
@@ -7659,6 +7727,16 @@ snapshots:
 
   prelude-ls@1.2.1: {}
 
+  prettier-plugin-astro@1.1.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(prettier@3.9.8):
+    dependencies:
+      '@astrojs/compiler-rs': 0.4.1(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)
+      '@prettier/parse-srcset': 3.1.0
+      prettier: 3.9.8
+      sass-formatter: 0.8.0
+    transitivePeerDependencies:
+      - '@emnapi/core'
+      - '@emnapi/runtime'
+
   prettier@3.9.8: {}
 
   prismjs@1.30.0: {}
@@ -7883,9 +7961,15 @@ snapshots:
       '@rolldown/binding-win32-arm64-msvc': 1.2.9
       '@rolldown/binding-win32-x64-msvc': 1.2.9
 
+  s.color@0.0.15: {}
+
   sade@1.8.1:
     dependencies:
       mri: 1.2.0
+
+  sass-formatter@0.8.0:
+    dependencies:
+      suf-log: 2.5.3
 
   satteri@0.10.5:
     dependencies:
@@ -8083,6 +8167,10 @@ snapshots:
     dependencies:
       inline-style-parser: 0.2.7
 
+  suf-log@2.5.3:
+    dependencies:
+      s.color: 0.0.15
+
   supports-color@10.2.2: {}
 
   supports-color@7.2.0:
@@ -8185,6 +8273,7 @@ snapshots:
       esbuild: 0.28.2
     optionalDependencies:
       fsevents: 2.3.3
+    optional: true
 
   turbo@2.10.13:
     optionalDependencies:

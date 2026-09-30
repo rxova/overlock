@@ -1,6 +1,6 @@
-import { sanitize, sanitizePath } from './rules/shared.js';
-import type { Finding, RuleId } from './types.js';
-import { RULE_IDS } from './types.js';
+import { sanitize, sanitizePath } from "./rules/shared.js";
+import type { Finding, RuleId } from "./types.js";
+import { RULE_IDS } from "./types.js";
 
 /**
  * `Overlock-Allow: <RULE_ID> [<target>] -- <reason>`
@@ -59,12 +59,12 @@ function isRuleId(value: string): value is RuleId {
 export function collectAllowances(text: string): Allowance[] {
   const found: Allowance[] = [];
 
-  for (const line of text.split('\n')) {
+  for (const line of text.split("\n")) {
     const match = TRAILER.exec(line);
     const rule = match?.[1]?.toUpperCase();
     // A case title has spaces in it, so a target naming one has to be quotable.
-    const target = match?.[2]?.replace(/^"(.*)"$/, '$1');
-    const reason = match ? line.slice(match[0].length).trim() : '';
+    const target = match?.[2]?.replace(/^"(.*)"$/, "$1");
+    const reason = match ? line.slice(match[0].length).trim() : "";
     if (!rule || !reason || !isRuleId(rule)) continue;
 
     found.push({

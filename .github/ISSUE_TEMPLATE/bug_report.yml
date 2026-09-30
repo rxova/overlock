@@ -1,6 +1,6 @@
 name: Bug report
 description: Something overlock does that it should not, or fails to do
-labels: ['bug']
+labels: ["bug"]
 body:
   - type: markdown
     attributes:
@@ -13,7 +13,7 @@ body:
     attributes:
       label: overlock version
       description: Output of `npx overlock --version`.
-      placeholder: '0.5.0'
+      placeholder: "0.5.0"
     validations:
       required: true
 
@@ -22,7 +22,7 @@ body:
     attributes:
       label: Environment
       description: Node version, operating system, and how overlock was invoked (CLI, Stop hook, MCP, GitHub Action).
-      placeholder: 'Node 22.14, macOS 15, Claude Code Stop hook'
+      placeholder: "Node 22.14, macOS 15, Claude Code Stop hook"
     validations:
       required: true
 

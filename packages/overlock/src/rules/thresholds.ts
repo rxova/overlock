@@ -1,25 +1,25 @@
-import { isTestFile, isThresholdConfig } from '../paths.js';
-import type { DiffFile, Finding } from '../types.js';
-import { finding, type Rule, type RuleContext } from './shared.js';
+import { isTestFile, isThresholdConfig } from "../paths.js";
+import type { DiffFile, Finding } from "../types.js";
+import { finding, type Rule, type RuleContext } from "./shared.js";
 
 /** Keys whose number is a gate: lowering one buys a green build. */
 const THRESHOLD_KEYS = [
-  'statements',
-  'branches',
-  'functions',
-  'lines',
-  'fail_under',
-  'fail-under',
-  'minimum_coverage',
-  'min_coverage',
-  'coverage',
-  'threshold',
-  'thresholds',
-  'target',
-  'mutationScore',
-  'high',
-  'low',
-  'break',
+  "statements",
+  "branches",
+  "functions",
+  "lines",
+  "fail_under",
+  "fail-under",
+  "minimum_coverage",
+  "min_coverage",
+  "coverage",
+  "threshold",
+  "thresholds",
+  "target",
+  "mutationScore",
+  "high",
+  "low",
+  "break",
 ];
 
 /**
@@ -35,14 +35,14 @@ const KEY_VALUE = /["']?\b([A-Za-z_][\w-]*)["']?\s*[:=]\s*["']?(-?\d[\d_]*(?:\.\
 function thresholdEntries(text: string): { key: string; value: number }[] {
   const found: { key: string; value: number }[] = [];
 
-  for (const match of text.matchAll(new RegExp(KEY_VALUE.source, 'g'))) {
+  for (const match of text.matchAll(new RegExp(KEY_VALUE.source, "g"))) {
     const key = match[1];
     const raw = match[2];
     if (key === undefined || raw === undefined) continue;
     if (!THRESHOLD_KEYS.includes(key)) continue;
     // `30_000` is a number in JS/TS source; without stripping the separator
     // it parses as 30 and every comparison against it is nonsense.
-    found.push({ key, value: Number(raw.replace(/_/g, '')) });
+    found.push({ key, value: Number(raw.replace(/_/g, "")) });
   }
 
   return found;
@@ -53,17 +53,17 @@ function isConfigLike(file: DiffFile): boolean {
 }
 
 export const coverageThresholdLowered: Rule = {
-  rule: 'COVERAGE_THRESHOLD_LOWERED',
+  rule: "COVERAGE_THRESHOLD_LOWERED",
   run(ctx: RuleContext): Finding[] {
     const findings: Finding[] = [];
 
     for (const file of ctx.files) {
-      if (file.status === 'deleted' || !isConfigLike(file)) continue;
+      if (file.status === "deleted" || !isConfigLike(file)) continue;
 
       for (const hunk of file.hunks) {
         const removed = new Map<string, { value: number; text: string }>();
         for (const line of hunk.lines) {
-          if (line.kind !== 'del') continue;
+          if (line.kind !== "del") continue;
           for (const entry of thresholdEntries(line.text)) {
             removed.set(entry.key, { value: entry.value, text: line.text });
           }
@@ -71,7 +71,7 @@ export const coverageThresholdLowered: Rule = {
 
         const seen = new Set<string>();
         for (const line of hunk.lines) {
-          if (line.kind !== 'add') continue;
+          if (line.kind !== "add") continue;
 
           for (const entry of thresholdEntries(line.text)) {
             seen.add(entry.key);
@@ -80,15 +80,15 @@ export const coverageThresholdLowered: Rule = {
 
             findings.push(
               finding({
-                rule: 'COVERAGE_THRESHOLD_LOWERED',
-                severity: 'high',
+                rule: "COVERAGE_THRESHOLD_LOWERED",
+                severity: "high",
                 file: file.path,
                 /* c8 ignore next -- an added line always carries a post-image number */
                 line: line.newLine ?? 1,
                 message: `Threshold "${entry.key}" lowered from ${was.value} to ${entry.value}.`,
                 before: was.text,
                 after: line.text,
-                fix_hint: 'Raise the number back and make the code meet it.',
+                fix_hint: "Raise the number back and make the code meet it.",
               }),
             );
           }
@@ -100,14 +100,14 @@ export const coverageThresholdLowered: Rule = {
 
           findings.push(
             finding({
-              rule: 'COVERAGE_THRESHOLD_LOWERED',
-              severity: 'high',
+              rule: "COVERAGE_THRESHOLD_LOWERED",
+              severity: "high",
               file: file.path,
               line: 1,
               message: `Threshold "${key}" (was ${was.value}) removed.`,
               before: was.text,
               fix_hint:
-                'Put the threshold back, or state in the commit why the gate is going away.',
+                "Put the threshold back, or state in the commit why the gate is going away.",
             }),
           );
         }
@@ -122,33 +122,33 @@ const TIMEOUT_KEY =
   /\b(timeout|testTimeout|hookTimeout|retries|retry|maxRetries)\b\s*[:=(]\s*["']?(\d[\d_]*)/;
 
 export const testTimeoutRaised: Rule = {
-  rule: 'TEST_TIMEOUT_RAISED',
+  rule: "TEST_TIMEOUT_RAISED",
   run(ctx: RuleContext): Finding[] {
     const findings: Finding[] = [];
 
     for (const file of ctx.files) {
-      if (file.status === 'deleted') continue;
+      if (file.status === "deleted") continue;
       if (!isTestFile(file.path) && !isConfigLike(file)) continue;
 
       for (const hunk of file.hunks) {
         const removed = new Map<string, number>();
         for (const line of hunk.lines) {
-          if (line.kind !== 'del') continue;
+          if (line.kind !== "del") continue;
           const m = TIMEOUT_KEY.exec(line.text);
           const key = m?.[1];
           const raw = m?.[2];
-          if (key && raw !== undefined) removed.set(key, Number(raw.replace(/_/g, '')));
+          if (key && raw !== undefined) removed.set(key, Number(raw.replace(/_/g, "")));
         }
 
         for (const line of hunk.lines) {
-          if (line.kind !== 'add') continue;
+          if (line.kind !== "add") continue;
           const m = TIMEOUT_KEY.exec(line.text);
           const key = m?.[1];
           const raw = m?.[2];
           if (!key || raw === undefined) continue;
 
           const was = removed.get(key);
-          const now = Number(raw.replace(/_/g, ''));
+          const now = Number(raw.replace(/_/g, ""));
           // Raised, or introduced where there was none. Both buy time for a
           // flaky test instead of fixing it — and both are ordinary tuning
           // often enough that this never blocks.
@@ -156,8 +156,8 @@ export const testTimeoutRaised: Rule = {
 
           findings.push(
             finding({
-              rule: 'TEST_TIMEOUT_RAISED',
-              severity: 'low',
+              rule: "TEST_TIMEOUT_RAISED",
+              severity: "low",
               file: file.path,
               line: line.newLine ?? 1,
               message:
@@ -168,11 +168,11 @@ export const testTimeoutRaised: Rule = {
                 ? {}
                 : {
                     before:
-                      hunk.lines.find((l) => l.kind === 'del' && TIMEOUT_KEY.test(l.text))?.text ??
-                      '',
+                      hunk.lines.find((l) => l.kind === "del" && TIMEOUT_KEY.test(l.text))?.text ??
+                      "",
                   }),
               after: line.text,
-              fix_hint: 'Worth checking the test is slow rather than racy.',
+              fix_hint: "Worth checking the test is slow rather than racy.",
             }),
           );
         }

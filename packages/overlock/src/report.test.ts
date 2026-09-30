@@ -1,11 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { analyze } from './analyze.js';
-import { compact, describeScope, human, isEmptyPatch, json, useColor } from './report.js';
-import { diffOf, hunk } from './__fixtures__/diffs.js';
+import { describe, expect, it } from "vitest";
+import { analyze } from "./analyze.js";
+import { compact, describeScope, human, isEmptyPatch, json, useColor } from "./report.js";
+import { diffOf, hunk } from "./__fixtures__/diffs.js";
 
-const ESC = '\u001B[';
+const ESC = "\u001B[";
 
-const clean = analyze({ diff: '' });
+const clean = analyze({ diff: "" });
 /** What `run` produces: the same report, plus what the range actually held. */
 const withScope = (report: typeof clean, files: number, commits: number) => ({
   ...report,
@@ -13,166 +13,166 @@ const withScope = (report: typeof clean, files: number, commits: number) => ({
 });
 const dirty = analyze({
   diff:
-    diffOf('src/a.test.ts', hunk("+  it.skip('rejects expired tokens', () => {})")) +
-    diffOf('vitest.config.ts', hunk(['-  statements: 95,', '+  statements: 40,'].join('\n'))) +
-    diffOf('src/b.test.ts', hunk(['-  expect(a).toBe(1);', '+  expect(a).toBe(2);'].join('\n'))) +
-    diffOf('src/c.test.ts', hunk('+  timeout: 9000,')),
+    diffOf("src/a.test.ts", hunk("+  it.skip('rejects expired tokens', () => {})")) +
+    diffOf("vitest.config.ts", hunk(["-  statements: 95,", "+  statements: 40,"].join("\n"))) +
+    diffOf("src/b.test.ts", hunk(["-  expect(a).toBe(1);", "+  expect(a).toBe(2);"].join("\n"))) +
+    diffOf("src/c.test.ts", hunk("+  timeout: 9000,")),
 });
 
-describe('human', () => {
-  it('says so plainly when there is nothing to report', () => {
-    expect(human(clean, false)).toContain('nothing weakened');
+describe("human", () => {
+  it("says so plainly when there is nothing to report", () => {
+    expect(human(clean, false)).toContain("nothing weakened");
   });
 
-  it('lists every finding with its evidence and hint', () => {
+  it("lists every finding with its evidence and hint", () => {
     const text = human(dirty, false);
-    expect(text).toContain('TEST_SKIPPED_ADDED');
-    expect(text).toContain('src/a.test.ts');
-    expect(text).toContain('rejects expired tokens');
-    expect(text).toContain('->');
+    expect(text).toContain("TEST_SKIPPED_ADDED");
+    expect(text).toContain("src/a.test.ts");
+    expect(text).toContain("rejects expired tokens");
+    expect(text).toContain("->");
   });
 
-  it('says what it examined, so a clean run is not the same line as an empty one', () => {
+  it("says what it examined, so a clean run is not the same line as an empty one", () => {
     const text = human(withScope(clean, 83, 3), false);
-    expect(text).toContain('nothing weakened');
-    expect(text).toContain('83 files, 3 commits, against HEAD');
+    expect(text).toContain("nothing weakened");
+    expect(text).toContain("83 files, 3 commits, against HEAD");
   });
 
-  it('warns instead of passing when the resolved patch is empty', () => {
+  it("warns instead of passing when the resolved patch is empty", () => {
     const text = human(withScope(clean, 0, 0), false);
-    expect(text).toContain('nothing to examine');
-    expect(text).not.toContain('nothing weakened');
+    expect(text).toContain("nothing to examine");
+    expect(text).not.toContain("nothing weakened");
   });
 
-  it('reports the scope alongside findings too', () => {
-    expect(human(withScope(dirty, 4, 1), false)).toContain('4 files, 1 commit, against HEAD');
+  it("reports the scope alongside findings too", () => {
+    expect(human(withScope(dirty, 4, 1), false)).toContain("4 files, 1 commit, against HEAD");
   });
 
-  it('emits escape codes only when colour is on', () => {
+  it("emits escape codes only when colour is on", () => {
     expect(human(dirty, false)).not.toContain(ESC);
     expect(human(dirty, true)).toContain(ESC);
   });
 });
 
-describe('compact', () => {
-  it('is one line when clean, and says what it read', () => {
+describe("compact", () => {
+  it("is one line when clean, and says what it read", () => {
     expect(compact(withScope(clean, 83, 3))).toBe(
-      'overlock: clean — 83 files, 3 commits, against HEAD.',
+      "overlock: clean — 83 files, 3 commits, against HEAD.",
     );
   });
 
-  it('does not call an empty patch clean', () => {
-    expect(compact(withScope(clean, 0, 0))).toContain('nothing to examine');
+  it("does not call an empty patch clean", () => {
+    expect(compact(withScope(clean, 0, 0))).toContain("nothing to examine");
   });
 
-  it('shows at most the limit and says how many it held back', () => {
+  it("shows at most the limit and says how many it held back", () => {
     const text = compact(dirty, 2);
-    expect(text).toContain('and 2 more');
-    expect(text.split('\n').filter((l) => l.startsWith('✗') || l.startsWith('!'))).toHaveLength(2);
+    expect(text).toContain("and 2 more");
+    expect(text.split("\n").filter((l) => l.startsWith("✗") || l.startsWith("!"))).toHaveLength(2);
   });
 
-  it('leads with the summary line', () => {
-    expect(compact(dirty).split('\n')[0]).toContain('4 findings');
+  it("leads with the summary line", () => {
+    expect(compact(dirty).split("\n")[0]).toContain("4 findings");
   });
 
-  it('clips long evidence so a phone line does not wrap forever', () => {
+  it("clips long evidence so a phone line does not wrap forever", () => {
     const long = analyze({
-      diff: diffOf('src/a.test.ts', hunk(`+  it.skip('${'x'.repeat(300)}', () => {})`)),
+      diff: diffOf("src/a.test.ts", hunk(`+  it.skip('${"x".repeat(300)}', () => {})`)),
     });
     const evidence = compact(long)
-      .split('\n')
-      .find((l) => l.trimStart().startsWith('+'));
+      .split("\n")
+      .find((l) => l.trimStart().startsWith("+"));
     expect(evidence?.length).toBeLessThan(120);
-    expect(evidence).toContain('...');
+    expect(evidence).toContain("...");
   });
 
-  it('never emits escape codes — it is read through another program', () => {
+  it("never emits escape codes — it is read through another program", () => {
     expect(compact(dirty)).not.toContain(ESC);
   });
 });
 
-describe('the suppressed note', () => {
-  it('is absent when nothing was suppressed', () => {
-    expect(human(dirty, false)).not.toContain('suppressed');
-    expect(compact(dirty)).not.toContain('suppressed');
+describe("the suppressed note", () => {
+  it("is absent when nothing was suppressed", () => {
+    expect(human(dirty, false)).not.toContain("suppressed");
+    expect(compact(dirty)).not.toContain("suppressed");
   });
 
-  it('appears alongside findings, not only on a clean run', () => {
+  it("appears alongside findings, not only on a clean run", () => {
     const withBoth = { ...dirty, suppressed: 2 };
-    expect(human(withBoth, false)).toContain('(2 suppressed)');
-    expect(compact(withBoth)).toContain('(2 suppressed)');
+    expect(human(withBoth, false)).toContain("(2 suppressed)");
+    expect(compact(withBoth)).toContain("(2 suppressed)");
   });
 
-  it('says what a rule graded off took out of the report', () => {
+  it("says what a rule graded off took out of the report", () => {
     const withOff = { ...dirty, silenced: 3 };
-    expect(human(withOff, false)).toContain('(3 silenced by config)');
-    expect(compact(withOff)).toContain('(3 silenced by config)');
+    expect(human(withOff, false)).toContain("(3 silenced by config)");
+    expect(compact(withOff)).toContain("(3 silenced by config)");
   });
 
-  it('says both when both silenced something', () => {
+  it("says both when both silenced something", () => {
     const withBoth = { ...dirty, suppressed: 1, silenced: 2 };
-    expect(human(withBoth, false)).toContain('(1 suppressed, 2 silenced by config)');
+    expect(human(withBoth, false)).toContain("(1 suppressed, 2 silenced by config)");
   });
 });
 
-describe('json', () => {
-  it('round-trips the report', () => {
+describe("json", () => {
+  it("round-trips the report", () => {
     const parsed = JSON.parse(json(dirty)) as typeof dirty;
     expect(parsed.schema).toBe(1);
     expect(parsed.findings).toHaveLength(dirty.findings.length);
-    expect(parsed.findings[0]).toHaveProperty('fix_hint');
+    expect(parsed.findings[0]).toHaveProperty("fix_hint");
   });
 
-  it('keeps evidence untruncated where compact clipped it', () => {
+  it("keeps evidence untruncated where compact clipped it", () => {
     const long = analyze({
-      diff: diffOf('src/a.test.ts', hunk(`+  it.skip('${'x'.repeat(300)}', () => {})`)),
+      diff: diffOf("src/a.test.ts", hunk(`+  it.skip('${"x".repeat(300)}', () => {})`)),
     });
     const parsed = JSON.parse(json(long)) as typeof long;
     expect(parsed.findings[0]?.evidence.after?.length).toBeGreaterThan(200);
   });
 });
 
-describe('useColor', () => {
-  it('follows NO_COLOR over everything else', () => {
-    expect(useColor({ isTTY: true }, { NO_COLOR: '1' })).toBe(false);
+describe("useColor", () => {
+  it("follows NO_COLOR over everything else", () => {
+    expect(useColor({ isTTY: true }, { NO_COLOR: "1" })).toBe(false);
   });
 
-  it('honours FORCE_COLOR without a TTY', () => {
-    expect(useColor({ isTTY: false }, { FORCE_COLOR: '1' })).toBe(true);
+  it("honours FORCE_COLOR without a TTY", () => {
+    expect(useColor({ isTTY: false }, { FORCE_COLOR: "1" })).toBe(true);
   });
 
-  it('otherwise follows the TTY', () => {
+  it("otherwise follows the TTY", () => {
     expect(useColor({ isTTY: true }, {})).toBe(true);
     expect(useColor({ isTTY: false }, {})).toBe(false);
     expect(useColor({}, {})).toBe(false);
   });
 });
 
-describe('grouping repeated findings', () => {
+describe("grouping repeated findings", () => {
   /**
    * The same edit in twenty files is one fact. Printing it twenty times is what
    * made a rename unreadable on the phone this output is written for.
    */
-  const repeated = ['a', 'b', 'c', 'd', 'e']
+  const repeated = ["a", "b", "c", "d", "e"]
     .map((name) => diffOf(`src/${name}.test.ts`, hunk(`+  it.skip('rejects', () => {})`)))
-    .join('');
+    .join("");
 
-  it('collapses identical findings into one row with a count', () => {
+  it("collapses identical findings into one row with a count", () => {
     const text = human(analyze({ diff: repeated }), false);
-    const rows = text.split('\n').filter((l) => l.includes('TEST_SKIPPED_ADDED'));
+    const rows = text.split("\n").filter((l) => l.includes("TEST_SKIPPED_ADDED"));
 
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toContain('(5)');
-    expect(rows[0]).toContain('and 2 more');
+    expect(rows[0]).toContain("(5)");
+    expect(rows[0]).toContain("and 2 more");
   });
 
-  it('leaves a single finding exactly as it was', () => {
-    const one = diffOf('src/a.test.ts', hunk(`+  it.skip('rejects', () => {})`));
-    expect(human(analyze({ diff: one }), false)).toContain('src/a.test.ts:1  TEST_SKIPPED_ADDED');
+  it("leaves a single finding exactly as it was", () => {
+    const one = diffOf("src/a.test.ts", hunk(`+  it.skip('rejects', () => {})`));
+    expect(human(analyze({ diff: one }), false)).toContain("src/a.test.ts:1  TEST_SKIPPED_ADDED");
   });
 });
 
-describe('a patch the rest of the patch explains', () => {
+describe("a patch the rest of the patch explains", () => {
   const rename = [1, 2, 3]
     .map((n) =>
       diffOf(
@@ -183,44 +183,44 @@ describe('a patch the rest of the patch explains', () => {
             `-    expect(warehouserouting.run(${n})).toBe(${n});`,
             `+  it('routing handles ${n}', () => {`,
             `+    expect(routing.run(${n})).toBe(${n});`,
-          ].join('\n'),
+          ].join("\n"),
         ),
       ),
     )
-    .join('');
+    .join("");
 
   // An identifier inside a string literal is the one thing a rename really does
   // change the value of, so it is what the rename has findings to explain: the
   // renamed case titles above are no longer reported at all, because the cases
   // they name are still there.
   const literal = diffOf(
-    'src/mod5.test.ts',
+    "src/mod5.test.ts",
     hunk(
       [
         "-    expect(label).toBe('warehouserouting core');",
         "+    expect(label).toBe('routing core');",
-      ].join('\n'),
+      ].join("\n"),
     ),
   );
 
   const report = analyze({ diff: rename + literal });
 
-  it('leads with the rename and the residual', () => {
+  it("leads with the rename and the residual", () => {
     const text = human(report, false);
-    expect(text).toContain('rename detected  warehouserouting -> routing');
-    expect(text).toContain('0 unexplained');
+    expect(text).toContain("rename detected  warehouserouting -> routing");
+    expect(text).toContain("0 unexplained");
   });
 
-  it('states what it did not list rather than dropping it silently', () => {
-    expect(human(report, false)).toContain('the patch itself accounts for, not listed');
+  it("states what it did not list rather than dropping it silently", () => {
+    expect(human(report, false)).toContain("the patch itself accounts for, not listed");
   });
 
-  it('says the same thing in the form a phone can read', () => {
-    expect(compact(report)).toContain('warehouserouting -> routing explains');
+  it("says the same thing in the form a phone can read", () => {
+    expect(compact(report)).toContain("warehouserouting -> routing explains");
   });
 });
 
-describe('a residual that is one change seen many times', () => {
+describe("a residual that is one change seen many times", () => {
   const many = [1, 2, 3, 4]
     .map((n) =>
       diffOf(
@@ -229,67 +229,67 @@ describe('a residual that is one change seen many times', () => {
           [
             `-    expect(cloudSync.state(${n})).toBe(${n});`,
             `+    expect(cloudSync.state(${n})).toBeDefined();`,
-          ].join('\n'),
+          ].join("\n"),
         ),
       ),
     )
-    .join('');
+    .join("");
 
-  it('says how many of the findings are about the same name', () => {
+  it("says how many of the findings are about the same name", () => {
     const text = human(analyze({ diff: many }), false);
-    expect(text).toContain('4 of 4 unexplained findings mention cloudSync');
+    expect(text).toContain("4 of 4 unexplained findings mention cloudSync");
   });
 
-  it('says it on a phone too, where the list is cut short', () => {
-    expect(compact(analyze({ diff: many }))).toContain('4 of 4 of them mention cloudSync.');
+  it("says it on a phone too, where the list is cut short", () => {
+    expect(compact(analyze({ diff: many }))).toContain("4 of 4 of them mention cloudSync.");
   });
 
-  it('says nothing when the findings have no name in common', () => {
+  it("says nothing when the findings have no name in common", () => {
     const scattered =
-      diffOf('src/a.test.ts', hunk("+  it.skip('one', () => {})")) +
-      diffOf('src/b.test.ts', hunk("+  it.skip('two', () => {})"));
+      diffOf("src/a.test.ts", hunk("+  it.skip('one', () => {})")) +
+      diffOf("src/b.test.ts", hunk("+  it.skip('two', () => {})"));
     expect(human(analyze({ diff: scattered }), false)).not.toContain(
-      'unexplained findings mention',
+      "unexplained findings mention",
     );
   });
 });
 
-describe('an acknowledgement that matched nothing', () => {
+describe("an acknowledgement that matched nothing", () => {
   const clean = analyze({
-    diff: diffOf('src/a.test.ts', hunk('+  const x = 1;')),
-    allowText: 'Overlock-Allow: TEST_REMOVED src/gone.test.ts -- ported every case',
+    diff: diffOf("src/a.test.ts", hunk("+  const x = 1;")),
+    allowText: "Overlock-Allow: TEST_REMOVED src/gone.test.ts -- ported every case",
   });
 
-  it('is not hidden by an otherwise clean run', () => {
+  it("is not hidden by an otherwise clean run", () => {
     const text = human(clean, false);
-    expect(text).toContain('allowed nothing: TEST_REMOVED src/gone.test.ts');
-    expect(text).toContain('ported every case');
+    expect(text).toContain("allowed nothing: TEST_REMOVED src/gone.test.ts");
+    expect(text).toContain("ported every case");
   });
 
-  it('reaches the phone view as a count', () => {
-    expect(compact(clean)).toContain('1 acknowledgement matched nothing');
+  it("reaches the phone view as a count", () => {
+    expect(compact(clean)).toContain("1 acknowledgement matched nothing");
   });
 });
 
-describe('describeScope', () => {
-  it('says the base alone when nothing counted it', () => {
-    expect(describeScope(clean)).toBe('against HEAD');
+describe("describeScope", () => {
+  it("says the base alone when nothing counted it", () => {
+    expect(describeScope(clean)).toBe("against HEAD");
   });
 
-  it('leaves the commit count out when there is none', () => {
-    expect(describeScope(withScope(clean, 1, 0))).toBe('1 file, against HEAD');
+  it("leaves the commit count out when there is none", () => {
+    expect(describeScope(withScope(clean, 1, 0))).toBe("1 file, against HEAD");
   });
 
-  it('reads the empty tree and the index by name', () => {
-    expect(describeScope({ ...clean, base: '--cached' })).toBe('against staged');
-    expect(describeScope({ ...clean, base: '4b825dc642cb6eb9a060e54bf8d69288fbee4904' })).toBe(
-      'against no commits yet',
+  it("reads the empty tree and the index by name", () => {
+    expect(describeScope({ ...clean, base: "--cached" })).toBe("against staged");
+    expect(describeScope({ ...clean, base: "4b825dc642cb6eb9a060e54bf8d69288fbee4904" })).toBe(
+      "against no commits yet",
     );
   });
 });
 
-describe('isEmptyPatch', () => {
-  it('is true only when a run counted nothing and found nothing', () => {
+describe("isEmptyPatch", () => {
+  it("is true only when a run counted nothing and found nothing", () => {
     expect(isEmptyPatch(withScope(clean, 0, 0))).toBe(true);
     expect(isEmptyPatch(withScope(clean, 3, 1))).toBe(false);
     expect(isEmptyPatch(withScope(dirty, 0, 0))).toBe(false);

@@ -1,11 +1,11 @@
-import { applyAllowances, collectAllowances } from './allow.js';
-import { parseDiff } from './diff.js';
-import { explainPatch, type PatchExplanation } from './substitution.js';
-import { isTestFile } from './paths.js';
-import { RULES } from './rules/index.js';
-import { sanitize } from './rules/shared.js';
-import { applySuppressions, collectSuppressions } from './suppress.js';
-import type { Finding, Grade, Report, RuleId, Severity } from './types.js';
+import { applyAllowances, collectAllowances } from "./allow.js";
+import { parseDiff } from "./diff.js";
+import { explainPatch, type PatchExplanation } from "./substitution.js";
+import { isTestFile } from "./paths.js";
+import { RULES } from "./rules/index.js";
+import { sanitize } from "./rules/shared.js";
+import { applySuppressions, collectSuppressions } from "./suppress.js";
+import type { Finding, Grade, Report, RuleId, Severity } from "./types.js";
 
 const SEVERITY_RANK: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
 
@@ -17,7 +17,7 @@ export interface AnalyzeOptions {
   /** Extra patterns that mark a path as a test file. */
   testGlobs?: RegExp[];
   /** Severity at or above which the report is not ok. Default `high`. */
-  failOn?: Severity | 'none';
+  failOn?: Severity | "none";
   /**
    * Per-rule severity, replacing the built-in grade for those rules.
    *
@@ -48,13 +48,13 @@ export interface AnalyzeOptions {
  * patch carrying a HIGH finding reported `ok`. A gate given a value it does not
  * understand has to fail closed.
  */
-function normalizeFailOn(value: Severity | 'none'): Severity | 'none' {
-  return value === 'none' || value in SEVERITY_RANK ? value : 'high';
+function normalizeFailOn(value: Severity | "none"): Severity | "none" {
+  return value === "none" || value in SEVERITY_RANK ? value : "high";
 }
 
 export function analyze(options: AnalyzeOptions): Report {
-  const { diff, base = 'HEAD', testGlobs = [] } = options;
-  const failOn = normalizeFailOn(options.failOn ?? 'high');
+  const { diff, base = "HEAD", testGlobs = [] } = options;
+  const failOn = normalizeFailOn(options.failOn ?? "high");
 
   const severities = options.severities ?? {};
 
@@ -68,15 +68,15 @@ export function analyze(options: AnalyzeOptions): Report {
 
   const produced = RULES.flatMap((rule) => rule.run(ctx));
   options.onFindings?.(produced);
-  const silenced = produced.filter((f) => severities[f.rule] === 'off');
+  const silenced = produced.filter((f) => severities[f.rule] === "off");
   const raw = produced
-    .filter((f) => severities[f.rule] !== 'off')
+    .filter((f) => severities[f.rule] !== "off")
     .map((f) => regrade(f, severities));
   const { kept, suppressed, used } = applySuppressions(
     sortFindings(dedupe(raw)),
     collectSuppressions(files),
   );
-  const allowances = collectAllowances(options.allowText ?? '');
+  const allowances = collectAllowances(options.allowText ?? "");
   const {
     kept: standing,
     allowed,
@@ -91,7 +91,7 @@ export function analyze(options: AnalyzeOptions): Report {
   for (const f of findings) counts[f.severity] += 1;
 
   const ok =
-    failOn === 'none'
+    failOn === "none"
       ? true
       : !findings.some((f) => SEVERITY_RANK[f.severity] <= SEVERITY_RANK[failOn]);
 
@@ -147,7 +147,7 @@ function annotate(f: Finding, explanation: PatchExplanation): Finding {
   if (verdict === null) return f;
   return {
     ...f,
-    explained_by: verdict === 'rename' ? (explanation.label ?? 'a rename') : 'reformatting only',
+    explained_by: verdict === "rename" ? (explanation.label ?? "a rename") : "reformatting only",
   };
 }
 
@@ -160,7 +160,7 @@ function regrade(f: Finding, severities: Partial<Record<RuleId, Grade>>): Findin
   const override = severities[f.rule];
   // `off` never reaches here: those findings are dropped before regrading,
   // because a severity is a fact about a finding and `off` is not one.
-  if (override === undefined || override === 'off' || override === f.severity) return f;
+  if (override === undefined || override === "off" || override === f.severity) return f;
   return { ...f, severity: override };
 }
 
@@ -184,11 +184,11 @@ function dedupe(findings: Finding[]): Finding[] {
 
   const loosened = new Set(
     [...byId.values()]
-      .filter((f) => f.rule === 'ASSERTION_WEAKENED' || f.rule === 'ASSERTION_NARROWED')
+      .filter((f) => f.rule === "ASSERTION_WEAKENED" || f.rule === "ASSERTION_NARROWED")
       .map((f) => `${f.file}:${f.line}`),
   );
 
-  const alsoSaidByLoosening = new Set<RuleId>(['EXPECTED_VALUE_CHANGED', 'PREDICATE_NARROWED']);
+  const alsoSaidByLoosening = new Set<RuleId>(["EXPECTED_VALUE_CHANGED", "PREDICATE_NARROWED"]);
 
   return [...byId.values()].filter(
     (f) => !(alsoSaidByLoosening.has(f.rule) && loosened.has(`${f.file}:${f.line}`)),

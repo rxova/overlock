@@ -1,6 +1,6 @@
-import { sanitizePath, withoutStringContents } from './rules/shared.js';
-import type { DiffFile, Finding, RuleId } from './types.js';
-import { RULE_IDS } from './types.js';
+import { sanitizePath, withoutStringContents } from "./rules/shared.js";
+import type { DiffFile, Finding, RuleId } from "./types.js";
+import { RULE_IDS } from "./types.js";
 
 /**
  * `overlock-ignore <RULE_ID> [<path>] -- <reason>`
@@ -70,7 +70,7 @@ export function collectSuppressions(files: DiffFile[]): Suppression[] {
   for (const file of files) {
     for (const hunk of file.hunks) {
       for (const line of hunk.lines) {
-        if (line.kind === 'del' || line.newLine === null) continue;
+        if (line.kind === "del" || line.newLine === null) continue;
 
         // Blanked the same way skip markers are: a directive quoted inside a
         // string is documentation or a fixture, not permission.
@@ -89,7 +89,7 @@ export function collectSuppressions(files: DiffFile[]): Suppression[] {
           target: target === undefined ? null : sanitizePath(target),
           file: file.path,
           line: line.newLine,
-          added: line.kind === 'add',
+          added: line.kind === "add",
         });
       }
     }

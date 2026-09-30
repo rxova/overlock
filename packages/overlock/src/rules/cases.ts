@@ -1,5 +1,5 @@
-import type { DiffFile, DiffLine } from '../types.js';
-import { canonicalQuotes } from './shared.js';
+import type { DiffFile, DiffLine } from "../types.js";
+import { canonicalQuotes } from "./shared.js";
 
 /**
  * Where a test case begins and ends, as far as a diff can tell.
@@ -43,7 +43,7 @@ export function declaredName(text: string): string | null {
 
 /** Whitespace-insensitive, because reindentation is not an edit. */
 export function squash(text: string): string {
-  return text.replace(/\s+/g, ' ').trim();
+  return text.replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -85,7 +85,7 @@ export function bodies(lines: DiffLine[]): CaseBody[] {
     }
     if (current === null) continue;
     const text = squash(canonicalQuotes(line.text));
-    if (text === '' || isStructural(text)) continue;
+    if (text === "" || isStructural(text)) continue;
     current.lines.add(text);
   }
 
@@ -147,13 +147,13 @@ export function byCase(file: DiffFile): Map<string, CaseDelta> {
     for (const line of hunk.lines) {
       const name = declaredName(line.text);
       if (name !== null) {
-        if (line.kind !== 'add') before = name;
-        if (line.kind !== 'del') after = name;
+        if (line.kind !== "add") before = name;
+        if (line.kind !== "del") after = name;
         continue;
       }
-      if (line.kind === 'del') {
+      if (line.kind === "del") {
         if (before !== null) entry(before).dels.push(line);
-      } else if (line.kind === 'add') {
+      } else if (line.kind === "add") {
         if (after !== null) entry(after).adds.push(line);
       }
     }

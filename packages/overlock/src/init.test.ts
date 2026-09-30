@@ -1,19 +1,19 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { afterEach, describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   HOOK_COMMAND,
   initClaude,
   initInstructions,
   instructionSnippet,
   mcpSnippet,
-} from './init.js';
+} from "./init.js";
 
 let dir: string | null = null;
 
 function makeDir(): string {
-  dir = mkdtempSync(join(tmpdir(), 'overlock-init-'));
+  dir = mkdtempSync(join(tmpdir(), "overlock-init-"));
   return dir;
 }
 
@@ -23,32 +23,32 @@ afterEach(() => {
 });
 
 function settings(root: string): Record<string, unknown> {
-  return JSON.parse(readFileSync(join(root, '.claude', 'settings.json'), 'utf8')) as Record<
+  return JSON.parse(readFileSync(join(root, ".claude", "settings.json"), "utf8")) as Record<
     string,
     unknown
   >;
 }
 
-describe('initClaude', () => {
-  it('creates a committed .claude/settings.json with a Stop hook', () => {
+describe("initClaude", () => {
+  it("creates a committed .claude/settings.json with a Stop hook", () => {
     const root = makeDir();
     const result = initClaude(root);
 
-    expect(result.written).toEqual(['.claude/settings.json']);
-    expect(result.notes.join(' ')).toContain('Commit this file');
+    expect(result.written).toEqual([".claude/settings.json"]);
+    expect(result.notes.join(" ")).toContain("Commit this file");
 
     const parsed = settings(root) as { hooks: { Stop: { hooks: { command: string }[] }[] } };
     expect(parsed.hooks.Stop[0]?.hooks[0]?.command).toBe(HOOK_COMMAND);
   });
 
-  it('preserves settings and hooks that are already there', () => {
+  it("preserves settings and hooks that are already there", () => {
     const root = makeDir();
-    mkdirSync(join(root, '.claude'), { recursive: true });
+    mkdirSync(join(root, ".claude"), { recursive: true });
     writeFileSync(
-      join(root, '.claude', 'settings.json'),
+      join(root, ".claude", "settings.json"),
       JSON.stringify({
-        permissions: { allow: ['Bash(pnpm test)'] },
-        hooks: { Stop: [{ hooks: [{ type: 'command', command: 'echo existing' }] }] },
+        permissions: { allow: ["Bash(pnpm test)"] },
+        hooks: { Stop: [{ hooks: [{ type: "command", command: "echo existing" }] }] },
       }),
     );
 
@@ -58,12 +58,12 @@ describe('initClaude', () => {
       permissions: unknown;
       hooks: { Stop: { hooks: { command: string }[] }[] };
     };
-    expect(parsed.permissions).toEqual({ allow: ['Bash(pnpm test)'] });
+    expect(parsed.permissions).toEqual({ allow: ["Bash(pnpm test)"] });
     expect(parsed.hooks.Stop).toHaveLength(2);
-    expect(parsed.hooks.Stop[0]?.hooks[0]?.command).toBe('echo existing');
+    expect(parsed.hooks.Stop[0]?.hooks[0]?.command).toBe("echo existing");
   });
 
-  it('is idempotent', () => {
+  it("is idempotent", () => {
     const root = makeDir();
     initClaude(root);
     const second = initClaude(root);
@@ -75,60 +75,60 @@ describe('initClaude', () => {
     expect(parsed.hooks.Stop).toHaveLength(1);
   });
 
-  it('refuses to overwrite a settings file it cannot parse', () => {
+  it("refuses to overwrite a settings file it cannot parse", () => {
     const root = makeDir();
-    mkdirSync(join(root, '.claude'), { recursive: true });
-    writeFileSync(join(root, '.claude', 'settings.json'), '{ not json');
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(join(root, ".claude", "settings.json"), "{ not json");
 
     expect(() => initClaude(root)).toThrow(/not valid JSON/);
   });
 });
 
-describe('initInstructions', () => {
-  it('appends the instruction to AGENTS.md for codex', () => {
+describe("initInstructions", () => {
+  it("appends the instruction to AGENTS.md for codex", () => {
     const root = makeDir();
-    const result = initInstructions(root, 'codex');
+    const result = initInstructions(root, "codex");
 
-    expect(result.written).toEqual(['AGENTS.md']);
-    expect(readFileSync(join(root, 'AGENTS.md'), 'utf8')).toContain('overlock check');
-    expect(result.notes.join(' ')).toContain('not a gate');
+    expect(result.written).toEqual(["AGENTS.md"]);
+    expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toContain("overlock check");
+    expect(result.notes.join(" ")).toContain("not a gate");
   });
 
-  it('keeps existing content', () => {
+  it("keeps existing content", () => {
     const root = makeDir();
-    writeFileSync(join(root, 'AGENTS.md'), '# House rules\n');
-    initInstructions(root, 'codex');
+    writeFileSync(join(root, "AGENTS.md"), "# House rules\n");
+    initInstructions(root, "codex");
 
-    const text = readFileSync(join(root, 'AGENTS.md'), 'utf8');
-    expect(text).toContain('# House rules');
-    expect(text).toContain('overlock check');
+    const text = readFileSync(join(root, "AGENTS.md"), "utf8");
+    expect(text).toContain("# House rules");
+    expect(text).toContain("overlock check");
   });
 
-  it('is idempotent', () => {
+  it("is idempotent", () => {
     const root = makeDir();
-    initInstructions(root, 'cursor');
-    expect(initInstructions(root, 'cursor').unchanged).toBe(true);
+    initInstructions(root, "cursor");
+    expect(initInstructions(root, "cursor").unchanged).toBe(true);
   });
 
-  it('writes where each agent looks', () => {
+  it("writes where each agent looks", () => {
     const root = makeDir();
-    expect(initInstructions(root, 'cursor').written).toEqual(['.cursor/rules/overlock.mdc']);
-    expect(initInstructions(root, 'copilot').written).toEqual(['.github/copilot-instructions.md']);
+    expect(initInstructions(root, "cursor").written).toEqual([".cursor/rules/overlock.mdc"]);
+    expect(initInstructions(root, "copilot").written).toEqual([".github/copilot-instructions.md"]);
   });
 });
 
-describe('mcpSnippet', () => {
-  it('is valid JSON an agent config can take verbatim', () => {
+describe("mcpSnippet", () => {
+  it("is valid JSON an agent config can take verbatim", () => {
     const parsed = JSON.parse(mcpSnippet()) as {
       mcpServers: { overlock: { command: string; args: string[] } };
     };
-    expect(parsed.mcpServers.overlock.command).toBe('npx');
-    expect(parsed.mcpServers.overlock.args).toEqual(['-y', 'overlock', 'mcp']);
+    expect(parsed.mcpServers.overlock.command).toBe("npx");
+    expect(parsed.mcpServers.overlock.args).toEqual(["-y", "overlock", "mcp"]);
   });
 });
 
-describe('instructionSnippet', () => {
-  it('tells the agent to fix the cause rather than the check', () => {
-    expect(instructionSnippet()).toContain('fix the cause rather than the check');
+describe("instructionSnippet", () => {
+  it("tells the agent to fix the cause rather than the check", () => {
+    expect(instructionSnippet()).toContain("fix the cause rather than the check");
   });
 });

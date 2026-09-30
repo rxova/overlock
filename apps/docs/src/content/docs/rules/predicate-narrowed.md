@@ -62,7 +62,7 @@ See [severity](../learn/severity.md) for why that is a better move than lowering
 
 ```ts
 // overlock-ignore PREDICATE_NARROWED -- pending entries are covered by "settles pending rows" below
-const rows = ledger.entries.filter((e) => e.state !== 'pending');
+const rows = ledger.entries.filter((e) => e.state !== "pending");
 ```
 
 The hint asks for the same sentence: say what covers the members the set no longer includes. When the answer is "nothing, and that is fine because the feature is gone", say that instead — the reason is the artefact, not the format.

@@ -551,9 +551,9 @@ empties quietly is not a gate.
 ## Programmatic use
 
 ```ts
-import { analyze } from 'overlock';
+import { analyze } from "overlock";
 
-const report = analyze({ diff: myUnifiedDiff, failOn: 'medium' });
+const report = analyze({ diff: myUnifiedDiff, failOn: "medium" });
 ```
 
 `analyze` takes a unified diff and returns the same report the CLI serialises.

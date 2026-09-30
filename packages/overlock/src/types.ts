@@ -17,7 +17,7 @@
  * deliberate. `low` is context: true often enough on ordinary work that
  * blocking on it would be noise.
  */
-export type Severity = 'high' | 'medium' | 'low';
+export type Severity = "high" | "medium" | "low";
 
 /**
  * What a repository may grade a rule as, which is one more thing than a finding
@@ -29,7 +29,7 @@ export type Severity = 'high' | 'medium' | 'low';
  * no finding can ever carry it. Keeping `Severity` as it was is also what keeps
  * `counts` a total record of three keys on the wire.
  */
-export type Grade = Severity | 'off';
+export type Grade = Severity | "off";
 
 /**
  * A substitution the patch applies wholesale, inferred from the patch itself.
@@ -49,19 +49,19 @@ export interface Rename {
 }
 
 export const RULE_IDS = [
-  'TEST_REMOVED',
-  'TEST_SKIPPED_ADDED',
-  'ASSERTION_REMOVED',
-  'ASSERTION_WEAKENED',
-  'ASSERTION_NARROWED',
-  'PREDICATE_NARROWED',
-  'EXPECTED_VALUE_CHANGED',
-  'SNAPSHOT_UPDATED_WITH_CODE',
-  'COVERAGE_THRESHOLD_LOWERED',
-  'TEST_TIMEOUT_RAISED',
-  'TEST_AND_IMPL_TOGETHER',
-  'TEST_GATE_DISABLED',
-  'SUITE_SCOPE_NARROWED',
+  "TEST_REMOVED",
+  "TEST_SKIPPED_ADDED",
+  "ASSERTION_REMOVED",
+  "ASSERTION_WEAKENED",
+  "ASSERTION_NARROWED",
+  "PREDICATE_NARROWED",
+  "EXPECTED_VALUE_CHANGED",
+  "SNAPSHOT_UPDATED_WITH_CODE",
+  "COVERAGE_THRESHOLD_LOWERED",
+  "TEST_TIMEOUT_RAISED",
+  "TEST_AND_IMPL_TOGETHER",
+  "TEST_GATE_DISABLED",
+  "SUITE_SCOPE_NARROWED",
 ] as const;
 
 export type RuleId = (typeof RULE_IDS)[number];
@@ -130,7 +130,7 @@ export interface Report {
    * "findings at or above X" reads X from the run rather than from its own idea
    * of the default, which is how two surfaces come to disagree in public.
    */
-  fail_on: Severity | 'none';
+  fail_on: Severity | "none";
   /**
    * How much that range covered. Present whenever the report came from a run
    * against a repository; absent when `analyze` was handed a diff directly,
@@ -207,7 +207,7 @@ export interface Report {
   }[];
 }
 
-type DiffLineKind = 'add' | 'del' | 'ctx';
+type DiffLineKind = "add" | "del" | "ctx";
 
 export interface DiffLine {
   kind: DiffLineKind;
@@ -224,7 +224,7 @@ export interface Hunk {
   lines: DiffLine[];
 }
 
-type FileStatus = 'added' | 'modified' | 'deleted' | 'renamed';
+type FileStatus = "added" | "modified" | "deleted" | "renamed";
 
 export interface DiffFile {
   /** Post-image path, or the pre-image path when the file was deleted. */

@@ -1,4 +1,4 @@
-import type { DiffFile, DiffLine, Hunk } from './types.js';
+import type { DiffFile, DiffLine, Hunk } from "./types.js";
 
 const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
 
@@ -13,7 +13,7 @@ const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
  */
 export function parseDiff(raw: string): DiffFile[] {
   const files: DiffFile[] = [];
-  const lines = raw.split('\n');
+  const lines = raw.split("\n");
 
   let current: DiffFile | null = null;
   let hunk: Hunk | null = null;
@@ -27,15 +27,15 @@ export function parseDiff(raw: string): DiffFile[] {
   };
 
   for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i] ?? '';
+    const line = lines[i] ?? "";
 
-    if (line.startsWith('diff --git ')) {
+    if (line.startsWith("diff --git ")) {
       closeFile();
       const paths = parseDiffGitHeader(line);
       current = {
         path: paths.b,
         oldPath: null,
-        status: 'modified',
+        status: "modified",
         hunks: [],
       };
       continue;
@@ -43,40 +43,40 @@ export function parseDiff(raw: string): DiffFile[] {
 
     if (!current) continue;
 
-    if (line.startsWith('new file mode')) {
-      current.status = 'added';
+    if (line.startsWith("new file mode")) {
+      current.status = "added";
       continue;
     }
-    if (line.startsWith('deleted file mode')) {
-      current.status = 'deleted';
+    if (line.startsWith("deleted file mode")) {
+      current.status = "deleted";
       continue;
     }
-    if (line.startsWith('rename from ')) {
-      current.status = 'renamed';
-      current.oldPath = line.slice('rename from '.length);
+    if (line.startsWith("rename from ")) {
+      current.status = "renamed";
+      current.oldPath = line.slice("rename from ".length);
       continue;
     }
-    if (line.startsWith('rename to ')) {
-      current.status = 'renamed';
-      current.path = line.slice('rename to '.length);
+    if (line.startsWith("rename to ")) {
+      current.status = "renamed";
+      current.path = line.slice("rename to ".length);
       continue;
     }
     // `Binary files a/x and b/y differ` — nothing here can read it, and a rule
     // that guessed at one would be guessing.
-    if (line.startsWith('Binary files ')) {
+    if (line.startsWith("Binary files ")) {
       hunk = null;
       continue;
     }
-    if (line.startsWith('--- ')) {
+    if (line.startsWith("--- ")) {
       const p = line.slice(4);
-      if (p !== '/dev/null' && current.oldPath === null) current.oldPath = cleanPath(p);
+      if (p !== "/dev/null" && current.oldPath === null) current.oldPath = cleanPath(p);
       continue;
     }
-    if (line.startsWith('+++ ')) {
+    if (line.startsWith("+++ ")) {
       const p = line.slice(4);
       // A deletion's post-image is /dev/null, so the pre-image path is the only
       // name the file has. Everything downstream reports on `path`.
-      if (p === '/dev/null') {
+      if (p === "/dev/null") {
         if (current.oldPath) current.path = current.oldPath;
       } else {
         current.path = cleanPath(p);
@@ -97,20 +97,20 @@ export function parseDiff(raw: string): DiffFile[] {
 
     // `\ No newline at end of file` annotates the preceding line rather than
     // being one.
-    if (line.startsWith('\\')) continue;
+    if (line.startsWith("\\")) continue;
 
     const marker = line[0];
     const text = line.slice(1);
     let entry: DiffLine | null = null;
 
-    if (marker === '+') {
-      entry = { kind: 'add', text, oldLine: null, newLine };
+    if (marker === "+") {
+      entry = { kind: "add", text, oldLine: null, newLine };
       newLine += 1;
-    } else if (marker === '-') {
-      entry = { kind: 'del', text, oldLine, newLine: null };
+    } else if (marker === "-") {
+      entry = { kind: "del", text, oldLine, newLine: null };
       oldLine += 1;
-    } else if (marker === ' ') {
-      entry = { kind: 'ctx', text, oldLine, newLine };
+    } else if (marker === " ") {
+      entry = { kind: "ctx", text, oldLine, newLine };
       oldLine += 1;
       newLine += 1;
     }
@@ -131,25 +131,25 @@ export function parseDiff(raw: string): DiffFile[] {
  * a few lines later.
  */
 function parseDiffGitHeader(line: string): { a: string; b: string } {
-  const rest = line.slice('diff --git '.length);
+  const rest = line.slice("diff --git ".length);
 
   // git escapes a quote inside a quoted path, so each path is a run of
   // non-quotes and escapes. `(.+)" "(.+)` also split on an escaped `\" "`, and
   // tried every such split, which is quadratic.
   const quoted = /^"((?:[^"\\]|\\.)+)" "((?:[^"\\]|\\.)+)"$/.exec(rest);
   if (quoted) {
-    return { a: cleanPath(quoted[1] ?? ''), b: cleanPath(quoted[2] ?? '') };
+    return { a: cleanPath(quoted[1] ?? ""), b: cleanPath(quoted[2] ?? "") };
   }
 
-  const halves = rest.split(' ');
+  const halves = rest.split(" ");
   if (halves.length === 2) {
-    return { a: cleanPath(halves[0] ?? ''), b: cleanPath(halves[1] ?? '') };
+    return { a: cleanPath(halves[0] ?? ""), b: cleanPath(halves[1] ?? "") };
   }
 
   const mid = Math.floor(halves.length / 2);
   return {
-    a: cleanPath(halves.slice(0, mid).join(' ')),
-    b: cleanPath(halves.slice(mid).join(' ')),
+    a: cleanPath(halves.slice(0, mid).join(" ")),
+    b: cleanPath(halves.slice(mid).join(" ")),
   };
 }
 
@@ -163,20 +163,20 @@ function parseDiffGitHeader(line: string): { a: string; b: string } {
 function cleanPath(raw: string): string {
   let path = raw;
   if (path.startsWith('"') && path.endsWith('"') && path.length >= 2) {
-    path = path.slice(1, -1).replace(/\\(.)/g, '$1');
+    path = path.slice(1, -1).replace(/\\(.)/g, "$1");
   }
-  if (path.startsWith('a/') || path.startsWith('b/')) return path.slice(2);
+  if (path.startsWith("a/") || path.startsWith("b/")) return path.slice(2);
   return path;
 }
 
 /** Every added line in a file, flattened, with its post-image line number. */
 export function addedLines(file: DiffFile): DiffLine[] {
-  return file.hunks.flatMap((h) => h.lines.filter((l) => l.kind === 'add'));
+  return file.hunks.flatMap((h) => h.lines.filter((l) => l.kind === "add"));
 }
 
 /** Every removed line in a file, flattened, with its pre-image line number. */
 export function removedLines(file: DiffFile): DiffLine[] {
-  return file.hunks.flatMap((h) => h.lines.filter((l) => l.kind === 'del'));
+  return file.hunks.flatMap((h) => h.lines.filter((l) => l.kind === "del"));
 }
 
 /**
@@ -196,7 +196,7 @@ export function changeBlocks(hunk: Hunk): DiffLine[][] {
   let current: DiffLine[] = [];
 
   for (const line of hunk.lines) {
-    if (line.kind === 'ctx') {
+    if (line.kind === "ctx") {
       if (current.length > 0) blocks.push(current);
       current = [];
       continue;

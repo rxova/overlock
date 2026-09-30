@@ -1,82 +1,82 @@
-import { describe, expect, it } from 'vitest';
-import { analyze } from './analyze.js';
-import { diffOf, hunk } from './__fixtures__/diffs.js';
+import { describe, expect, it } from "vitest";
+import { analyze } from "./analyze.js";
+import { diffOf, hunk } from "./__fixtures__/diffs.js";
 
-const skip = diffOf('src/a.test.ts', hunk("+  it.skip('x', () => {})"));
-const timeout = diffOf('src/b.test.ts', hunk('+  timeout: 9000,'));
+const skip = diffOf("src/a.test.ts", hunk("+  it.skip('x', () => {})"));
+const timeout = diffOf("src/b.test.ts", hunk("+  timeout: 9000,"));
 
-describe('analyze', () => {
-  it('reports nothing for an empty diff', () => {
-    const report = analyze({ diff: '' });
+describe("analyze", () => {
+  it("reports nothing for an empty diff", () => {
+    const report = analyze({ diff: "" });
     expect(report).toMatchObject({ schema: 1, ok: true, findings: [], counts: { high: 0 } });
   });
 
-  it('echoes the range it was told about', () => {
-    expect(analyze({ diff: '', base: 'origin/main' }).base).toBe('origin/main');
+  it("echoes the range it was told about", () => {
+    expect(analyze({ diff: "", base: "origin/main" }).base).toBe("origin/main");
   });
 
-  it('is not ok when a finding meets --fail-on', () => {
+  it("is not ok when a finding meets --fail-on", () => {
     expect(analyze({ diff: skip }).ok).toBe(false);
-    expect(analyze({ diff: skip, failOn: 'none' }).ok).toBe(true);
+    expect(analyze({ diff: skip, failOn: "none" }).ok).toBe(true);
   });
 
-  it('treats low findings as passing until --fail-on says otherwise', () => {
+  it("treats low findings as passing until --fail-on says otherwise", () => {
     expect(analyze({ diff: timeout }).ok).toBe(true);
-    expect(analyze({ diff: timeout, failOn: 'low' }).ok).toBe(false);
+    expect(analyze({ diff: timeout, failOn: "low" }).ok).toBe(false);
   });
 
-  it('counts findings by severity', () => {
+  it("counts findings by severity", () => {
     const report = analyze({ diff: skip + timeout });
     expect(report.counts.high).toBe(1);
     expect(report.counts.low).toBe(1);
   });
 
-  it('sorts the most severe finding first', () => {
+  it("sorts the most severe finding first", () => {
     const report = analyze({ diff: timeout + skip });
-    expect(report.findings[0]?.severity).toBe('high');
+    expect(report.findings[0]?.severity).toBe("high");
   });
 
-  it('gives every finding a stable id', () => {
+  it("gives every finding a stable id", () => {
     const first = analyze({ diff: skip }).findings[0];
     const second = analyze({ diff: skip }).findings[0];
     expect(first?.id).toBe(second?.id);
-    expect(first?.id).toContain('TEST_SKIPPED_ADDED');
+    expect(first?.id).toContain("TEST_SKIPPED_ADDED");
   });
 
-  it('regrades a rule when a severity override names it', () => {
-    const report = analyze({ diff: skip, severities: { TEST_SKIPPED_ADDED: 'low' } });
-    expect(report.findings[0]?.severity).toBe('low');
+  it("regrades a rule when a severity override names it", () => {
+    const report = analyze({ diff: skip, severities: { TEST_SKIPPED_ADDED: "low" } });
+    expect(report.findings[0]?.severity).toBe("low");
     expect(report.counts).toMatchObject({ high: 0, low: 1 });
     expect(report.ok).toBe(true);
   });
 
-  it('drops a rule graded off, and counts what it dropped', () => {
-    const report = analyze({ diff: skip, severities: { TEST_SKIPPED_ADDED: 'off' } });
+  it("drops a rule graded off, and counts what it dropped", () => {
+    const report = analyze({ diff: skip, severities: { TEST_SKIPPED_ADDED: "off" } });
     expect(report.findings).toEqual([]);
     expect(report.counts).toEqual({ high: 0, medium: 0, low: 0 });
     expect(report.silenced).toBe(1);
     expect(report.ok).toBe(true);
   });
 
-  it('grades off one rule without touching the next', () => {
-    const report = analyze({ diff: skip + timeout, severities: { TEST_TIMEOUT_RAISED: 'off' } });
-    expect(report.findings.map((f) => f.rule)).toEqual(['TEST_SKIPPED_ADDED']);
+  it("grades off one rule without touching the next", () => {
+    const report = analyze({ diff: skip + timeout, severities: { TEST_TIMEOUT_RAISED: "off" } });
+    expect(report.findings.map((f) => f.rule)).toEqual(["TEST_SKIPPED_ADDED"]);
     expect(report.silenced).toBe(1);
     expect(report.ok).toBe(false);
   });
 
-  it('counts nothing as silenced when no rule is off', () => {
+  it("counts nothing as silenced when no rule is off", () => {
     expect(analyze({ diff: skip }).silenced).toBe(0);
   });
 
-  it('leaves the rules it does not name at their built-in grade', () => {
-    const report = analyze({ diff: skip, severities: { TEST_REMOVED: 'low' } });
-    expect(report.findings[0]?.severity).toBe('high');
+  it("leaves the rules it does not name at their built-in grade", () => {
+    const report = analyze({ diff: skip, severities: { TEST_REMOVED: "low" } });
+    expect(report.findings[0]?.severity).toBe("high");
     expect(report.ok).toBe(false);
   });
 
-  it('honours extra test globs', () => {
-    const diff = diffOf('checks/login.check.ts', hunk("+  it.skip('x', () => {})"));
+  it("honours extra test globs", () => {
+    const diff = diffOf("checks/login.check.ts", hunk("+  it.skip('x', () => {})"));
     expect(analyze({ diff }).findings).toHaveLength(0);
     expect(analyze({ diff, testGlobs: [/\.check\.ts$/] }).findings).not.toHaveLength(0);
   });

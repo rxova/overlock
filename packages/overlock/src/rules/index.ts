@@ -3,14 +3,14 @@ import {
   assertionRemoved,
   assertionWeakened,
   expectedValueChanged,
-} from './assertions.js';
-import { snapshotUpdatedWithCode, testAndImplTogether } from './pairing.js';
-import { predicateNarrowed } from './predicates.js';
-import { testRemoved } from './removal.js';
-import { testSkippedAdded } from './skip.js';
-import { suiteScopeNarrowed, testGateDisabled } from './suite.js';
-import { coverageThresholdLowered, testTimeoutRaised } from './thresholds.js';
-import type { Rule } from './shared.js';
+} from "./assertions.js";
+import { snapshotUpdatedWithCode, testAndImplTogether } from "./pairing.js";
+import { predicateNarrowed } from "./predicates.js";
+import { testRemoved } from "./removal.js";
+import { testSkippedAdded } from "./skip.js";
+import { suiteScopeNarrowed, testGateDisabled } from "./suite.js";
+import { coverageThresholdLowered, testTimeoutRaised } from "./thresholds.js";
+import type { Rule } from "./shared.js";
 
 /** Registry order is report order for equal severities. */
 export const RULES: Rule[] = [
@@ -29,4 +29,4 @@ export const RULES: Rule[] = [
   testAndImplTogether,
 ];
 
-export type { Rule } from './shared.js';
+export type { Rule } from "./shared.js";

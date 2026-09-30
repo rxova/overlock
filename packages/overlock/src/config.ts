@@ -16,19 +16,19 @@
  * finding out otherwise from a blocked merge — the same failure this file is
  * meant to prevent.
  */
-import { readFileSync } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
-import { isRecord } from '@rxova/ts-utils';
-import type { BaseMode } from './git.js';
-import type { EvaluationConfig } from './evaluation-record.js';
-import { RULE_IDS, type Grade, type RuleId, type Severity } from './types.js';
+import { readFileSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import { isRecord } from "@rxova/ts-utils";
+import type { BaseMode } from "./git.js";
+import type { EvaluationConfig } from "./evaluation-record.js";
+import { RULE_IDS, type Grade, type RuleId, type Severity } from "./types.js";
 
 export class ConfigError extends Error {}
 
 export interface OverlockConfig {
   base?: string;
   baseMode?: BaseMode;
-  failOn?: Severity | 'none';
+  failOn?: Severity | "none";
   failOnEmpty?: boolean;
   severity?: Partial<Record<RuleId, Grade>>;
   testGlob?: string[];
@@ -45,22 +45,22 @@ export interface LoadedConfig {
 }
 
 /** The file looked for, in the order it is looked for. */
-export const CONFIG_FILE = 'overlock.config.json';
+export const CONFIG_FILE = "overlock.config.json";
 /** The key read from a package.json when there is no config file beside it. */
-export const CONFIG_KEY = 'overlock';
+export const CONFIG_KEY = "overlock";
 
 const KEYS = [
-  'base',
-  'baseMode',
-  'failOn',
-  'failOnEmpty',
-  'severity',
-  'testGlob',
-  'untracked',
-  'exclude',
-  'evaluation',
+  "base",
+  "baseMode",
+  "failOn",
+  "failOnEmpty",
+  "severity",
+  "testGlob",
+  "untracked",
+  "exclude",
+  "evaluation",
 ];
-const LEVELS = ['high', 'medium', 'low'];
+const LEVELS = ["high", "medium", "low"];
 /**
  * What a rule may be graded, which is one more than a finding may carry.
  *
@@ -68,7 +68,7 @@ const LEVELS = ['high', 'medium', 'low'];
  * about that rule, while a `failOn` of `none` is a judgement about all of them,
  * and the second already exists.
  */
-const GRADES = [...LEVELS, 'off'];
+const GRADES = [...LEVELS, "off"];
 
 /**
  * One `exclude` entry as git will be given it, or the reason it is refused.
@@ -80,31 +80,31 @@ const GRADES = [...LEVELS, 'off'];
  * written is a way to take files out of the patch that nobody decided to.
  */
 function excludeEntry(entry: unknown): string | { refused: string } {
-  if (typeof entry !== 'string' || entry.trim() === '') {
-    return { refused: 'must be a non-empty string' };
+  if (typeof entry !== "string" || entry.trim() === "") {
+    return { refused: "must be a non-empty string" };
   }
   if ([...entry].some((c) => c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f)) {
-    return { refused: 'contains a control character' };
+    return { refused: "contains a control character" };
   }
-  if (entry.startsWith(':'))
+  if (entry.startsWith(":"))
     return { refused: 'starts with ":", which git reads as pathspec magic' };
   if (/[*?[\]\\]/.test(entry)) {
-    return { refused: 'contains glob characters (* ? [ ] \\); name the path literally' };
+    return { refused: "contains glob characters (* ? [ ] \\); name the path literally" };
   }
-  if (entry.startsWith('//') || entry.startsWith('~') || /^[A-Za-z]:/.test(entry)) {
-    return { refused: 'is a filesystem path; name it relative to the repository root' };
+  if (entry.startsWith("//") || entry.startsWith("~") || /^[A-Za-z]:/.test(entry)) {
+    return { refused: "is a filesystem path; name it relative to the repository root" };
   }
 
   // Trailing slashes are counted off by hand: `/\/+$/` rescans a run of slashes
   // from every position in it, which is quadratic on `a//////…/b`.
-  const relative = entry.replace(/^\.?\//, '');
+  const relative = entry.replace(/^\.?\//, "");
   let end = relative.length;
-  while (end > 0 && relative[end - 1] === '/') end -= 1;
+  while (end > 0 && relative[end - 1] === "/") end -= 1;
   const path = relative.slice(0, end);
-  const segments = path.split('/');
-  if (path === '' || path === '.') return { refused: 'would exclude the whole repository' };
-  if (segments.includes('..')) return { refused: 'climbs out with ".."' };
-  if (segments.some((segment) => segment === '' || segment === '.')) {
+  const segments = path.split("/");
+  if (path === "" || path === ".") return { refused: "would exclude the whole repository" };
+  if (segments.includes("..")) return { refused: 'climbs out with ".."' };
+  if (segments.some((segment) => segment === "" || segment === ".")) {
     return { refused: 'has an empty or "." segment' };
   }
   return path;
@@ -123,7 +123,7 @@ export function parseConfig(value: unknown, where: string): OverlockConfig {
   for (const key of Object.keys(value)) {
     if (!KEYS.includes(key)) {
       throw new ConfigError(
-        `${where}: unknown setting ${JSON.stringify(key)}. Known: ${KEYS.join(', ')}`,
+        `${where}: unknown setting ${JSON.stringify(key)}. Known: ${KEYS.join(", ")}`,
       );
     }
   }
@@ -133,9 +133,9 @@ export function parseConfig(value: unknown, where: string): OverlockConfig {
     const entry = value.evaluation;
     if (
       !isRecord(entry) ||
-      Object.keys(entry).some((k) => k !== 'repository' && k !== 'captureDiff') ||
-      (entry.captureDiff !== undefined && typeof entry.captureDiff !== 'boolean') ||
-      typeof entry.repository !== 'string' ||
+      Object.keys(entry).some((k) => k !== "repository" && k !== "captureDiff") ||
+      (entry.captureDiff !== undefined && typeof entry.captureDiff !== "boolean") ||
+      typeof entry.repository !== "string" ||
       !/^[\w.-]+(?:\/[\w.-]+)*$/.test(entry.repository)
     ) {
       throw new ConfigError(
@@ -143,39 +143,39 @@ export function parseConfig(value: unknown, where: string): OverlockConfig {
       );
     }
     config.evaluation = { repository: entry.repository };
-    if (typeof entry.captureDiff === 'boolean') config.evaluation.captureDiff = entry.captureDiff;
+    if (typeof entry.captureDiff === "boolean") config.evaluation.captureDiff = entry.captureDiff;
   }
 
   if (value.base !== undefined) {
-    if (typeof value.base !== 'string' || value.base === '') {
+    if (typeof value.base !== "string" || value.base === "") {
       throw new ConfigError(`${where}: base must be a non-empty string`);
     }
     config.base = value.base;
   }
 
   if (value.baseMode !== undefined) {
-    if (value.baseMode !== 'fork-point' && value.baseMode !== 'direct') {
+    if (value.baseMode !== "fork-point" && value.baseMode !== "direct") {
       throw new ConfigError(`${where}: baseMode must be "fork-point" or "direct"`);
     }
     config.baseMode = value.baseMode;
   }
 
   if (value.failOn !== undefined) {
-    if (typeof value.failOn !== 'string' || ![...LEVELS, 'none'].includes(value.failOn)) {
+    if (typeof value.failOn !== "string" || ![...LEVELS, "none"].includes(value.failOn)) {
       throw new ConfigError(`${where}: failOn must be high, medium, low or none`);
     }
-    config.failOn = value.failOn as Severity | 'none';
+    config.failOn = value.failOn as Severity | "none";
   }
 
   if (value.failOnEmpty !== undefined) {
-    if (typeof value.failOnEmpty !== 'boolean') {
+    if (typeof value.failOnEmpty !== "boolean") {
       throw new ConfigError(`${where}: failOnEmpty must be true or false`);
     }
     config.failOnEmpty = value.failOnEmpty;
   }
 
   if (value.untracked !== undefined) {
-    if (typeof value.untracked !== 'boolean') {
+    if (typeof value.untracked !== "boolean") {
       throw new ConfigError(`${where}: untracked must be true or false`);
     }
     config.untracked = value.untracked;
@@ -190,7 +190,7 @@ export function parseConfig(value: unknown, where: string): OverlockConfig {
     const exclude: string[] = [];
     for (const entry of value.exclude as unknown[]) {
       const path = excludeEntry(entry);
-      if (typeof path !== 'string') {
+      if (typeof path !== "string") {
         throw new ConfigError(`${where}: exclude entry ${JSON.stringify(entry)} ${path.refused}`);
       }
       if (!exclude.includes(path)) exclude.push(path);
@@ -207,7 +207,7 @@ export function parseConfig(value: unknown, where: string): OverlockConfig {
       if (!(RULE_IDS as readonly string[]).includes(rule)) {
         throw new ConfigError(`${where}: severity names an unknown rule ${JSON.stringify(rule)}`);
       }
-      if (typeof level !== 'string' || !GRADES.includes(level)) {
+      if (typeof level !== "string" || !GRADES.includes(level)) {
         throw new ConfigError(`${where}: severity.${rule} must be high, medium, low or off`);
       }
       severity[rule as RuleId] = level as Grade;
@@ -216,7 +216,7 @@ export function parseConfig(value: unknown, where: string): OverlockConfig {
   }
 
   if (value.testGlob !== undefined) {
-    if (!Array.isArray(value.testGlob) || value.testGlob.some((p) => typeof p !== 'string')) {
+    if (!Array.isArray(value.testGlob) || value.testGlob.some((p) => typeof p !== "string")) {
       throw new ConfigError(`${where}: testGlob must be an array of regex strings`);
     }
     for (const pattern of value.testGlob as string[]) {
@@ -235,7 +235,7 @@ export function parseConfig(value: unknown, where: string): OverlockConfig {
 }
 
 const readJson = (file: string): unknown => {
-  const text = readFileSync(file, 'utf8');
+  const text = readFileSync(file, "utf8");
   try {
     return JSON.parse(text) as unknown;
   } catch (error) {
@@ -280,7 +280,7 @@ export function loadConfig(options: {
       if (error instanceof ConfigError) throw error;
     }
 
-    const manifest = join(dir, 'package.json');
+    const manifest = join(dir, "package.json");
     try {
       const raw = readJson(manifest);
       if (isRecord(raw) && raw[CONFIG_KEY] !== undefined) {

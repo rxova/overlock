@@ -1,7 +1,7 @@
-import { changeBlocks } from '../diff.js';
-import type { DiffLine, Finding, Severity } from '../types.js';
-import { squash } from './cases.js';
-import { finding, looksLikeAssertion, type Rule, type RuleContext } from './shared.js';
+import { changeBlocks } from "../diff.js";
+import type { DiffLine, Finding, Severity } from "../types.js";
+import { squash } from "./cases.js";
+import { finding, looksLikeAssertion, type Rule, type RuleContext } from "./shared.js";
 
 /**
  * The predicate that decides what an assertion ranges over.
@@ -29,23 +29,23 @@ function* scan(text: string, from = 0): Generator<{ i: number; ch: string; depth
   let quote: string | null = null;
 
   for (let i = from; i < text.length; i += 1) {
-    const ch = text[i] ?? '';
+    const ch = text[i] ?? "";
     if (quote !== null) {
-      if (ch === '\\') i += 1;
+      if (ch === "\\") i += 1;
       else if (ch === quote) quote = null;
       continue;
     }
-    if (ch === "'" || ch === '"' || ch === '`') {
+    if (ch === "'" || ch === '"' || ch === "`") {
       quote = ch;
       continue;
     }
-    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
-    else if (ch === ')' || ch === ']' || ch === '}') depth -= 1;
+    if (ch === "(" || ch === "[" || ch === "{") depth += 1;
+    else if (ch === ")" || ch === "]" || ch === "}") depth -= 1;
     yield { i, ch, depth };
   }
 }
 
-const CLOSERS: Record<string, string> = { '(': ')', '[': ']' };
+const CLOSERS: Record<string, string> = { "(": ")", "[": "]" };
 
 /**
  * What the bracket at `open` encloses, or null when this line does not close it.
@@ -55,7 +55,7 @@ const CLOSERS: Record<string, string> = { '(': ')', '[': ']' };
  * narrowing out of a reflow.
  */
 function enclosed(text: string, open: number): string | null {
-  const close = CLOSERS[text[open] ?? ''];
+  const close = CLOSERS[text[open] ?? ""];
   if (close === undefined) return null;
   for (const { i, ch, depth } of scan(text, open)) {
     if (ch === close && depth === 0) return text.slice(open + 1, i);
@@ -77,7 +77,7 @@ function splitTop(text: string, separator: string): string[] {
 
   // A term reassembled from a wrapped construct keeps the separator the
   // formatter left at the end of its line, and `a` and `a,` are the same term.
-  return parts.map((part) => squash(part).replace(/[,;]+$/, '')).filter((p) => p !== '');
+  return parts.map((part) => squash(part).replace(/[,;]+$/, "")).filter((p) => p !== "");
 }
 
 /** The index of the `(` or `[` a match opens with, given the match and its text. */
@@ -139,9 +139,9 @@ function iterationSource(text: string): string | null {
 /** Members of an array literal, or null when the text is not one. */
 function members(text: string): string[] | null {
   const source = squash(text);
-  if (!source.startsWith('[')) return null;
+  if (!source.startsWith("[")) return null;
   const inner = enclosed(source, 0);
-  return inner === null ? null : splitTop(inner, ',');
+  return inner === null ? null : splitTop(inner, ",");
 }
 
 const DECLARED_LIST = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]*)?=\s*\[/;
@@ -154,40 +154,40 @@ const DECLARED_LIST = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]*)?=\s
  * a finding; a list of what is covered growing is the opposite and stays quiet.
  */
 const EXCLUSION_WORDS = new Set([
-  'allow',
-  'allowed',
-  'allowlist',
-  'except',
-  'excepted',
-  'exclude',
-  'excluded',
-  'excludes',
-  'exempt',
-  'exempted',
-  'exemptions',
-  'exempts',
-  'ignore',
-  'ignored',
-  'known',
-  'no',
-  'not',
-  'omit',
-  'omitted',
-  'pending',
-  'quarantined',
-  'skip',
-  'skipped',
-  'unsupported',
-  'waive',
-  'waived',
-  'whitelist',
+  "allow",
+  "allowed",
+  "allowlist",
+  "except",
+  "excepted",
+  "exclude",
+  "excluded",
+  "excludes",
+  "exempt",
+  "exempted",
+  "exemptions",
+  "exempts",
+  "ignore",
+  "ignored",
+  "known",
+  "no",
+  "not",
+  "omit",
+  "omitted",
+  "pending",
+  "quarantined",
+  "skip",
+  "skipped",
+  "unsupported",
+  "waive",
+  "waived",
+  "whitelist",
 ]);
 
 function wordsOf(identifier: string): string[] {
   return identifier
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .split(/[\s_$]+/)
-    .filter((w) => w !== '')
+    .filter((w) => w !== "")
     .map((w) => w.toLowerCase());
 }
 
@@ -198,7 +198,7 @@ function exclusionList(text: string): { name: string; values: string[] } | null 
   if (m === null || name === undefined) return null;
   if (!wordsOf(name).some((w) => EXCLUSION_WORDS.has(w))) return null;
   const inner = enclosed(text, openerOf(m));
-  return inner === null ? null : { name, values: splitTop(inner, ',') };
+  return inner === null ? null : { name, values: splitTop(inner, ",") };
 }
 
 /** Whether every member of `was` survives into `now`. */
@@ -217,13 +217,13 @@ function conjunctGained(before: string, after: string): Verdict | null {
   const now = filterCall(after);
   if (was === null || now === null || was.receiver !== now.receiver) return null;
 
-  const had = splitTop(was.predicate, '&&');
-  const has = splitTop(now.predicate, '&&');
+  const had = splitTop(was.predicate, "&&");
+  const has = splitTop(now.predicate, "&&");
   if (has.length <= had.length || !keepsAll(had, has)) return null;
 
   const kept = new Set(had);
   const gained = has.filter((term) => !kept.has(term));
-  return { message: `the filter gained a condition — ${gained.join(' && ')}` };
+  return { message: `the filter gained a condition — ${gained.join(" && ")}` };
 }
 
 const RESTRICTING = /^\.\s*(filter|slice)\s*\(/;
@@ -236,7 +236,7 @@ function stepGained(before: string, after: string): Verdict | null {
 
   const had = squash(was);
   const has = squash(now);
-  if (had === '' || !has.startsWith(had)) return null;
+  if (had === "" || !has.startsWith(had)) return null;
 
   const step = RESTRICTING.exec(has.slice(had.length));
   return step === null ? null : { message: `the iterated source gained a .${step[1]}(...) step` };
@@ -265,7 +265,7 @@ function exclusionGrew(before: string, after: string): Verdict | null {
 
   const kept = new Set(was.values);
   const gained = now.values.filter((v) => !kept.has(v));
-  return { message: `${was.name} exempts ${gained.length} more: ${gained.join(', ')}` };
+  return { message: `${was.name} exempts ${gained.length} more: ${gained.join(", ")}` };
 }
 
 const SHAPES = [conjunctGained, stepGained, membersLost, exclusionGrew];
@@ -277,7 +277,7 @@ const SHAPES = [conjunctGained, stepGained, membersLost, exclusionGrew];
  * `medium` is what this repository grades a rule that cannot tell.
  */
 function gradeOf(text: string): Severity {
-  return iterationSource(text) !== null || looksLikeAssertion(text) ? 'high' : 'medium';
+  return iterationSource(text) !== null || looksLikeAssertion(text) ? "high" : "medium";
 }
 
 /**
@@ -290,7 +290,7 @@ function gradeOf(text: string): Severity {
  * one line at a time still is.
  */
 function joined(lines: DiffLine[]): string {
-  return lines.map((l) => l.text).join(' ');
+  return lines.map((l) => l.text).join(" ");
 }
 
 interface Match {
@@ -306,8 +306,8 @@ function firstVerdict(before: string, after: string): Verdict | null {
 
 /** Every narrowing in one run of changed lines, each answering addition claimed once. */
 function matchesIn(block: DiffLine[], renamed: (text: string) => string): Match[] {
-  const adds = block.filter((l) => l.kind === 'add');
-  const dels = block.filter((l) => l.kind === 'del');
+  const adds = block.filter((l) => l.kind === "add");
+  const dels = block.filter((l) => l.kind === "del");
   const claimed = new Set<DiffLine>();
   const found: Match[] = [];
 
@@ -377,30 +377,30 @@ function reflowedMatch(
 }
 
 export const predicateNarrowed: Rule = {
-  rule: 'PREDICATE_NARROWED',
+  rule: "PREDICATE_NARROWED",
   run(ctx: RuleContext): Finding[] {
     const findings: Finding[] = [];
 
     for (const file of ctx.files) {
-      if (file.status === 'deleted' || !ctx.isTest(file.path)) continue;
+      if (file.status === "deleted" || !ctx.isTest(file.path)) continue;
 
       for (const hunk of file.hunks) {
         for (const block of changeBlocks(hunk)) {
           for (const match of matchesIn(block, ctx.renamed)) {
             findings.push(
               finding({
-                rule: 'PREDICATE_NARROWED',
+                rule: "PREDICATE_NARROWED",
                 severity: gradeOf(match.after),
                 file: file.path,
                 /* c8 ignore next -- an added line always carries a post-image number */
                 line: match.line.newLine ?? 1,
                 message:
                   `Test input narrowed: ${match.verdict.message}. ` +
-                  'The assertions are unchanged; there are fewer of them to run.',
+                  "The assertions are unchanged; there are fewer of them to run.",
                 before: match.before,
                 after: match.after,
                 fix_hint:
-                  'Keep the set the assertions ranged over, or say what covers the members it no longer includes.',
+                  "Keep the set the assertions ranged over, or say what covers the members it no longer includes.",
               }),
             );
           }

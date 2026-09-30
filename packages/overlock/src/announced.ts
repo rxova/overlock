@@ -1,8 +1,8 @@
-import { createHash } from 'node:crypto';
-import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
-import type { Report, RuleId } from './types.js';
+import { createHash } from "node:crypto";
+import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+import type { Report, RuleId } from "./types.js";
 
 /**
  * What the Stop hook has already put in front of a person.
@@ -48,7 +48,7 @@ export interface Claim {
 export function announcedPath(env: NodeJS.ProcessEnv = process.env): string {
   const override = env.OVERLOCK_ANNOUNCED;
   if (override) return override;
-  return join(env.OVERLOCK_HOME ?? join(homedir(), '.overlock'), 'announced.jsonl');
+  return join(env.OVERLOCK_HOME ?? join(homedir(), ".overlock"), "announced.jsonl");
 }
 
 /**
@@ -63,24 +63,24 @@ export function patchClaims(report: Report): Claim[] {
   return [
     ...report.suppressions_new.map((s) => ({
       rule: s.rule,
-      key: fingerprint(['ignore', s.rule, s.file, s.target ?? '', s.reason]),
+      key: fingerprint(["ignore", s.rule, s.file, s.target ?? "", s.reason]),
     })),
     ...report.allowed.map((a) => ({
       rule: a.rule,
-      key: fingerprint(['allow', a.rule, a.target ?? '', a.reason]),
+      key: fingerprint(["allow", a.rule, a.target ?? "", a.reason]),
     })),
   ];
 }
 
 function fingerprint(parts: string[]): string {
-  return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
+  return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
 }
 
 /** Malformed lines are skipped: a partial record still answers for the rest. */
 export function readAnnounced(path: string, scope: ClaimScope): Set<string> {
   let raw: string;
   try {
-    raw = readFileSync(path, 'utf8');
+    raw = readFileSync(path, "utf8");
   } catch {
     // Nothing has been announced yet, or the file cannot be read. Either way
     // the hook stops once more, which is the safe direction to be wrong in.
@@ -88,7 +88,7 @@ export function readAnnounced(path: string, scope: ClaimScope): Set<string> {
   }
 
   const keys = new Set<string>();
-  for (const line of raw.split('\n')) {
+  for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
     try {
       const parsed = JSON.parse(line) as Partial<Announcement>;
@@ -112,11 +112,11 @@ export function recordAnnounced(
   if (claimed.length === 0) return true;
   const lines = claimed
     .map((c) => JSON.stringify({ ts: now.toISOString(), ...scope, rule: c.rule, key: c.key }))
-    .join('\n');
+    .join("\n");
 
   try {
     mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(path, `${lines}\n`, 'utf8');
+    appendFileSync(path, `${lines}\n`, "utf8");
     return true;
   } catch {
     return false;
@@ -134,7 +134,7 @@ export function suppressionMemory(options: {
     remember: (claimed) => {
       if (!recordAnnounced(claimed, options.scope, path))
         options.warn(
-          'overlock: this notice could not be recorded, so it will stop the next turn too.\n',
+          "overlock: this notice could not be recorded, so it will stop the next turn too.\n",
         );
     },
   };

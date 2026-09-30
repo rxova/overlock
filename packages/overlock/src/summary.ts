@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { isObjectLike } from '@rxova/ts-utils';
-import type { LedgerEntry } from './ledger.js';
-import type { RuleId, Severity } from './types.js';
+import { readFileSync } from "node:fs";
+import { isObjectLike } from "@rxova/ts-utils";
+import type { LedgerEntry } from "./ledger.js";
+import type { RuleId, Severity } from "./types.js";
 
 /**
  * Reading back what the ledger has been collecting.
@@ -21,17 +21,17 @@ export interface Window {
 export function readLedger(path: string): LedgerEntry[] {
   let raw: string;
   try {
-    raw = readFileSync(path, 'utf8');
+    raw = readFileSync(path, "utf8");
   } catch {
     return [];
   }
 
   const entries: LedgerEntry[] = [];
-  for (const line of raw.split('\n')) {
+  for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
     try {
       const parsed: unknown = JSON.parse(line);
-      if (isObjectLike(parsed) && 'ts' in parsed) {
+      if (isObjectLike(parsed) && "ts" in parsed) {
         entries.push(parsed as LedgerEntry);
       }
     } catch {
@@ -96,7 +96,7 @@ export function summarize(entries: LedgerEntry[], window: Window = {}): Summary 
 
   for (const entry of inWindow) {
     const rules = entry.rules ?? [];
-    const real = rules.some((r) => r.severity === 'high' || r.severity === 'medium');
+    const real = rules.some((r) => r.severity === "high" || r.severity === "medium");
 
     if (real) {
       caught += 1;

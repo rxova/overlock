@@ -1,5 +1,11 @@
 # overlock
 
+## 0.10.4
+
+### Patch Changes
+
+- [#61](https://github.com/rxova/overlock/pull/61) [`3ec8134`](https://github.com/rxova/overlock/commit/3ec81347a6a53e87db0d32392090d015a31fc855) - `overlock replay` now refuses a manifest entry that climbs out of the corpus on Windows too. The check looked for `../`, and on Windows `path.relative` answers `..\`, so an entry such as `../outside.diff` was read from outside the corpus instead of being refused.
+
 ## 0.10.3
 
 ### Patch Changes

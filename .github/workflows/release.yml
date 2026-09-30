@@ -44,6 +44,11 @@ jobs:
       # workflow checks out main by name, which can be a later commit than the
       # one CI judged.
       run-verify: true
+      # The action's `vX.Y.Z` release below is the only GitHub release: a second
+      # `overlock@X.Y.Z` one per version would sit beside it on the releases
+      # page. The `overlock@X.Y.Z` tag is still pushed, because action-tags
+      # reads it.
+      create-github-releases: false
 
   # The action half of this repository. Runs only when the release above
   # published, and reads the commit to tag from the `overlock@<version>` tag

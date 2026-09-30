@@ -38,7 +38,7 @@ subject.
 
 ```ts
 export const myRule: Rule = {
-  rule: 'MY_RULE',
+  rule: "MY_RULE",
   run: ({ files, isTest, renamed }) => {
     /* ... */
   },

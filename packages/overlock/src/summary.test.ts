@@ -1,13 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { CATCH_BAR, meetsBar, readLedger, summarize } from './summary.js';
-import { summaryText } from './report.js';
-import type { LedgerEntry } from './ledger.js';
-import type { Severity } from './types.js';
+import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { CATCH_BAR, meetsBar, readLedger, summarize } from "./summary.js";
+import { summaryText } from "./report.js";
+import type { LedgerEntry } from "./ledger.js";
+import type { Severity } from "./types.js";
 
-const NOW = new Date('2026-08-31T00:00:00.000Z');
+const NOW = new Date("2026-08-31T00:00:00.000Z");
 
 function entry(overrides: Partial<LedgerEntry> & { hoursAgo?: number } = {}): LedgerEntry {
   const { hoursAgo = 1, ...rest } = overrides;
@@ -17,10 +17,10 @@ function entry(overrides: Partial<LedgerEntry> & { hoursAgo?: number } = {}): Le
 
   return {
     ts: new Date(NOW.getTime() - hoursAgo * 3600_000).toISOString(),
-    repo: '/repo',
-    branch: 'main',
-    base: 'HEAD',
-    mode: 'check',
+    repo: "/repo",
+    branch: "main",
+    base: "HEAD",
+    mode: "check",
     ok: rules.length === 0,
     blocked: false,
     counts,
@@ -31,23 +31,23 @@ function entry(overrides: Partial<LedgerEntry> & { hoursAgo?: number } = {}): Le
 }
 
 const high = [
-  { rule: 'TEST_SKIPPED_ADDED', severity: 'high' as const, file: 'a.test.ts', line: 1 },
+  { rule: "TEST_SKIPPED_ADDED", severity: "high" as const, file: "a.test.ts", line: 1 },
 ];
 const low = [
-  { rule: 'TEST_AND_IMPL_TOGETHER', severity: 'low' as const, file: 'a.test.ts', line: 1 },
+  { rule: "TEST_AND_IMPL_TOGETHER", severity: "low" as const, file: "a.test.ts", line: 1 },
 ];
 
-describe('readLedger', () => {
-  it('is empty when there is no file', () => {
-    expect(readLedger('/nowhere/ledger.jsonl')).toEqual([]);
+describe("readLedger", () => {
+  it("is empty when there is no file", () => {
+    expect(readLedger("/nowhere/ledger.jsonl")).toEqual([]);
   });
 
-  it('skips malformed and truncated lines rather than giving up', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'overlock-summary-'));
-    const path = join(dir, 'ledger.jsonl');
+  it("skips malformed and truncated lines rather than giving up", () => {
+    const dir = mkdtempSync(join(tmpdir(), "overlock-summary-"));
+    const path = join(dir, "ledger.jsonl");
     writeFileSync(
       path,
-      [JSON.stringify(entry()), 'not json', '', '{"half":', JSON.stringify(entry())].join('\n'),
+      [JSON.stringify(entry()), "not json", "", '{"half":', JSON.stringify(entry())].join("\n"),
     );
 
     try {
@@ -57,10 +57,10 @@ describe('readLedger', () => {
     }
   });
 
-  it('rejects rows that are not ledger entries', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'overlock-summary-'));
-    const path = join(dir, 'ledger.jsonl');
-    writeFileSync(path, ['{"unrelated":true}', '[]', 'null'].join('\n'));
+  it("rejects rows that are not ledger entries", () => {
+    const dir = mkdtempSync(join(tmpdir(), "overlock-summary-"));
+    const path = join(dir, "ledger.jsonl");
+    writeFileSync(path, ['{"unrelated":true}', "[]", "null"].join("\n"));
 
     try {
       expect(readLedger(path)).toEqual([]);
@@ -70,8 +70,8 @@ describe('readLedger', () => {
   });
 });
 
-describe('summarize', () => {
-  it('counts nothing for an empty ledger', () => {
+describe("summarize", () => {
+  it("counts nothing for an empty ledger", () => {
     const s = summarize([], { days: 30, now: NOW });
     expect(s).toMatchObject({ runs: 0, caught: 0, noted: 0, blocked: 0, repos: 0 });
     expect(s.first).toBeNull();
@@ -79,13 +79,13 @@ describe('summarize', () => {
 
   // The metric that decides whether the tool passes its own bar, so it is the
   // one most worth pinning: low findings are context, not catches.
-  it('does not count a low-only run as a catch', () => {
+  it("does not count a low-only run as a catch", () => {
     const s = summarize([entry({ rules: low })], { now: NOW });
     expect(s.caught).toBe(0);
     expect(s.noted).toBe(1);
   });
 
-  it('counts a run carrying anything above low', () => {
+  it("counts a run carrying anything above low", () => {
     const s = summarize([entry({ rules: high }), entry({ rules: [...high, ...low] })], {
       now: NOW,
     });
@@ -93,7 +93,7 @@ describe('summarize', () => {
     expect(s.noted).toBe(0);
   });
 
-  it('counts a run once however many rules fired', () => {
+  it("counts a run once however many rules fired", () => {
     const s = summarize([entry({ rules: [...high, ...high] })], { now: NOW });
     expect(s.caught).toBe(1);
     // Runs, not findings: one mass rename produces hundreds of findings in a
@@ -102,7 +102,7 @@ describe('summarize', () => {
     expect(s.byRule[0]?.count).toBe(1);
   });
 
-  it('honours the day window', () => {
+  it("honours the day window", () => {
     const entries = [
       entry({ hoursAgo: 1, rules: high }),
       entry({ hoursAgo: 24 * 40, rules: high }),
@@ -112,40 +112,40 @@ describe('summarize', () => {
     expect(summarize(entries, { now: NOW }).caught).toBe(2);
   });
 
-  it('ignores an unparseable timestamp when a window is set', () => {
-    const s = summarize([entry({ ts: 'not a date', rules: high })], { days: 30, now: NOW });
+  it("ignores an unparseable timestamp when a window is set", () => {
+    const s = summarize([entry({ ts: "not a date", rules: high })], { days: 30, now: NOW });
     expect(s.runs).toBe(0);
   });
 
-  it('tallies blocks, suppressions and repositories', () => {
+  it("tallies blocks, suppressions and repositories", () => {
     const s = summarize(
       [
-        entry({ repo: '/a', rules: high, blocked: true, suppressed: 2 }),
-        entry({ repo: '/b', rules: high }),
-        entry({ repo: '/b' }),
+        entry({ repo: "/a", rules: high, blocked: true, suppressed: 2 }),
+        entry({ repo: "/b", rules: high }),
+        entry({ repo: "/b" }),
       ],
       { now: NOW },
     );
 
     expect(s).toMatchObject({ runs: 3, blocked: 1, suppressed: 2, repos: 2 });
     expect(s.byRepo).toEqual([
-      { repo: '/a', caught: 1 },
-      { repo: '/b', caught: 1 },
+      { repo: "/a", caught: 1 },
+      { repo: "/b", caught: 1 },
     ]);
   });
 
-  it('orders rules by how many runs they fired in', () => {
+  it("orders rules by how many runs they fired in", () => {
     const s = summarize(
       [entry({ rules: high }), entry({ rules: [...high, ...low] }), entry({ rules: high })],
       { now: NOW },
     );
     expect(s.byRule).toEqual([
-      { rule: 'TEST_SKIPPED_ADDED', count: 3 },
-      { rule: 'TEST_AND_IMPL_TOGETHER', count: 1 },
+      { rule: "TEST_SKIPPED_ADDED", count: 3 },
+      { rule: "TEST_AND_IMPL_TOGETHER", count: 1 },
     ]);
   });
 
-  it('survives a row written before `suppressed` existed', () => {
+  it("survives a row written before `suppressed` existed", () => {
     const legacy = { ...entry({ rules: high }) } as Partial<LedgerEntry>;
     delete legacy.suppressed;
     delete legacy.rules;
@@ -155,8 +155,8 @@ describe('summarize', () => {
   });
 });
 
-describe('meetsBar', () => {
-  it('cannot establish success from any number of unreviewed detections', () => {
+describe("meetsBar", () => {
+  it("cannot establish success from any number of unreviewed detections", () => {
     const under = summarize(
       Array.from({ length: CATCH_BAR - 1 }, () => entry({ rules: high })),
       {
@@ -174,7 +174,7 @@ describe('meetsBar', () => {
     expect(meetsBar(over)).toBe(false);
   });
 
-  it('cannot be met by low findings alone', () => {
+  it("cannot be met by low findings alone", () => {
     const s = summarize(
       Array.from({ length: 50 }, () => entry({ rules: low })),
       { now: NOW },
@@ -183,24 +183,24 @@ describe('meetsBar', () => {
   });
 });
 
-describe('summaryText', () => {
-  it('tells you how to start when nothing is recorded', () => {
+describe("summaryText", () => {
+  it("tells you how to start when nothing is recorded", () => {
     const text = summaryText(summarize([], { days: 30, now: NOW }), false);
-    expect(text).toContain('nothing recorded');
-    expect(text).toContain('overlock init claude');
+    expect(text).toContain("nothing recorded");
+    expect(text).toContain("overlock init claude");
   });
 
-  it('separates low-severity rules from the headline chart', () => {
+  it("separates low-severity rules from the headline chart", () => {
     const s = summarize([entry({ rules: high }), entry({ rules: low })], { now: NOW });
     const text = summaryText(s, false);
 
-    expect(text).toContain('By rule');
-    expect(text).toContain('Context only');
-    expect(text.indexOf('TEST_SKIPPED_ADDED')).toBeLessThan(text.indexOf('Context only'));
-    expect(text.indexOf('TEST_AND_IMPL_TOGETHER')).toBeGreaterThan(text.indexOf('Context only'));
+    expect(text).toContain("By rule");
+    expect(text).toContain("Context only");
+    expect(text.indexOf("TEST_SKIPPED_ADDED")).toBeLessThan(text.indexOf("Context only"));
+    expect(text.indexOf("TEST_AND_IMPL_TOGETHER")).toBeGreaterThan(text.indexOf("Context only"));
   });
 
-  it('states that repeated detections cannot measure useful corrections', () => {
+  it("states that repeated detections cannot measure useful corrections", () => {
     const met = summaryText(
       summarize(
         Array.from({ length: CATCH_BAR }, () => entry({ rules: high })),
@@ -208,39 +208,39 @@ describe('summaryText', () => {
       ),
       false,
     );
-    expect(met).toContain('cannot measure useful corrections');
-    expect(met).toContain('overlock evaluate');
+    expect(met).toContain("cannot measure useful corrections");
+    expect(met).toContain("overlock evaluate");
 
     const missed = summaryText(summarize([entry({ rules: high })], { now: NOW }), false);
-    expect(missed).not.toContain('Bar:');
+    expect(missed).not.toContain("Bar:");
   });
 
-  it('breaks down by repository once there is more than one', () => {
-    const s = summarize([entry({ repo: '/a', rules: high }), entry({ repo: '/b', rules: high })], {
+  it("breaks down by repository once there is more than one", () => {
+    const s = summarize([entry({ repo: "/a", rules: high }), entry({ repo: "/b", rules: high })], {
       now: NOW,
     });
     const text = summaryText(s, false);
 
-    expect(text).toContain('By repository');
-    expect(text).toContain('/a');
-    expect(text).toContain('/b');
+    expect(text).toContain("By repository");
+    expect(text).toContain("/a");
+    expect(text).toContain("/b");
   });
 
-  it('keeps the identifying tail of a long repository path', () => {
-    const long = `/home/someone/a/very/deeply/nested/workspace/directory/${'x'.repeat(40)}/my-repo`;
-    const s = summarize([entry({ repo: long, rules: high }), entry({ repo: '/b', rules: high })], {
+  it("keeps the identifying tail of a long repository path", () => {
+    const long = `/home/someone/a/very/deeply/nested/workspace/directory/${"x".repeat(40)}/my-repo`;
+    const s = summarize([entry({ repo: long, rules: high }), entry({ repo: "/b", rules: high })], {
       now: NOW,
     });
     const text = summaryText(s, false);
 
-    expect(text).toContain('my-repo');
-    expect(text).toContain('...');
-    expect(text.split('\n').every((l) => l.length < 100)).toBe(true);
+    expect(text).toContain("my-repo");
+    expect(text).toContain("...");
+    expect(text.split("\n").every((l) => l.length < 100)).toBe(true);
   });
 
-  it('hides the per-repository breakdown for a single repository', () => {
+  it("hides the per-repository breakdown for a single repository", () => {
     expect(summaryText(summarize([entry({ rules: high })], { now: NOW }), false)).not.toContain(
-      'By repository',
+      "By repository",
     );
   });
 });

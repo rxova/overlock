@@ -1,8 +1,8 @@
-import { addedLines, removedLines } from '../diff.js';
-import { sourceSubject, testSubject } from '../paths.js';
-import type { DiffFile, Finding } from '../types.js';
-import { bodies, declaredName, isSameCase, type CaseBody } from './cases.js';
-import { finding, type Rule, type RuleContext } from './shared.js';
+import { addedLines, removedLines } from "../diff.js";
+import { sourceSubject, testSubject } from "../paths.js";
+import type { DiffFile, Finding } from "../types.js";
+import { bodies, declaredName, isSameCase, type CaseBody } from "./cases.js";
+import { finding, type Rule, type RuleContext } from "./shared.js";
 
 /**
  * Every case this patch declares on an added line, with the file it landed in.
@@ -20,7 +20,7 @@ interface Arrival {
 function arrivals(ctx: RuleContext): Arrival[] {
   const found: Arrival[] = [];
   for (const file of ctx.files) {
-    if (file.status === 'deleted' || !ctx.isTest(file.path)) continue;
+    if (file.status === "deleted" || !ctx.isTest(file.path)) continue;
     for (const body of bodies(addedLines(file))) found.push({ path: file.path, body });
   }
   return found;
@@ -68,7 +68,7 @@ function subjectAlsoDeleted(file: DiffFile, ctx: RuleContext): string | null {
   if (subject === null) return null;
 
   for (const other of ctx.files) {
-    if (other.status !== 'deleted' || ctx.isTest(other.path)) continue;
+    if (other.status !== "deleted" || ctx.isTest(other.path)) continue;
     if (sourceSubject(other.path) === subject) return other.path;
   }
   return null;
@@ -78,15 +78,15 @@ function subjectAlsoDeleted(file: DiffFile, ctx: RuleContext): string | null {
 const MAX_NAMES = 5;
 
 function listNames(names: string[]): string {
-  const shown = names.slice(0, MAX_NAMES).join(', ');
+  const shown = names.slice(0, MAX_NAMES).join(", ");
   const hidden = names.length - Math.min(names.length, MAX_NAMES);
   return hidden > 0 ? `${shown}, and ${hidden} more` : shown;
 }
 
 const DELETION_HINT =
-  'Move the missing cases into a file the runner collects, or record the decision where ' +
-  'overlock reads it: `overlock-ignore TEST_REMOVED <path> -- <reason>`. Saying it in the ' +
-  'commit message or description explains it to a reviewer, but nothing reads that.';
+  "Move the missing cases into a file the runner collects, or record the decision where " +
+  "overlock reads it: `overlock-ignore TEST_REMOVED <path> -- <reason>`. Saying it in the " +
+  "commit message or description explains it to a reviewer, but nothing reads that.";
 
 /** A file whose every case is accounted for somewhere else in the patch. */
 interface Move {
@@ -108,7 +108,7 @@ function soleDestination(landings: string[]): string | null {
   return distinct.length === 1 ? (distinct[0] ?? null) : null;
 }
 
-type Verdict = { kind: 'moved'; move: Move } | { kind: 'finding'; finding: Finding };
+type Verdict = { kind: "moved"; move: Move } | { kind: "finding"; finding: Finding };
 
 /**
  * What a deleted test file amounts to, given everything else in the patch.
@@ -120,7 +120,7 @@ type Verdict = { kind: 'moved'; move: Move } | { kind: 'finding'; finding: Findi
  */
 function deletedFile(file: DiffFile, ctx: RuleContext, gained: Arrival[]): Verdict {
   const base = {
-    rule: 'TEST_REMOVED',
+    rule: "TEST_REMOVED",
     file: file.path,
     line: null,
     fix_hint: DELETION_HINT,
@@ -129,10 +129,10 @@ function deletedFile(file: DiffFile, ctx: RuleContext, gained: Arrival[]): Verdi
   const deletedSubject = subjectAlsoDeleted(file, ctx);
   if (deletedSubject !== null) {
     return {
-      kind: 'finding',
+      kind: "finding",
       finding: finding({
         ...base,
-        severity: 'medium',
+        severity: "medium",
         message: `Test file deleted, along with the module it covers (${deletedSubject}).`,
       }),
     };
@@ -145,8 +145,8 @@ function deletedFile(file: DiffFile, ctx: RuleContext, gained: Arrival[]): Verdi
   // graded down.
   if (removed.length === 0) {
     return {
-      kind: 'finding',
-      finding: finding({ ...base, severity: 'high', message: 'Test file deleted.' }),
+      kind: "finding",
+      finding: finding({ ...base, severity: "high", message: "Test file deleted." }),
     };
   }
 
@@ -156,7 +156,7 @@ function deletedFile(file: DiffFile, ctx: RuleContext, gained: Arrival[]): Verdi
 
   if (vanished.length === 0) {
     return {
-      kind: 'moved',
+      kind: "moved",
       move: {
         from: file.path,
         to: soleDestination(rehomed.map((l) => l.at)),
@@ -166,17 +166,17 @@ function deletedFile(file: DiffFile, ctx: RuleContext, gained: Arrival[]): Verdi
   }
 
   const destination = soleDestination(rehomed.map((l) => l.at));
-  const where = destination === null ? 'elsewhere in this patch' : `in ${destination}`;
+  const where = destination === null ? "elsewhere in this patch" : `in ${destination}`;
   const preamble =
     rehomed.length > 0
       ? `Test file deleted — ${rehomed.length} of ${removed.length} cases reappear ${where}. ${vanished.length} did not`
       : `Test file deleted — none of its ${removed.length} cases appear elsewhere in this patch`;
 
   return {
-    kind: 'finding',
+    kind: "finding",
     finding: finding({
       ...base,
-      severity: 'high',
+      severity: "high",
       message: `${preamble}: ${listNames(vanished)}`,
     }),
   };
@@ -201,10 +201,10 @@ function describeMove(move: Move): string {
 function movedFiles(moves: Move[]): Finding {
   const first = moves[0] as Move;
   if (moves.length === 1) {
-    const where = first.to === null ? 'elsewhere in this patch' : `in ${first.to}`;
+    const where = first.to === null ? "elsewhere in this patch" : `in ${first.to}`;
     return finding({
-      rule: 'TEST_REMOVED',
-      severity: 'medium',
+      rule: "TEST_REMOVED",
+      severity: "medium",
       file: first.from,
       line: null,
       message: `Test file deleted — all ${first.cases} of its cases reappear ${where}.`,
@@ -214,8 +214,8 @@ function movedFiles(moves: Move[]): Finding {
 
   const cases = moves.reduce((total, m) => total + m.cases, 0);
   return finding({
-    rule: 'TEST_REMOVED',
-    severity: 'medium',
+    rule: "TEST_REMOVED",
+    severity: "medium",
     file: first.from,
     line: null,
     message:
@@ -223,22 +223,22 @@ function movedFiles(moves: Move[]): Finding {
       `in this patch: ${listNames(moves.map(describeMove))}`,
     fix_hint:
       `One acknowledgement covers the set: \`overlock-ignore TEST_REMOVED ${first.from} -- <reason>\`, ` +
-      'or `Overlock-Allow: TEST_REMOVED -- <reason>` in the commit message. Read one of the ' +
-      'destination files first — a case that was found again by name is not a case that still asserts what it did.',
+      "or `Overlock-Allow: TEST_REMOVED -- <reason>` in the commit message. Read one of the " +
+      "destination files first — a case that was found again by name is not a case that still asserts what it did.",
   });
 }
 
 export const testRemoved: Rule = {
-  rule: 'TEST_REMOVED',
+  rule: "TEST_REMOVED",
   run(ctx: RuleContext): Finding[] {
     const findings: Finding[] = [];
     const gained = arrivals(ctx);
     const moves: Move[] = [];
 
     for (const file of ctx.files) {
-      if (file.status === 'deleted' && ctx.isTest(file.path)) {
+      if (file.status === "deleted" && ctx.isTest(file.path)) {
         const verdict = deletedFile(file, ctx, gained);
-        if (verdict.kind === 'moved') moves.push(verdict.move);
+        if (verdict.kind === "moved") moves.push(verdict.move);
         else findings.push(verdict.finding);
         continue;
       }
@@ -246,33 +246,33 @@ export const testRemoved: Rule = {
       // A rename out of the runner's glob deletes the tests without deleting
       // the file, which is why this is checked separately and at the same
       // severity: `login.test.ts` becoming `login.helpers.ts` stops it running.
-      if (file.status === 'renamed' && file.oldPath && ctx.isTest(file.oldPath)) {
+      if (file.status === "renamed" && file.oldPath && ctx.isTest(file.oldPath)) {
         if (!ctx.isTest(file.path)) {
           findings.push(
             finding({
-              rule: 'TEST_REMOVED',
-              severity: 'high',
+              rule: "TEST_REMOVED",
+              severity: "high",
               file: file.path,
               line: null,
               message: `Test file renamed out of the test glob (was ${file.oldPath}).`,
               before: file.oldPath,
               after: file.path,
-              fix_hint: 'Rename it back, or move the cases into a file the runner still collects.',
+              fix_hint: "Rename it back, or move the cases into a file the runner still collects.",
             }),
           );
           continue;
         }
       }
 
-      if (file.status === 'deleted' || !ctx.isTest(file.path)) continue;
+      if (file.status === "deleted" || !ctx.isTest(file.path)) continue;
 
       for (const removed of bodies(removedLines(file))) {
         if (landedIn(removed, ctx, gained) !== null) continue;
 
         findings.push(
           finding({
-            rule: 'TEST_REMOVED',
-            severity: 'medium',
+            rule: "TEST_REMOVED",
+            severity: "medium",
             file: file.path,
             line: removed.declaration.oldLine ?? 1,
             // Named so an acknowledgement can cover this case and no other:
@@ -281,7 +281,7 @@ export const testRemoved: Rule = {
             subject: removed.name,
             message: `Test case removed: ${removed.name}`,
             before: removed.declaration.text,
-            fix_hint: 'Put the case back, or replace it with one that covers the same behaviour.',
+            fix_hint: "Put the case back, or replace it with one that covers the same behaviour.",
           }),
         );
       }

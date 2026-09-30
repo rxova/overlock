@@ -1,5 +1,5 @@
-import type { Finding } from '../types.js';
-import { finding, withoutStringContents, type Rule, type RuleContext } from './shared.js';
+import type { Finding } from "../types.js";
+import { finding, withoutStringContents, type Rule, type RuleContext } from "./shared.js";
 
 interface SkipPattern {
   re: RegExp;
@@ -14,27 +14,27 @@ interface SkipPattern {
 }
 
 const SKIP_PATTERNS: SkipPattern[] = [
-  { re: /\b(?:it|test|describe|context|suite)\s*\.\s*skip\b/, label: '.skip' },
-  { re: /\b(?:it|test|describe|context|suite)\s*\.\s*todo\b/, label: '.todo' },
-  { re: /\bx(?:it|test|describe|context)\s*\(/, label: 'x-prefixed declaration' },
-  { re: /\bpending\s*\(/, label: 'pending()' },
+  { re: /\b(?:it|test|describe|context|suite)\s*\.\s*skip\b/, label: ".skip" },
+  { re: /\b(?:it|test|describe|context|suite)\s*\.\s*todo\b/, label: ".todo" },
+  { re: /\bx(?:it|test|describe|context)\s*\(/, label: "x-prefixed declaration" },
+  { re: /\bpending\s*\(/, label: "pending()" },
   // `.only` is the inverse trick and a worse one: it does not skip this test,
   // it skips every other test in the file. Committed, it is never intentional.
-  { re: /\b(?:it|test|describe|context|suite)\s*\.\s*only\b/, label: '.only', exclusive: true },
-  { re: /\bfit\s*\(|\bfdescribe\s*\(/, label: 'f-prefixed declaration', exclusive: true },
-  { re: /@pytest\.mark\.skip/, label: '@pytest.mark.skip' },
-  { re: /@pytest\.mark\.xfail/, label: '@pytest.mark.xfail' },
-  { re: /@(?:unittest\.)?skip(?:If|Unless)?\b/, label: '@skip' },
-  { re: /\bpytest\.skip\s*\(/, label: 'pytest.skip()' },
+  { re: /\b(?:it|test|describe|context|suite)\s*\.\s*only\b/, label: ".only", exclusive: true },
+  { re: /\bfit\s*\(|\bfdescribe\s*\(/, label: "f-prefixed declaration", exclusive: true },
+  { re: /@pytest\.mark\.skip/, label: "@pytest.mark.skip" },
+  { re: /@pytest\.mark\.xfail/, label: "@pytest.mark.xfail" },
+  { re: /@(?:unittest\.)?skip(?:If|Unless)?\b/, label: "@skip" },
+  { re: /\bpytest\.skip\s*\(/, label: "pytest.skip()" },
   // Go, Rust, JVM and .NET keep tests in ordinary source files, so these are not
   // gated on the path looking like a test — but they ARE gated on the language.
   // Without that, a markdown table listing the markers, or a linter rule that
   // matches them, reads as tampering. That is not hypothetical: it is the first
   // thing this tool reported when run against its own repository.
-  { re: /\bt\.Skip(?:Now|f)?\s*\(/, label: 't.Skip()', extensions: ['.go'] },
-  { re: /#!?\[ignore\]/, label: '#[ignore]', extensions: ['.rs'] },
-  { re: /@(?:Disabled|Ignore)\b/, label: '@Disabled', extensions: ['.java', '.kt', '.kts'] },
-  { re: /\[(?:Ignore|Skip)\]/, label: '[Ignore]', extensions: ['.cs', '.fs'] },
+  { re: /\bt\.Skip(?:Now|f)?\s*\(/, label: "t.Skip()", extensions: [".go"] },
+  { re: /#!?\[ignore\]/, label: "#[ignore]", extensions: [".rs"] },
+  { re: /@(?:Disabled|Ignore)\b/, label: "@Disabled", extensions: [".java", ".kt", ".kts"] },
+  { re: /\[(?:Ignore|Skip)\]/, label: "[Ignore]", extensions: [".cs", ".fs"] },
 ];
 
 /**
@@ -50,28 +50,28 @@ function isCommented(text: string): boolean {
 }
 
 function extensionOf(path: string): string {
-  const base = path.slice(path.lastIndexOf('/') + 1);
-  const dot = base.lastIndexOf('.');
-  return dot === -1 ? '' : base.slice(dot);
+  const base = path.slice(path.lastIndexOf("/") + 1);
+  const dot = base.lastIndexOf(".");
+  return dot === -1 ? "" : base.slice(dot);
 }
 
 export const testSkippedAdded: Rule = {
-  rule: 'TEST_SKIPPED_ADDED',
+  rule: "TEST_SKIPPED_ADDED",
   run(ctx: RuleContext): Finding[] {
     const findings: Finding[] = [];
 
     for (const file of ctx.files) {
-      if (file.status === 'deleted') continue;
+      if (file.status === "deleted") continue;
       const inTestFile = ctx.isTest(file.path);
       const extension = extensionOf(file.path);
 
       // Every line of the post-image, so a marker split over two lines can be
       // rejoined. `it\n  .skip(...)` is a formatter's ordinary output and it
       // evaded this rule entirely while only the added half was examined.
-      const post = file.hunks.flatMap((h) => h.lines.filter((l) => l.kind !== 'del'));
+      const post = file.hunks.flatMap((h) => h.lines.filter((l) => l.kind !== "del"));
 
       for (const [index, line] of post.entries()) {
-        if (line.kind !== 'add') continue;
+        if (line.kind !== "add") continue;
         if (isCommented(line.text)) continue;
 
         const previous = post[index - 1];
@@ -94,8 +94,8 @@ export const testSkippedAdded: Rule = {
 
           findings.push(
             finding({
-              rule: 'TEST_SKIPPED_ADDED',
-              severity: 'high',
+              rule: "TEST_SKIPPED_ADDED",
+              severity: "high",
               file: file.path,
               /* c8 ignore next -- an added line always carries a post-image number */
               line: line.newLine ?? 1,
@@ -105,7 +105,7 @@ export const testSkippedAdded: Rule = {
               after: line.text,
               fix_hint: pattern.exclusive
                 ? `Remove ${pattern.label} so the rest of the file runs again.`
-                : 'Make the test pass, or delete it deliberately and say why.',
+                : "Make the test pass, or delete it deliberately and say why.",
             }),
           );
           break;

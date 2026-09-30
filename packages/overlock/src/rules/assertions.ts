@@ -1,6 +1,6 @@
-import { addedLines, changeBlocks, removedLines } from '../diff.js';
-import type { DiffFile, DiffLine, Finding, Severity } from '../types.js';
-import { byCase, squash, type CaseDelta } from './cases.js';
+import { addedLines, changeBlocks, removedLines } from "../diff.js";
+import type { DiffFile, DiffLine, Finding, Severity } from "../types.js";
+import { byCase, squash, type CaseDelta } from "./cases.js";
 import {
   canonicalQuotes,
   countAssertions,
@@ -11,7 +11,7 @@ import {
   normalizeLiterals,
   type Rule,
   type RuleContext,
-} from './shared.js';
+} from "./shared.js";
 
 /**
  * Matchers that pin a value down.
@@ -45,12 +45,12 @@ const PLACEHOLDER = /\bexpect\s*\.\s*any(?:thing)?\s*\(/;
  * the ways an assertion stops naming a value, kept separate from them.
  */
 const LOOSE: { re: RegExp; checks: string }[] = [
-  { re: /\b(?:toBeDefined|assertIsNotNone)\s*\(/, checks: 'that a value is present' },
-  { re: /\b(?:toBeTruthy|assertTrue)\s*\(/, checks: 'that a value is truthy' },
-  { re: /\btoBeFalsy\s*\(/, checks: 'that a value is falsy' },
-  { re: /\btoBeInstanceOf\s*\(/, checks: 'the type' },
-  { re: /\btoHaveBeenCalled\s*\(/, checks: 'that it was called at all' },
-  { re: PLACEHOLDER, checks: 'the type' },
+  { re: /\b(?:toBeDefined|assertIsNotNone)\s*\(/, checks: "that a value is present" },
+  { re: /\b(?:toBeTruthy|assertTrue)\s*\(/, checks: "that a value is truthy" },
+  { re: /\btoBeFalsy\s*\(/, checks: "that a value is falsy" },
+  { re: /\btoBeInstanceOf\s*\(/, checks: "the type" },
+  { re: /\btoHaveBeenCalled\s*\(/, checks: "that it was called at all" },
+  { re: PLACEHOLDER, checks: "the type" },
 ];
 
 /** Whether an assertion still names the value it expects. */
@@ -74,7 +74,7 @@ function looseness(text: string): string | null {
     // is there and nothing at all about what it is. Every other negated matcher
     // is left alone — `not.toBeTruthy()` is neither exact nor an existence
     // check, and guessing which is how this rule got too wide in the first place.
-    return NULLISH.test(text) ? 'that a value is present' : null;
+    return NULLISH.test(text) ? "that a value is present" : null;
   }
   for (const m of LOOSE) if (m.re.test(text)) return m.checks;
   return null;
@@ -108,7 +108,7 @@ function postImage(file: DiffFile, renamed: (text: string) => string): Set<strin
   const kept = new Set<string>();
   for (const hunk of file.hunks) {
     for (const line of hunk.lines) {
-      if (line.kind === 'del') continue;
+      if (line.kind === "del") continue;
       kept.add(squash(canonicalQuotes(line.text)));
       // A removal is compared under the patch's inferred rename, so the
       // post-image has to be readable on the same terms.
@@ -141,12 +141,12 @@ function checksFewerValues(before: string, after: string): boolean {
 
 /** What a replacement gave up, in the terms the finding is written in. */
 type Verdict =
-  | { rule: 'ASSERTION_WEAKENED'; message: string; fix_hint: string }
-  | { rule: 'ASSERTION_NARROWED'; message: string; fix_hint: string };
+  | { rule: "ASSERTION_WEAKENED"; message: string; fix_hint: string }
+  | { rule: "ASSERTION_NARROWED"; message: string; fix_hint: string };
 
-const WEAKENED_HINT = 'Assert the value, not that a value is present.';
+const WEAKENED_HINT = "Assert the value, not that a value is present.";
 const NARROWED_HINT =
-  'Keep the assertion that covered the whole thing, or say what now covers the rest of it.';
+  "Keep the assertion that covered the whole thing, or say what now covers the rest of it.";
 
 /**
  * The first unclaimed addition that answers for this removal, and what it gave up.
@@ -180,7 +180,7 @@ function answerFor(
           index,
           line,
           verdict: {
-            rule: 'ASSERTION_WEAKENED',
+            rule: "ASSERTION_WEAKENED",
             message: `An exact assertion was replaced with one that only checks ${checks}.`,
             fix_hint: WEAKENED_HINT,
           },
@@ -191,7 +191,7 @@ function answerFor(
           index,
           line,
           verdict: {
-            rule: 'ASSERTION_NARROWED',
+            rule: "ASSERTION_NARROWED",
             message:
               `Assertion narrowed: ${literalsOf(before).length} expected values checked, ` +
               `now ${literalsOf(line.text).length}.`,
@@ -207,7 +207,7 @@ function answerFor(
         index,
         line,
         verdict: {
-          rule: 'ASSERTION_NARROWED',
+          rule: "ASSERTION_NARROWED",
           message: `Assertion narrowed: ${subject} was checked as a whole, now only ${target}.`,
           fix_hint: NARROWED_HINT,
         },
@@ -255,21 +255,21 @@ function gradeByCase(
 ): { severity: Severity; note: string } {
   const delta = around.get(line);
   const balance = delta === undefined ? 0 : assertionBalance(delta);
-  if (balance <= 0) return { severity: 'high', note: '' };
+  if (balance <= 0) return { severity: "high", note: "" };
   return {
-    severity: 'medium',
-    note: ` The case gained ${balance} assertion${balance === 1 ? '' : 's'} overall.`,
+    severity: "medium",
+    note: ` The case gained ${balance} assertion${balance === 1 ? "" : "s"} overall.`,
   };
 }
 
 export const assertionRemoved: Rule = {
-  rule: 'ASSERTION_REMOVED',
+  rule: "ASSERTION_REMOVED",
   run(ctx: RuleContext): Finding[] {
     const findings: Finding[] = [];
 
     for (const file of ctx.files) {
       // A deleted test file is TEST_REMOVED's finding, not a second one here.
-      if (file.status === 'deleted' || !ctx.isTest(file.path)) continue;
+      if (file.status === "deleted" || !ctx.isTest(file.path)) continue;
 
       const removed = removedLines(file);
       const before = removed.reduce((n, l) => n + countAssertions(l.text), 0);
@@ -281,15 +281,15 @@ export const assertionRemoved: Rule = {
 
       findings.push(
         finding({
-          rule: 'ASSERTION_REMOVED',
-          severity: 'medium',
+          rule: "ASSERTION_REMOVED",
+          severity: "medium",
           file: file.path,
           /* c8 ignore next -- a removed line always carries a pre-image number */
           line: firstAssertion?.oldLine ?? 1,
-          message: `${lost} assertion${lost === 1 ? '' : 's'} removed and not replaced.`,
+          message: `${lost} assertion${lost === 1 ? "" : "s"} removed and not replaced.`,
           ...(firstAssertion ? { before: firstAssertion.text } : {}),
           fix_hint:
-            'If the behaviour still holds, assert it. If it does not, the test was telling you something.',
+            "If the behaviour still holds, assert it. If it does not, the test was telling you something.",
         }),
       );
     }
@@ -317,7 +317,7 @@ function looseningFindings(ctx: RuleContext): Finding[] {
   const findings: Finding[] = [];
 
   for (const file of ctx.files) {
-    if (file.status === 'deleted' || !ctx.isTest(file.path)) continue;
+    if (file.status === "deleted" || !ctx.isTest(file.path)) continue;
 
     const kept = postImage(file, ctx.renamed);
     const around = casesAround(file);
@@ -327,11 +327,11 @@ function looseningFindings(ctx: RuleContext): Finding[] {
       // apart are one hunk and two different tests, and pairing across them
       // invents a weakening out of a removal here and an addition there.
       for (const block of changeBlocks(hunk)) {
-        const adds = block.filter((l) => l.kind === 'add');
+        const adds = block.filter((l) => l.kind === "add");
         const claimed = new Set<number>();
 
         for (const del of block) {
-          if (del.kind !== 'del') continue;
+          if (del.kind !== "del") continue;
 
           // The subject is taken from the renamed pre-image, because the
           // subject is where a rename lands: `expect(warehouserouting.total())`
@@ -379,26 +379,26 @@ function looseningFindings(ctx: RuleContext): Finding[] {
 }
 
 export const assertionWeakened: Rule = {
-  rule: 'ASSERTION_WEAKENED',
-  run: (ctx) => looseningFindings(ctx).filter((f) => f.rule === 'ASSERTION_WEAKENED'),
+  rule: "ASSERTION_WEAKENED",
+  run: (ctx) => looseningFindings(ctx).filter((f) => f.rule === "ASSERTION_WEAKENED"),
 };
 
 export const assertionNarrowed: Rule = {
-  rule: 'ASSERTION_NARROWED',
-  run: (ctx) => looseningFindings(ctx).filter((f) => f.rule === 'ASSERTION_NARROWED'),
+  rule: "ASSERTION_NARROWED",
+  run: (ctx) => looseningFindings(ctx).filter((f) => f.rule === "ASSERTION_NARROWED"),
 };
 
 export const expectedValueChanged: Rule = {
-  rule: 'EXPECTED_VALUE_CHANGED',
+  rule: "EXPECTED_VALUE_CHANGED",
   run(ctx: RuleContext): Finding[] {
     const findings: Finding[] = [];
 
     for (const file of ctx.files) {
-      if (file.status === 'deleted' || !ctx.isTest(file.path)) continue;
+      if (file.status === "deleted" || !ctx.isTest(file.path)) continue;
 
       for (const hunk of file.hunks) {
-        const dels = hunk.lines.filter((l) => l.kind === 'del' && looksLikeAssertion(l.text));
-        const adds = hunk.lines.filter((l) => l.kind === 'add' && looksLikeAssertion(l.text));
+        const dels = hunk.lines.filter((l) => l.kind === "del" && looksLikeAssertion(l.text));
+        const adds = hunk.lines.filter((l) => l.kind === "add" && looksLikeAssertion(l.text));
         const claimed = new Set<number>();
 
         for (const del of dels) {
@@ -411,12 +411,12 @@ export const expectedValueChanged: Rule = {
           // removal before any neighbour of the same shape can: otherwise two
           // same-shaped assertions whose quotes changed cross-pair, and each is
           // reported as having taken the other's values.
-          const values = literalsOf(canonicalQuotes(del.text)).join(', ');
+          const values = literalsOf(canonicalQuotes(del.text)).join(", ");
           const itself = adds.findIndex(
             (add, i) =>
               !claimed.has(i) &&
               normalizeLiterals(add.text) === shape &&
-              literalsOf(canonicalQuotes(add.text)).join(', ') === values,
+              literalsOf(canonicalQuotes(add.text)).join(", ") === values,
           );
           if (itself !== -1) {
             claimed.add(itself);
@@ -430,14 +430,14 @@ export const expectedValueChanged: Rule = {
             // the code now returns.
             if (normalizeLiterals(add.text) !== shape) continue;
 
-            const before = literalsOf(del.text).join(', ');
-            const after = literalsOf(add.text).join(', ');
+            const before = literalsOf(del.text).join(", ");
+            const after = literalsOf(add.text).join(", ");
 
             claimed.add(i);
             findings.push(
               finding({
-                rule: 'EXPECTED_VALUE_CHANGED',
-                severity: 'medium',
+                rule: "EXPECTED_VALUE_CHANGED",
+                severity: "medium",
                 file: file.path,
                 /* c8 ignore next -- an added line always carries a post-image number */
                 line: add.newLine ?? 1,
@@ -445,7 +445,7 @@ export const expectedValueChanged: Rule = {
                 before: del.text,
                 after: add.text,
                 fix_hint:
-                  'Confirm the new value is the correct one, not just the one the code produces now.',
+                  "Confirm the new value is the correct one, not just the one the code produces now.",
               }),
             );
             break;

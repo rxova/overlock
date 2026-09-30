@@ -120,7 +120,7 @@ export function isThresholdConfig(path: string): boolean {
  * never blocks.
  */
 export function testSubject(path: string): string | null {
-  const withoutExt = basename(path).replace(/\.[^.]+$/, '');
+  const withoutExt = basename(path).replace(/\.[^.]+$/, "");
 
   const candidates = [
     /^(.*)\.(test|spec)$/,
@@ -145,11 +145,11 @@ export function testSubject(path: string): string | null {
 /** The stem of a non-test source file, for pairing against `testSubject`. */
 export function sourceSubject(path: string): string {
   return basename(path)
-    .replace(/\.[^.]+$/, '')
+    .replace(/\.[^.]+$/, "")
     .toLowerCase();
 }
 
 /** Always defined, unlike `split('/').pop()`, which the type system doubts. */
 function basename(path: string): string {
-  return path.slice(path.lastIndexOf('/') + 1);
+  return path.slice(path.lastIndexOf("/") + 1);
 }

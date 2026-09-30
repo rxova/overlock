@@ -1,17 +1,17 @@
-import { type Summary } from './summary.js';
-import { EMPTY_TREE } from './git.js';
-import type { Finding, Report, Severity } from './types.js';
+import { type Summary } from "./summary.js";
+import { EMPTY_TREE } from "./git.js";
+import type { Finding, Report, Severity } from "./types.js";
 
-const MARK: Record<Severity, string> = { high: '✗', medium: '!', low: '·' };
-const LABEL: Record<Severity, string> = { high: 'HIGH', medium: 'MED ', low: 'LOW ' };
+const MARK: Record<Severity, string> = { high: "✗", medium: "!", low: "·" };
+const LABEL: Record<Severity, string> = { high: "HIGH", medium: "MED ", low: "LOW " };
 
 const ANSI = {
-  reset: '\u001B[0m',
-  dim: '\u001B[2m',
-  bold: '\u001B[1m',
-  red: '\u001B[31m',
-  yellow: '\u001B[33m',
-  green: '\u001B[32m',
+  reset: "\u001B[0m",
+  dim: "\u001B[2m",
+  bold: "\u001B[1m",
+  red: "\u001B[31m",
+  yellow: "\u001B[33m",
+  green: "\u001B[32m",
 } as const;
 
 /**
@@ -19,8 +19,8 @@ const ANSI = {
  * into an agent's context never smuggles escape codes into the payload.
  */
 export function useColor(stream: { isTTY?: boolean | undefined }, env: NodeJS.ProcessEnv): boolean {
-  if (env.NO_COLOR !== undefined && env.NO_COLOR !== '') return false;
-  if (env.FORCE_COLOR !== undefined && env.FORCE_COLOR !== '') return true;
+  if (env.NO_COLOR !== undefined && env.NO_COLOR !== "") return false;
+  if (env.FORCE_COLOR !== undefined && env.FORCE_COLOR !== "") return true;
   return stream.isTTY === true;
 }
 
@@ -38,8 +38,8 @@ function where(f: Finding): string {
 }
 
 function severityColor(severity: Severity): string {
-  if (severity === 'high') return ANSI.red;
-  if (severity === 'medium') return ANSI.yellow;
+  if (severity === "high") return ANSI.red;
+  if (severity === "medium") return ANSI.yellow;
   return ANSI.dim;
 }
 
@@ -62,8 +62,8 @@ function groupFindings(findings: Finding[]): Group[] {
   const groups = new Map<string, Group>();
 
   for (const f of findings) {
-    const key = [f.rule, f.severity, f.evidence.before ?? '', f.evidence.after ?? ''].join(
-      '\u0000',
+    const key = [f.rule, f.severity, f.evidence.before ?? "", f.evidence.after ?? ""].join(
+      "\u0000",
     );
     const group = groups.get(key);
     if (group === undefined) {
@@ -82,9 +82,9 @@ const MAX_PATHS = 3;
 
 function groupWhere(group: Group): string {
   if (group.count === 1) return where(group.first);
-  const shown = group.files.slice(0, MAX_PATHS).join(', ');
+  const shown = group.files.slice(0, MAX_PATHS).join(", ");
   const rest = group.files.length - Math.min(group.files.length, MAX_PATHS);
-  return `${shown}${rest > 0 ? `, and ${rest} more` : ''}  (${group.count})`;
+  return `${shown}${rest > 0 ? `, and ${rest} more` : ""}  (${group.count})`;
 }
 
 /**
@@ -95,31 +95,31 @@ function groupWhere(group: Group): string {
  * that used it.
  */
 const VOCABULARY = new Set([
-  'const',
-  'let',
-  'var',
-  'function',
-  'return',
-  'await',
-  'async',
-  'this',
-  'new',
-  'import',
-  'export',
-  'from',
-  'true',
-  'false',
-  'null',
-  'undefined',
-  'it',
-  'test',
-  'describe',
-  'def',
-  'func',
-  'self',
-  'value',
-  'result',
-  'data',
+  "const",
+  "let",
+  "var",
+  "function",
+  "return",
+  "await",
+  "async",
+  "this",
+  "new",
+  "import",
+  "export",
+  "from",
+  "true",
+  "false",
+  "null",
+  "undefined",
+  "it",
+  "test",
+  "describe",
+  "def",
+  "func",
+  "self",
+  "value",
+  "result",
+  "data",
 ]);
 
 const MATCHER = /^(?:to[A-Z]|expect$|assert|should$|not$)/;
@@ -148,7 +148,7 @@ const MIN_CLUSTER = 3;
 function sharedIdentifier(findings: Finding[]): { name: string; count: number } | null {
   const counts = new Map<string, number>();
   for (const f of findings) {
-    const text = `${f.evidence.before ?? ''}\n${f.evidence.after ?? ''}`;
+    const text = `${f.evidence.before ?? ""}\n${f.evidence.after ?? ""}`;
     for (const name of identifiersIn(text)) counts.set(name, (counts.get(name) ?? 0) + 1);
   }
 
@@ -173,12 +173,12 @@ function staleLines(report: Report, color: boolean): string[] {
 
   const lines = report.allowances_unused.map((a) =>
     paint(
-      `  ! allowed nothing: ${a.rule}${a.target === null ? '' : ` ${a.target}`} -- ${a.reason}`,
+      `  ! allowed nothing: ${a.rule}${a.target === null ? "" : ` ${a.target}`} -- ${a.reason}`,
       ANSI.yellow,
       color,
     ),
   );
-  return [...lines, paint('    The finding it names is not in this patch.', ANSI.dim, color)];
+  return [...lines, paint("    The finding it names is not in this patch.", ANSI.dim, color)];
 }
 
 /**
@@ -194,7 +194,7 @@ function renameBlock(report: Report, color: boolean): string[] {
 
   const lines: string[] = [];
   for (const rename of report.renames) {
-    const casings = rename.casings === 1 ? '' : `, ${rename.casings} casings`;
+    const casings = rename.casings === 1 ? "" : `, ${rename.casings} casings`;
     lines.push(
       paint(
         `  rename detected  ${rename.from} -> ${rename.to}  (${rename.files} files${casings})`,
@@ -209,7 +209,7 @@ function renameBlock(report: Report, color: boolean): string[] {
   lines.push(
     paint(`    ${unexplained} unexplained`, unexplained === 0 ? ANSI.green : ANSI.yellow, color),
   );
-  lines.push('');
+  lines.push("");
 
   return lines;
 }
@@ -224,11 +224,11 @@ export function describeScope(report: Report): string {
   const parts: string[] = [];
   const scope = report.scope;
   if (scope) {
-    parts.push(`${scope.files} file${scope.files === 1 ? '' : 's'}`);
-    if (scope.commits > 0) parts.push(`${scope.commits} commit${scope.commits === 1 ? '' : 's'}`);
+    parts.push(`${scope.files} file${scope.files === 1 ? "" : "s"}`);
+    if (scope.commits > 0) parts.push(`${scope.commits} commit${scope.commits === 1 ? "" : "s"}`);
   }
   parts.push(`against ${describeBase(report.base)}`);
-  return parts.join(', ');
+  return parts.join(", ");
 }
 
 /** True when the resolved range held nothing, so nothing was examined. */
@@ -240,7 +240,7 @@ export function isEmptyPatch(report: Report): boolean {
  * Said out loud rather than reported as a pass, because an empty patch and a
  * clean patch are the same green line and only one of them means anything.
  */
-export const EMPTY_PATCH_NOTE = 'nothing to examine — the resolved patch is empty';
+export const EMPTY_PATCH_NOTE = "nothing to examine — the resolved patch is empty";
 
 /** The terminal view: everything, grouped, with the evidence inline. */
 export function human(report: Report, color: boolean): string {
@@ -253,7 +253,7 @@ export function human(report: Report, color: boolean): string {
           color,
         ),
         ...staleLines(report, color),
-      ].join('\n');
+      ].join("\n");
     }
     return [
       paint(
@@ -262,7 +262,7 @@ export function human(report: Report, color: boolean): string {
         color,
       ) + paint(`  (${describeScope(report)})`, ANSI.dim, color),
       ...staleLines(report, color),
-    ].join('\n');
+    ].join("\n");
   }
 
   const lines: string[] = [];
@@ -270,7 +270,7 @@ export function human(report: Report, color: boolean): string {
     paint(`overlock — ${summarize(report)}`, ANSI.bold, color) +
       paint(`  (${describeScope(report)})${suppressedNote(report)}`, ANSI.dim, color),
   );
-  lines.push('');
+  lines.push("");
   lines.push(...staleLines(report, color));
   lines.push(...renameBlock(report, color));
 
@@ -284,8 +284,8 @@ export function human(report: Report, color: boolean): string {
         ANSI.bold,
         color,
       ),
-      paint('    Read that change once and most of this list goes with it.', ANSI.dim, color),
-      '',
+      paint("    Read that change once and most of this list goes with it.", ANSI.dim, color),
+      "",
     );
   }
 
@@ -303,7 +303,7 @@ export function human(report: Report, color: boolean): string {
     if (f.evidence.before) lines.push(paint(`     - ${f.evidence.before}`, ANSI.red, color));
     if (f.evidence.after) lines.push(paint(`     + ${f.evidence.after}`, ANSI.green, color));
     lines.push(paint(`     -> ${f.fix_hint}`, ANSI.dim, color));
-    lines.push('');
+    lines.push("");
   }
 
   // Stated, never silently dropped: the inference is a heuristic, and a count
@@ -311,15 +311,15 @@ export function human(report: Report, color: boolean): string {
   if (report.explained > 0) {
     lines.push(
       paint(
-        `${report.explained} finding${report.explained === 1 ? '' : 's'} the patch itself ` +
-          'accounts for, not listed. `--json` has all of them.',
+        `${report.explained} finding${report.explained === 1 ? "" : "s"} the patch itself ` +
+          "accounts for, not listed. `--json` has all of them.",
         ANSI.dim,
         color,
       ),
     );
   }
 
-  return lines.join('\n').trimEnd();
+  return lines.join("\n").trimEnd();
 }
 
 /**
@@ -345,14 +345,14 @@ export function compact(report: Report, limit = 3): string {
   const shown = groups.slice(0, limit);
   const hidden = groups.length - shown.length;
 
-  const lines: string[] = [`overlock: ${summarize(report)}.${suppressedNote(report)}`, ''];
+  const lines: string[] = [`overlock: ${summarize(report)}.${suppressedNote(report)}`, ""];
 
   const rename = report.renames[0];
   if (rename !== undefined) {
     lines.push(
       `rename ${rename.from} -> ${rename.to} explains ${report.explained} of them; ` +
         `${report.findings.length - report.explained} unexplained.`,
-      '',
+      "",
     );
   }
 
@@ -360,7 +360,7 @@ export function compact(report: Report, limit = 3): string {
   // below is one change or twenty-five.
   const cluster = sharedIdentifier(unexplained);
   if (cluster !== null) {
-    lines.push(`${cluster.count} of ${unexplained.length} of them mention ${cluster.name}.`, '');
+    lines.push(`${cluster.count} of ${unexplained.length} of them mention ${cluster.name}.`, "");
   }
 
   for (const group of shown) {
@@ -369,20 +369,20 @@ export function compact(report: Report, limit = 3): string {
     lines.push(`   ${f.message}`);
     const evidence = f.evidence.after ?? f.evidence.before;
     if (evidence) {
-      const prefix = f.evidence.after ? '+' : '-';
+      const prefix = f.evidence.after ? "+" : "-";
       lines.push(`   ${prefix} ${clip(evidence, 100)}`);
     }
   }
 
   if (hidden > 0) {
-    lines.push('', `...and ${hidden} more. Run \`npx overlock check\` for the full list.`);
+    lines.push("", `...and ${hidden} more. Run \`npx overlock check\` for the full list.`);
   }
 
   for (const a of report.allowances_unused) {
-    lines.push('', `! allowed nothing: ${a.rule}${a.target === null ? '' : ` ${a.target}`}`);
+    lines.push("", `! allowed nothing: ${a.rule}${a.target === null ? "" : ` ${a.target}`}`);
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 export function json(report: Report): string {
@@ -395,7 +395,7 @@ function summarize(report: Report): string {
   if (report.counts.medium > 0) parts.push(`${report.counts.medium} medium`);
   if (report.counts.low > 0) parts.push(`${report.counts.low} low`);
   const total = report.findings.length;
-  return `${total} finding${total === 1 ? '' : 's'} (${parts.join(', ')})`;
+  return `${total} finding${total === 1 ? "" : "s"} (${parts.join(", ")})`;
 }
 
 /**
@@ -404,8 +404,8 @@ function summarize(report: Report): string {
  */
 /** The empty-tree hash is git's answer, not an answer a person can read. */
 function describeBase(base: string): string {
-  if (base === EMPTY_TREE) return 'no commits yet';
-  if (base === '--cached') return 'staged';
+  if (base === EMPTY_TREE) return "no commits yet";
+  if (base === "--cached") return "staged";
   return base;
 }
 
@@ -415,8 +415,8 @@ function describeBase(base: string): string {
  */
 function staleNote(report: Report): string {
   const stale = report.allowances_unused.length;
-  if (stale === 0) return '';
-  return ` (${stale} acknowledgement${stale === 1 ? '' : 's'} matched nothing)`;
+  if (stale === 0) return "";
+  return ` (${stale} acknowledgement${stale === 1 ? "" : "s"} matched nothing)`;
 }
 
 function suppressedNote(report: Report): string {
@@ -427,7 +427,7 @@ function suppressedNote(report: Report): string {
   // out loud, because the alternative is a green line standing on however many
   // findings nobody sees.
   if (report.silenced > 0) parts.push(`${report.silenced} silenced by config`);
-  return parts.length === 0 ? '' : ` (${parts.join(', ')})`;
+  return parts.length === 0 ? "" : ` (${parts.join(", ")})`;
 }
 
 function clip(text: string, max: number): string {
@@ -442,29 +442,29 @@ function clip(text: string, max: number): string {
  * to hide.
  */
 /** Rules that never block, kept out of the headline chart. */
-const LOW_RULES = new Set<string>(['TEST_AND_IMPL_TOGETHER', 'TEST_TIMEOUT_RAISED']);
+const LOW_RULES = new Set<string>(["TEST_AND_IMPL_TOGETHER", "TEST_TIMEOUT_RAISED"]);
 
 export function summaryText(summary: Summary, color: boolean): string {
-  const window = summary.days === undefined ? 'all time' : `${summary.days} days`;
+  const window = summary.days === undefined ? "all time" : `${summary.days} days`;
 
   if (summary.runs === 0) {
     return [
       paint(`overlock — nothing recorded in ${window}.`, ANSI.bold, color),
-      '',
-      paint('  Install the hook and leave it on:  overlock init claude', ANSI.dim, color),
-      paint('  The ledger only fills while something is running it.', ANSI.dim, color),
-    ].join('\n');
+      "",
+      paint("  Install the hook and leave it on:  overlock init claude", ANSI.dim, color),
+      paint("  The ledger only fills while something is running it.", ANSI.dim, color),
+    ].join("\n");
   }
 
   const lines: string[] = [];
-  const repos = `${summary.repos} repo${summary.repos === 1 ? '' : 's'}`;
+  const repos = `${summary.repos} repo${summary.repos === 1 ? "" : "s"}`;
   lines.push(
     paint(`overlock — ${window}, ${repos}, ${summary.runs} runs`, ANSI.bold, color),
-    '',
-    row('Flagged', summary.caught, 'runs with a high or medium finding', color),
-    row('Blocked', summary.blocked, 'recorded blocks (legacy entries may be estimates)', color),
-    row('Suppressed', summary.suppressed, 'findings silenced with a reason', color),
-    row('Noted', summary.noted, 'runs with low findings only', color),
+    "",
+    row("Flagged", summary.caught, "runs with a high or medium finding", color),
+    row("Blocked", summary.blocked, "recorded blocks (legacy entries may be estimates)", color),
+    row("Suppressed", summary.suppressed, "findings silenced with a reason", color),
+    row("Noted", summary.noted, "runs with low findings only", color),
   );
 
   // Low-severity rules are listed under their own heading rather than mixed in.
@@ -475,9 +475,9 @@ export function summaryText(summary: Summary, color: boolean): string {
 
   if (real.length > 0) {
     const widest = real[0]?.count ?? 1;
-    lines.push('', paint('By rule', ANSI.dim, color));
+    lines.push("", paint("By rule", ANSI.dim, color));
     for (const { rule, count } of real) {
-      const bar = '█'.repeat(Math.max(1, Math.round((count / widest) * 24)));
+      const bar = "█".repeat(Math.max(1, Math.round((count / widest) * 24)));
       lines.push(
         `  ${rule.padEnd(28)}${String(count).padStart(4)}  ${paint(bar, ANSI.dim, color)}`,
       );
@@ -485,26 +485,26 @@ export function summaryText(summary: Summary, color: boolean): string {
   }
 
   if (context.length > 0) {
-    lines.push('', paint('Context only', ANSI.dim, color));
+    lines.push("", paint("Context only", ANSI.dim, color));
     for (const { rule, count } of context) {
       lines.push(paint(`  ${rule.padEnd(28)}${String(count).padStart(4)}`, ANSI.dim, color));
     }
   }
 
   if (summary.byRepo.length > 1) {
-    lines.push('', paint('By repository', ANSI.dim, color));
+    lines.push("", paint("By repository", ANSI.dim, color));
     for (const { repo, caught } of summary.byRepo) {
       lines.push(`  ${shorten(repo, 40).padEnd(42)}${String(caught).padStart(4)}`);
     }
   }
 
   lines.push(
-    '',
-    'Repeated runs are not independent catches. This legacy ledger cannot measure useful corrections.',
-    'Use overlock evaluate for distinct findings and reviewed outcomes.',
+    "",
+    "Repeated runs are not independent catches. This legacy ledger cannot measure useful corrections.",
+    "Use overlock evaluate for distinct findings and reviewed outcomes.",
   );
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 function row(label: string, value: number, note: string, color: boolean): string {

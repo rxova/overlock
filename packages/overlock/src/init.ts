@@ -1,12 +1,12 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
-export type Agent = 'claude' | 'codex' | 'cursor' | 'copilot';
+export type Agent = "claude" | "codex" | "cursor" | "copilot";
 
-export const AGENTS: Agent[] = ['claude', 'codex', 'cursor', 'copilot'];
+export const AGENTS: Agent[] = ["claude", "codex", "cursor", "copilot"];
 
 /** The command a hook or instruction file tells the agent to run. */
-export const HOOK_COMMAND = 'npx -y overlock hook claude';
+export const HOOK_COMMAND = "npx -y overlock hook claude";
 
 export interface InitResult {
   agent: Agent;
@@ -37,22 +37,22 @@ interface ClaudeSettings {
  * writes a committed file, and says so.
  */
 export function initClaude(repoRoot: string): InitResult {
-  const dir = join(repoRoot, '.claude');
-  const file = join(dir, 'settings.json');
+  const dir = join(repoRoot, ".claude");
+  const file = join(dir, "settings.json");
 
   let settings: ClaudeSettings = {};
   let existed = false;
   try {
-    settings = JSON.parse(readFileSync(file, 'utf8')) as ClaudeSettings;
+    settings = JSON.parse(readFileSync(file, "utf8")) as ClaudeSettings;
     existed = true;
   } catch {
     // No settings file yet, or it is not readable as JSON. Either way this call
     // creates one; a malformed existing file is reported rather than overwritten.
     try {
-      readFileSync(file, 'utf8');
+      readFileSync(file, "utf8");
       throw new Error(`${file} exists but is not valid JSON — fix or remove it first.`);
     } catch (error) {
-      if (error instanceof Error && error.message.includes('not valid JSON')) throw error;
+      if (error instanceof Error && error.message.includes("not valid JSON")) throw error;
     }
   }
 
@@ -61,31 +61,31 @@ export function initClaude(repoRoot: string): InitResult {
 
   const already = stop.some((group) =>
     (group.hooks ?? []).some(
-      (h) => typeof h.command === 'string' && h.command.includes('overlock'),
+      (h) => typeof h.command === "string" && h.command.includes("overlock"),
     ),
   );
 
   if (already) {
     return {
-      agent: 'claude',
+      agent: "claude",
       written: [],
       unchanged: true,
-      notes: ['.claude/settings.json already runs overlock on Stop.'],
+      notes: [".claude/settings.json already runs overlock on Stop."],
     };
   }
 
-  stop.push({ hooks: [{ type: 'command', command: HOOK_COMMAND }] });
+  stop.push({ hooks: [{ type: "command", command: HOOK_COMMAND }] });
 
   mkdirSync(dir, { recursive: true });
-  writeFileSync(file, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
+  writeFileSync(file, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 
   return {
-    agent: 'claude',
-    written: ['.claude/settings.json'],
+    agent: "claude",
+    written: [".claude/settings.json"],
     unchanged: false,
     notes: [
-      existed ? 'Added a Stop hook to your existing settings.' : 'Created .claude/settings.json.',
-      'Commit this file. Cloud and mobile sessions read hooks from the repo, never from ~/.claude.',
+      existed ? "Added a Stop hook to your existing settings." : "Created .claude/settings.json.",
+      "Commit this file. Cloud and mobile sessions read hooks from the repo, never from ~/.claude.",
     ],
   };
 }
@@ -98,45 +98,45 @@ export function initClaude(repoRoot: string): InitResult {
 /** What to paste into `.mcp.json` for any MCP-capable agent. */
 export function mcpSnippet(): string {
   return [
-    '{',
+    "{",
     '  "mcpServers": {',
     '    "overlock": { "command": "npx", "args": ["-y", "overlock", "mcp"] }',
-    '  }',
-    '}',
-    '',
-  ].join('\n');
+    "  }",
+    "}",
+    "",
+  ].join("\n");
 }
 
 export function instructionSnippet(): string {
   return [
-    '## Before you finish',
-    '',
-    'Run `npx -y overlock check --compact` before reporting a task complete.',
-    'If it reports any HIGH finding, fix the cause rather than the check, then run it again.',
-    'It reads only the diff you just made; it takes about a second and makes no network calls.',
-    '',
-  ].join('\n');
+    "## Before you finish",
+    "",
+    "Run `npx -y overlock check --compact` before reporting a task complete.",
+    "If it reports any HIGH finding, fix the cause rather than the check, then run it again.",
+    "It reads only the diff you just made; it takes about a second and makes no network calls.",
+    "",
+  ].join("\n");
 }
 
-const INSTRUCTION_FILES: Record<Exclude<Agent, 'claude'>, string> = {
-  codex: 'AGENTS.md',
-  cursor: '.cursor/rules/overlock.mdc',
-  copilot: '.github/copilot-instructions.md',
+const INSTRUCTION_FILES: Record<Exclude<Agent, "claude">, string> = {
+  codex: "AGENTS.md",
+  cursor: ".cursor/rules/overlock.mdc",
+  copilot: ".github/copilot-instructions.md",
 };
 
-export function initInstructions(repoRoot: string, agent: Exclude<Agent, 'claude'>): InitResult {
+export function initInstructions(repoRoot: string, agent: Exclude<Agent, "claude">): InitResult {
   const relative = INSTRUCTION_FILES[agent];
   const file = join(repoRoot, relative);
   const snippet = instructionSnippet();
 
-  let existing = '';
+  let existing = "";
   try {
-    existing = readFileSync(file, 'utf8');
+    existing = readFileSync(file, "utf8");
   } catch {
     // First write for this agent.
   }
 
-  if (existing.includes('overlock check')) {
+  if (existing.includes("overlock check")) {
     return {
       agent,
       written: [],
@@ -145,9 +145,9 @@ export function initInstructions(repoRoot: string, agent: Exclude<Agent, 'claude
     };
   }
 
-  const separator = existing.length > 0 && !existing.endsWith('\n\n') ? '\n\n' : '';
-  mkdirSync(join(file, '..'), { recursive: true });
-  writeFileSync(file, `${existing}${separator}${snippet}`, 'utf8');
+  const separator = existing.length > 0 && !existing.endsWith("\n\n") ? "\n\n" : "";
+  mkdirSync(join(file, ".."), { recursive: true });
+  writeFileSync(file, `${existing}${separator}${snippet}`, "utf8");
 
   return {
     agent,
@@ -155,7 +155,7 @@ export function initInstructions(repoRoot: string, agent: Exclude<Agent, 'claude
     unchanged: false,
     notes: [
       `Appended the instruction to ${relative}.`,
-      'This is an instruction, not a gate — the agent can forget it. The Claude Code Stop hook is the form that can block a turn.',
+      "This is an instruction, not a gate — the agent can forget it. The Claude Code Stop hook is the form that can block a turn.",
     ],
   };
 }

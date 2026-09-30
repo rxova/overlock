@@ -14,19 +14,19 @@ inputs:
       says, and otherwise to "auto" (uncommitted work if any, otherwise this
       branch's commits).
     required: false
-    default: ''
+    default: ""
   fail-on:
     description: >-
       Severity at or above which the job fails: high, medium, low or none.
       Left empty, overlock.config.json decides, and failing that, high.
     required: false
-    default: ''
+    default: ""
   comment:
     description: >-
       Post the findings as a single pull request comment, updated in place on
       later runs rather than added to. Needs `pull-requests: write`.
     required: false
-    default: 'true'
+    default: "true"
   severity:
     description: >-
       Per-rule grades, one `RULE_ID=high|medium|low|off` per line. Lets a
@@ -35,24 +35,24 @@ inputs:
       `off` retires a rule it has judged says nothing here. What an `off` rule
       drops is still counted and reported.
     required: false
-    default: ''
+    default: ""
   working-directory:
     description: Directory to run in.
     required: false
-    default: '.'
+    default: "."
   version:
     description: >-
       Version of overlock to run. Pinning an exact version lets the runner's npm
       cache hit; "latest" has to ask the registry what that means on every run.
     required: false
-    default: 'latest'
+    default: "latest"
   cli-path:
     description: >-
       Path to an already-built CLI, used instead of fetching from npm. This
       repository's own dogfood job sets it so overlock gates its pull requests
       with the code in the branch rather than the last release.
     required: false
-    default: ''
+    default: ""
   github-token:
     description: Token used to post the comment.
     required: false

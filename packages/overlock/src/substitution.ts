@@ -1,4 +1,4 @@
-import type { DiffFile, Rename } from './types.js';
+import type { DiffFile, Rename } from "./types.js";
 
 /**
  * What a patch does that is not about its tests.
@@ -54,7 +54,7 @@ const MAX_TARGETS = 2;
 const MAX_TOKENS = 400;
 
 /** Why a change is not what it looks like. */
-type Explanation = 'rename' | 'reformatting';
+type Explanation = "rename" | "reformatting";
 
 export interface PatchExplanation {
   renames: Rename[];
@@ -72,7 +72,7 @@ export interface PatchExplanation {
 }
 
 function collapseWhitespace(text: string): string {
-  return text.replace(/\s+/g, ' ').trim();
+  return text.replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -107,17 +107,17 @@ function runsOf(file: DiffFile): Run[] {
 
     const flush = (): void => {
       if (dels.length > 0 || adds.length > 0) {
-        runs.push({ before: dels.join(' '), after: adds.join(' ') });
+        runs.push({ before: dels.join(" "), after: adds.join(" ") });
       }
       dels = [];
       adds = [];
     };
 
     for (const line of hunk.lines) {
-      if (line.kind === 'del') {
+      if (line.kind === "del") {
         if (adds.length > 0) flush();
         dels.push(line.text);
-      } else if (line.kind === 'add') {
+      } else if (line.kind === "add") {
         adds.push(line.text);
       } else {
         flush();
@@ -176,7 +176,7 @@ function explainRun(run: Run, map: Map<string, Set<string>>): Explanation | null
     substituted = true;
   }
 
-  return substituted ? 'rename' : 'reformatting';
+  return substituted ? "rename" : "reformatting";
 }
 
 /**
@@ -190,7 +190,7 @@ function explainRun(run: Run, map: Map<string, Set<string>>): Explanation | null
 function substituter(map: Map<string, string>): (text: string) => string {
   if (map.size === 0) return (text) => text;
 
-  const pattern = new RegExp(`\\b(?:${[...map.keys()].join('|')})\\b`, 'g');
+  const pattern = new RegExp(`\\b(?:${[...map.keys()].join("|")})\\b`, "g");
   return (text) => text.replace(pattern, (name) => map.get(name) ?? name);
 }
 
@@ -289,7 +289,7 @@ export function explainPatch(files: DiffFile[]): PatchExplanation {
   for (const { file, runs } of perFile) {
     if (runs.length === 0) continue;
 
-    let verdict: Explanation = 'reformatting';
+    let verdict: Explanation = "reformatting";
     let all = true;
     for (const run of runs) {
       const one = explainRun(run, map);
@@ -297,7 +297,7 @@ export function explainPatch(files: DiffFile[]): PatchExplanation {
         all = false;
         break;
       }
-      if (one === 'rename') verdict = 'rename';
+      if (one === "rename") verdict = "rename";
     }
     if (all) explained.set(file.path, verdict);
   }
@@ -316,7 +316,7 @@ export function explainPatch(files: DiffFile[]): PatchExplanation {
 /** `cloud_sync -> cloud_backup + multi_device`, so a split reads as one thing. */
 function describeRename(from: string, renames: Rename[]): string {
   const targets = renames.filter((r) => r.from === from).map((r) => r.to);
-  return `${from} -> ${targets.join(' + ')}`;
+  return `${from} -> ${targets.join(" + ")}`;
 }
 
 /** Whether a file's changes are whitespace and nothing else. */

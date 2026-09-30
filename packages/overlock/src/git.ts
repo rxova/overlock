@@ -1,6 +1,6 @@
-import { execFileSync } from 'node:child_process';
-import { lstatSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { execFileSync } from "node:child_process";
+import { lstatSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 export class GitError extends Error {
   /**
@@ -23,16 +23,16 @@ export class GitError extends Error {
  */
 function git(args: string[], cwd: string): string {
   try {
-    return execFileSync('git', args, {
+    return execFileSync("git", args, {
       cwd,
-      encoding: 'utf8',
+      encoding: "utf8",
       maxBuffer: 64 * 1024 * 1024,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (error) {
-    throw new GitError(`git ${args.join(' ')} failed`, {
+    throw new GitError(`git ${args.join(" ")} failed`, {
       cause: error,
-      hint: 'Is this a git repository?',
+      hint: "Is this a git repository?",
     });
   }
 }
@@ -50,7 +50,7 @@ function git(args: string[], cwd: string): string {
  * No legitimate ref starts with a dash: git itself rejects such branch names.
  */
 export function assertSafeRef(ref: string): void {
-  if (ref.startsWith('-')) {
+  if (ref.startsWith("-")) {
     throw new GitError(
       `refusing to treat ${JSON.stringify(ref)} as a ref: it looks like an option`,
     );
@@ -58,7 +58,7 @@ export function assertSafeRef(ref: string): void {
 }
 
 export function repoRoot(cwd: string): string {
-  return git(['rev-parse', '--show-toplevel'], cwd).trim();
+  return git(["rev-parse", "--show-toplevel"], cwd).trim();
 }
 
 /**
@@ -68,13 +68,13 @@ export function repoRoot(cwd: string): string {
  * HEAD, which is what the old form spelled `HEAD`.
  */
 export function currentBranch(cwd: string): string {
-  return git(['branch', '--show-current'], cwd).trim() || 'HEAD';
+  return git(["branch", "--show-current"], cwd).trim() || "HEAD";
 }
 
 /** False in a repository that has been initialised but never committed to. */
 export function hasCommits(cwd: string): boolean {
   try {
-    git(['rev-parse', '--verify', '--quiet', 'HEAD'], cwd);
+    git(["rev-parse", "--verify", "--quiet", "HEAD"], cwd);
     return true;
   } catch {
     return false;
@@ -89,16 +89,16 @@ export function hasCommits(cwd: string): boolean {
  */
 export function defaultBranch(cwd: string): string | null {
   try {
-    const head = git(['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD'], cwd).trim();
-    const name = head.replace(/^refs\/remotes\/origin\//, '');
+    const head = git(["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"], cwd).trim();
+    const name = head.replace(/^refs\/remotes\/origin\//, "");
     if (name) return name;
   } catch {
     // No origin/HEAD in this clone; fall through to the conventional names.
   }
 
-  for (const candidate of ['main', 'master', 'develop']) {
+  for (const candidate of ["main", "master", "develop"]) {
     try {
-      git(['rev-parse', '--verify', '--quiet', `refs/heads/${candidate}`], cwd);
+      git(["rev-parse", "--verify", "--quiet", `refs/heads/${candidate}`], cwd);
       return candidate;
     } catch {
       continue;
@@ -119,9 +119,9 @@ export function defaultBranch(cwd: string): string | null {
  */
 function patchPathspec(exclude: readonly string[] = []): string[] {
   return [
-    '--',
-    '.',
-    ':(top,exclude).overlock',
+    "--",
+    ".",
+    ":(top,exclude).overlock",
     ...exclude.map((path) => `:(top,exclude,literal)${path}`),
   ];
 }
@@ -145,7 +145,7 @@ export interface RangeOptions {
 }
 
 /** See `RangeOptions.baseMode`. */
-export type BaseMode = 'fork-point' | 'direct';
+export type BaseMode = "fork-point" | "direct";
 
 /**
  * A resolved range and the reasoning that produced it.
@@ -179,29 +179,29 @@ export interface ResolvedRange {
  * since it left main. `--base-mode direct` asks for the literal comparison.
  */
 export function explainRange(options: RangeOptions): ResolvedRange {
-  const { cwd, base, staged, baseMode = 'fork-point', exclude } = options;
+  const { cwd, base, staged, baseMode = "fork-point", exclude } = options;
   const steps: string[] = [];
 
   if (staged) {
-    steps.push('--staged: the index');
-    return { range: '--cached', steps };
+    steps.push("--staged: the index");
+    return { range: "--cached", steps };
   }
 
-  if (base && base !== 'auto') {
+  if (base && base !== "auto") {
     assertSafeRef(base);
     steps.push(`explicit --base ${base}`);
 
-    if (baseMode === 'direct') {
-      steps.push('--base-mode direct: comparing against the ref itself');
+    if (baseMode === "direct") {
+      steps.push("--base-mode direct: comparing against the ref itself");
       return { range: base, steps };
     }
     if (!hasCommits(cwd)) {
-      steps.push('no commits here yet, so there is no fork point to find');
+      steps.push("no commits here yet, so there is no fork point to find");
       return { range: base, steps };
     }
 
     try {
-      const mergeBase = git(['merge-base', base, 'HEAD'], cwd).trim();
+      const mergeBase = git(["merge-base", base, "HEAD"], cwd).trim();
       if (mergeBase) {
         steps.push(`fork point with ${base} is ${mergeBase.slice(0, 7)}`);
         return { range: mergeBase, steps };
@@ -220,31 +220,31 @@ export function explainRange(options: RangeOptions): ResolvedRange {
   // and it used to be reported as "not a git repository". Checked after an
   // explicit ref, which the caller means literally either way.
   if (!hasCommits(cwd)) {
-    steps.push('no commits yet: everything in the tree is an addition');
+    steps.push("no commits yet: everything in the tree is an addition");
     return { range: EMPTY_TREE, steps };
   }
 
   if (base === undefined) {
-    steps.push('no --base: the working tree');
-    return { range: 'HEAD', steps };
+    steps.push("no --base: the working tree");
+    return { range: "HEAD", steps };
   }
 
-  steps.push('auto');
+  steps.push("auto");
 
-  const dirty = git(['status', '--porcelain', ...patchPathspec(exclude)], cwd).trim();
+  const dirty = git(["status", "--porcelain", ...patchPathspec(exclude)], cwd).trim();
   if (dirty) {
-    steps.push('uncommitted changes present: the working tree');
-    return { range: 'HEAD', steps };
+    steps.push("uncommitted changes present: the working tree");
+    return { range: "HEAD", steps };
   }
-  steps.push('nothing uncommitted');
+  steps.push("nothing uncommitted");
 
   const branch = currentBranch(cwd);
   const trunk = defaultBranch(cwd);
-  if (trunk && branch !== trunk && branch !== 'HEAD') {
+  if (trunk && branch !== trunk && branch !== "HEAD") {
     try {
-      const mergeBase = git(['merge-base', trunk, 'HEAD'], cwd).trim();
-      const ahead = git(['rev-list', '--count', `${mergeBase}..HEAD`], cwd).trim();
-      if (mergeBase && ahead !== '0') {
+      const mergeBase = git(["merge-base", trunk, "HEAD"], cwd).trim();
+      const ahead = git(["rev-list", "--count", `${mergeBase}..HEAD`], cwd).trim();
+      if (mergeBase && ahead !== "0") {
         steps.push(
           `${branch} is ${ahead} commit(s) ahead of ${trunk} since ${mergeBase.slice(0, 7)}`,
         );
@@ -258,16 +258,16 @@ export function explainRange(options: RangeOptions): ResolvedRange {
   } else if (trunk) {
     steps.push(`on ${trunk} itself, so there are no branch commits to read`);
   } else {
-    steps.push('no default branch to measure against');
+    steps.push("no default branch to measure against");
   }
 
   // A repository with exactly one commit has no HEAD~1 to compare against.
   try {
-    git(['rev-parse', '--verify', '--quiet', 'HEAD~1'], cwd);
-    steps.push('falling back to the last commit');
-    return { range: 'HEAD~1', steps };
+    git(["rev-parse", "--verify", "--quiet", "HEAD~1"], cwd);
+    steps.push("falling back to the last commit");
+    return { range: "HEAD~1", steps };
   } catch {
-    steps.push('only one commit here, so it is the whole patch');
+    steps.push("only one commit here, so it is the whole patch");
     return { range: EMPTY_TREE, steps };
   }
 }
@@ -290,22 +290,22 @@ export function rangeScope(
   exclude: readonly string[] = [],
 ): { files: number; commits: number } {
   const files = countLines(
-    range === '--cached'
-      ? git(['diff', '--cached', '--name-only', ...patchPathspec(exclude)], cwd)
-      : git(['diff', '--name-only', range, ...patchPathspec(exclude)], cwd),
+    range === "--cached"
+      ? git(["diff", "--cached", "--name-only", ...patchPathspec(exclude)], cwd)
+      : git(["diff", "--name-only", range, ...patchPathspec(exclude)], cwd),
   );
 
-  if (range === '--cached' || range === 'HEAD') return { files, commits: 0 };
+  if (range === "--cached" || range === "HEAD") return { files, commits: 0 };
 
   try {
-    const commits = Number(git(['rev-list', '--count', `${range}..HEAD`], cwd).trim());
+    const commits = Number(git(["rev-list", "--count", `${range}..HEAD`], cwd).trim());
     return { files, commits: Number.isFinite(commits) ? commits : 0 };
   } catch {
     return { files, commits: 0 };
   }
 }
 
-const countLines = (text: string): number => text.split('\n').filter(Boolean).length;
+const countLines = (text: string): number => text.split("\n").filter(Boolean).length;
 
 /**
  * The last commit made at or before a moment, or null when there is none.
@@ -321,7 +321,7 @@ const countLines = (text: string): number => text.split('\n').filter(Boolean).le
  */
 export function commitBefore(when: Date, cwd: string): string | null {
   try {
-    const sha = git(['rev-list', '-1', `--before=${when.toISOString()}`, 'HEAD'], cwd).trim();
+    const sha = git(["rev-list", "-1", `--before=${when.toISOString()}`, "HEAD"], cwd).trim();
     return sha || null;
   } catch {
     // No commits, or no HEAD. Either way there is no "before" to point at.
@@ -330,7 +330,7 @@ export function commitBefore(when: Date, cwd: string): string | null {
 }
 
 /** git's canonical empty tree, so the first commit in a repo can be diffed. */
-export const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+export const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 /**
  * The commit messages in the range, for `Overlock-Allow:` trailers.
@@ -342,30 +342,30 @@ export const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
  * in it is the normal case, not an error.
  */
 export function readMessages(range: string, cwd: string): string {
-  if (range === '--cached' || range === EMPTY_TREE || range === 'HEAD') return '';
+  if (range === "--cached" || range === EMPTY_TREE || range === "HEAD") return "";
 
   assertSafeRef(range);
   try {
-    return git(['log', '--format=%B', `${range}..HEAD`, '--'], cwd);
+    return git(["log", "--format=%B", `${range}..HEAD`, "--"], cwd);
   } catch {
-    return '';
+    return "";
   }
 }
 
 export function readDiff(range: string, cwd: string, exclude: readonly string[] = []): string {
   const args = [
-    'diff',
-    '--no-color',
-    '--no-ext-diff',
+    "diff",
+    "--no-color",
+    "--no-ext-diff",
     // Renames matter: a test file renamed out of the runner's glob is one of
     // the things this tool looks for, and without -M it reads as an
     // unrelated add plus delete.
-    '--find-renames',
-    '--unified=3',
+    "--find-renames",
+    "--unified=3",
   ];
 
-  if (range === '--cached') {
-    args.push('--cached');
+  if (range === "--cached") {
+    args.push("--cached");
   } else {
     // Checked here as well as where the range is resolved: this is the boundary
     // that actually hands the value to git, and it is exported.
@@ -388,8 +388,8 @@ export function readDiff(range: string, cwd: string, exclude: readonly string[] 
  * straight into path matching.
  */
 export function untrackedFiles(cwd: string, exclude: readonly string[] = []): string[] {
-  return git(['ls-files', '--others', '--exclude-standard', '-z', ...patchPathspec(exclude)], cwd)
-    .split('\0')
+  return git(["ls-files", "--others", "--exclude-standard", "-z", ...patchPathspec(exclude)], cwd)
+    .split("\0")
     .filter(Boolean);
 }
 
@@ -423,7 +423,7 @@ export function untrackedDiff(cwd: string, paths: string[]): string {
       const stats = lstatSync(absolute);
       if (!stats.isFile()) continue;
       if (stats.size > MAX_UNTRACKED_BYTES) continue;
-      contents = readFileSync(absolute, 'utf8');
+      contents = readFileSync(absolute, "utf8");
     } catch {
       // Vanished between listing and reading, or is not readable. Either way
       // there is nothing to report and this must not fail the run.
@@ -432,34 +432,34 @@ export function untrackedDiff(cwd: string, paths: string[]): string {
 
     // A NUL byte in text decoded as UTF-8 means it was never text. git makes
     // the same call, and reports `Binary files differ` rather than a hunk.
-    if (contents.includes('\u0000')) continue;
+    if (contents.includes("\u0000")) continue;
 
-    const lines = contents.split('\n');
+    const lines = contents.split("\n");
     // A trailing newline splits into a final empty element that is not a line.
-    if (lines.at(-1) === '') lines.pop();
+    if (lines.at(-1) === "") lines.pop();
     if (lines.length === 0) continue;
 
     chunks.push(
       [
         `diff --git a/${path} b/${path}`,
-        'new file mode 100644',
-        '--- /dev/null',
+        "new file mode 100644",
+        "--- /dev/null",
         `+++ b/${path}`,
         `@@ -0,0 +1,${lines.length} @@`,
         ...lines.map((line) => `+${line}`),
-        '',
-      ].join('\n'),
+        "",
+      ].join("\n"),
     );
   }
 
-  return chunks.join('');
+  return chunks.join("");
 }
 
 /** Immutable revision identifiers for portable evaluation records. */
 export function revision(ref: string, cwd: string): string | null {
   assertSafeRef(ref);
   try {
-    return git(['rev-parse', '--verify', ref], cwd).trim();
+    return git(["rev-parse", "--verify", ref], cwd).trim();
   } catch {
     return null;
   }
@@ -486,7 +486,7 @@ export function revision(ref: string, cwd: string): string | null {
 export function stageEvidence(paths: readonly string[], cwd: string): boolean {
   if (paths.length === 0) return true;
   try {
-    git(['add', '--', ...paths], cwd);
+    git(["add", "--", ...paths], cwd);
     return true;
   } catch {
     return false;

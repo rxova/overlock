@@ -1,5 +1,5 @@
-import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   EMPTY_TREE,
   GitError,
@@ -14,8 +14,8 @@ import {
   resolveRange,
   stageEvidence,
   untrackedFiles,
-} from './git.js';
-import { PASSING_TEST, SKIPPED_TEST, TempRepo } from './__fixtures__/repo.js';
+} from "./git.js";
+import { PASSING_TEST, SKIPPED_TEST, TempRepo } from "./__fixtures__/repo.js";
 
 let repo: TempRepo | null = null;
 
@@ -29,307 +29,307 @@ afterEach(() => {
   repo = null;
 });
 
-describe('repository facts', () => {
-  it('finds the root and the branch', () => {
+describe("repository facts", () => {
+  it("finds the root and the branch", () => {
     const r = makeRepo();
-    r.write('a.txt', 'hello\n');
-    r.commit('feat: first');
+    r.write("a.txt", "hello\n");
+    r.commit("feat: first");
 
     // macOS resolves the temp dir through a symlink, so compare the basenames.
-    expect(repoRoot(r.dir).split('/').pop()).toBe(r.dir.split('/').pop());
-    expect(currentBranch(r.dir)).toBe('main');
+    expect(repoRoot(r.dir).split("/").pop()).toBe(r.dir.split("/").pop());
+    expect(currentBranch(r.dir)).toBe("main");
   });
 
-  it('reports the default branch by name when there is no origin', () => {
+  it("reports the default branch by name when there is no origin", () => {
     const r = makeRepo();
-    r.write('a.txt', 'hello\n');
-    r.commit('feat: first');
-    expect(defaultBranch(r.dir)).toBe('main');
+    r.write("a.txt", "hello\n");
+    r.commit("feat: first");
+    expect(defaultBranch(r.dir)).toBe("main");
   });
 
-  it('has no default branch before the first commit', () => {
+  it("has no default branch before the first commit", () => {
     const r = makeRepo();
     expect(defaultBranch(r.dir)).toBeNull();
   });
 
-  it('raises a typed error outside a repository', () => {
-    expect(() => repoRoot('/')).toThrow(GitError);
+  it("raises a typed error outside a repository", () => {
+    expect(() => repoRoot("/")).toThrow(GitError);
   });
 });
 
-describe('resolveRange', () => {
-  it('uses --cached for staged work', () => {
+describe("resolveRange", () => {
+  it("uses --cached for staged work", () => {
     const r = makeRepo();
-    expect(resolveRange({ cwd: r.dir, staged: true })).toBe('--cached');
+    expect(resolveRange({ cwd: r.dir, staged: true })).toBe("--cached");
   });
 
-  describe('an explicit ref', () => {
+  describe("an explicit ref", () => {
     /** A branch that forked before the trunk moved on — the shape that broke. */
     function forkedRepo(): { repo: TempRepo; fork: string } {
       const r = makeRepo();
-      r.write('a.test.ts', PASSING_TEST);
-      r.commit('feat: first');
-      const fork = r.git(['rev-parse', 'HEAD']).trim();
+      r.write("a.test.ts", PASSING_TEST);
+      r.commit("feat: first");
+      const fork = r.git(["rev-parse", "HEAD"]).trim();
 
-      r.git(['checkout', '--quiet', '-b', 'feature']);
-      r.write('feature.ts', 'export const x = 1;\n');
-      r.commit('feat: on the branch');
+      r.git(["checkout", "--quiet", "-b", "feature"]);
+      r.write("feature.ts", "export const x = 1;\n");
+      r.commit("feat: on the branch");
 
-      r.git(['checkout', '--quiet', 'main']);
-      r.write('b.test.ts', PASSING_TEST);
-      r.commit('feat: on main, after the fork');
-      r.git(['checkout', '--quiet', 'feature']);
+      r.git(["checkout", "--quiet", "main"]);
+      r.write("b.test.ts", PASSING_TEST);
+      r.commit("feat: on main, after the fork");
+      r.git(["checkout", "--quiet", "feature"]);
 
       return { repo: r, fork };
     }
 
-    it('resolves to the fork point, not to the ref itself', () => {
+    it("resolves to the fork point, not to the ref itself", () => {
       const { repo: r, fork } = forkedRepo();
       // `git diff main` would report b.test.ts — a file this branch never
       // touched — as a deletion, and a deleted test file is a HIGH finding.
-      expect(resolveRange({ cwd: r.dir, base: 'main' })).toBe(fork);
-      expect(readDiff(resolveRange({ cwd: r.dir, base: 'main' }), r.dir)).not.toContain(
-        'b.test.ts',
+      expect(resolveRange({ cwd: r.dir, base: "main" })).toBe(fork);
+      expect(readDiff(resolveRange({ cwd: r.dir, base: "main" }), r.dir)).not.toContain(
+        "b.test.ts",
       );
     });
 
-    it('compares against the ref itself when asked directly', () => {
+    it("compares against the ref itself when asked directly", () => {
       const { repo: r } = forkedRepo();
-      expect(resolveRange({ cwd: r.dir, base: 'main', baseMode: 'direct' })).toBe('main');
-      expect(readDiff('main', r.dir)).toContain('b.test.ts');
+      expect(resolveRange({ cwd: r.dir, base: "main", baseMode: "direct" })).toBe("main");
+      expect(readDiff("main", r.dir)).toContain("b.test.ts");
     });
 
-    it('falls back to the ref when there is no common history', () => {
+    it("falls back to the ref when there is no common history", () => {
       const r = makeRepo();
-      r.write('a.txt', 'one\n');
-      r.commit('feat: first');
+      r.write("a.txt", "one\n");
+      r.commit("feat: first");
       // A ref this clone has never heard of cannot be merge-based.
-      expect(resolveRange({ cwd: r.dir, base: 'origin/main' })).toBe('origin/main');
+      expect(resolveRange({ cwd: r.dir, base: "origin/main" })).toBe("origin/main");
     });
 
-    it('passes the ref through before the first commit', () => {
+    it("passes the ref through before the first commit", () => {
       const r = makeRepo();
-      expect(resolveRange({ cwd: r.dir, base: 'origin/main' })).toBe('origin/main');
+      expect(resolveRange({ cwd: r.dir, base: "origin/main" })).toBe("origin/main");
     });
 
-    it('still refuses a ref that looks like an option', () => {
+    it("still refuses a ref that looks like an option", () => {
       const r = makeRepo();
-      expect(() => resolveRange({ cwd: r.dir, base: '--output=/tmp/pwned' })).toThrow(GitError);
+      expect(() => resolveRange({ cwd: r.dir, base: "--output=/tmp/pwned" })).toThrow(GitError);
     });
   });
 
-  it('defaults to the working tree when no base is given', () => {
+  it("defaults to the working tree when no base is given", () => {
     const r = makeRepo();
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
-    expect(resolveRange({ cwd: r.dir })).toBe('HEAD');
+    r.write("a.txt", "one\n");
+    r.commit("feat: first");
+    expect(resolveRange({ cwd: r.dir })).toBe("HEAD");
   });
 
   // Before this, a freshly initialised repository reported itself as not being
   // a git repository at all.
-  it('falls back to the empty tree before the first commit', () => {
+  it("falls back to the empty tree before the first commit", () => {
     const r = makeRepo();
     expect(hasCommits(r.dir)).toBe(false);
     expect(resolveRange({ cwd: r.dir })).toBe(EMPTY_TREE);
-    expect(resolveRange({ cwd: r.dir, base: 'auto' })).toBe(EMPTY_TREE);
+    expect(resolveRange({ cwd: r.dir, base: "auto" })).toBe(EMPTY_TREE);
   });
 
-  describe('auto', () => {
-    it('picks the working tree when anything is uncommitted', () => {
+  describe("auto", () => {
+    it("picks the working tree when anything is uncommitted", () => {
       const r = makeRepo();
-      r.write('a.test.ts', PASSING_TEST);
-      r.commit('feat: first');
-      r.write('a.test.ts', SKIPPED_TEST);
+      r.write("a.test.ts", PASSING_TEST);
+      r.commit("feat: first");
+      r.write("a.test.ts", SKIPPED_TEST);
 
-      expect(resolveRange({ cwd: r.dir, base: 'auto' })).toBe('HEAD');
+      expect(resolveRange({ cwd: r.dir, base: "auto" })).toBe("HEAD");
     });
 
-    it('picks the merge base when a clean feature branch is ahead', () => {
+    it("picks the merge base when a clean feature branch is ahead", () => {
       const r = makeRepo();
-      r.write('a.test.ts', PASSING_TEST);
-      r.commit('feat: first');
-      const base = r.git(['rev-parse', 'HEAD']).trim();
+      r.write("a.test.ts", PASSING_TEST);
+      r.commit("feat: first");
+      const base = r.git(["rev-parse", "HEAD"]).trim();
 
-      r.git(['checkout', '--quiet', '-b', 'feature']);
-      r.write('a.test.ts', SKIPPED_TEST);
-      r.commit('fix: second');
+      r.git(["checkout", "--quiet", "-b", "feature"]);
+      r.write("a.test.ts", SKIPPED_TEST);
+      r.commit("fix: second");
 
-      expect(resolveRange({ cwd: r.dir, base: 'auto' })).toBe(base);
+      expect(resolveRange({ cwd: r.dir, base: "auto" })).toBe(base);
     });
 
-    it('falls back to the previous commit on a clean default branch', () => {
+    it("falls back to the previous commit on a clean default branch", () => {
       const r = makeRepo();
-      r.write('a.txt', 'one\n');
-      r.commit('feat: first');
-      r.write('a.txt', 'two\n');
-      r.commit('feat: second');
+      r.write("a.txt", "one\n");
+      r.commit("feat: first");
+      r.write("a.txt", "two\n");
+      r.commit("feat: second");
 
-      expect(resolveRange({ cwd: r.dir, base: 'auto' })).toBe('HEAD~1');
+      expect(resolveRange({ cwd: r.dir, base: "auto" })).toBe("HEAD~1");
     });
 
-    it('falls back to the empty tree when there is only one commit', () => {
+    it("falls back to the empty tree when there is only one commit", () => {
       const r = makeRepo();
-      r.write('a.txt', 'one\n');
-      r.commit('feat: first');
+      r.write("a.txt", "one\n");
+      r.commit("feat: first");
 
-      expect(resolveRange({ cwd: r.dir, base: 'auto' })).toBe(EMPTY_TREE);
+      expect(resolveRange({ cwd: r.dir, base: "auto" })).toBe(EMPTY_TREE);
     });
   });
 });
 
-describe('explainRange', () => {
-  it('says it read the index', () => {
+describe("explainRange", () => {
+  it("says it read the index", () => {
     const r = makeRepo();
-    expect(explainRange({ cwd: r.dir, staged: true }).steps).toEqual(['--staged: the index']);
+    expect(explainRange({ cwd: r.dir, staged: true }).steps).toEqual(["--staged: the index"]);
   });
 
-  it('names the fork point it found', () => {
+  it("names the fork point it found", () => {
     const r = makeRepo();
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
-    r.git(['checkout', '--quiet', '-b', 'feature']);
-    r.write('b.txt', 'two\n');
-    r.commit('feat: second');
+    r.write("a.txt", "one\n");
+    r.commit("feat: first");
+    r.git(["checkout", "--quiet", "-b", "feature"]);
+    r.write("b.txt", "two\n");
+    r.commit("feat: second");
 
-    const { steps } = explainRange({ cwd: r.dir, base: 'main' });
-    expect(steps[0]).toBe('explicit --base main');
+    const { steps } = explainRange({ cwd: r.dir, base: "main" });
+    expect(steps[0]).toBe("explicit --base main");
     expect(steps[1]).toMatch(/^fork point with main is [0-9a-f]{7}$/);
   });
 
-  it('says when it was told to compare directly', () => {
+  it("says when it was told to compare directly", () => {
     const r = makeRepo();
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
-    expect(explainRange({ cwd: r.dir, base: 'main', baseMode: 'direct' }).steps).toContain(
-      '--base-mode direct: comparing against the ref itself',
+    r.write("a.txt", "one\n");
+    r.commit("feat: first");
+    expect(explainRange({ cwd: r.dir, base: "main", baseMode: "direct" }).steps).toContain(
+      "--base-mode direct: comparing against the ref itself",
     );
   });
 
-  it('traces auto all the way to the answer', () => {
+  it("traces auto all the way to the answer", () => {
     const r = makeRepo();
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
-    r.git(['checkout', '--quiet', '-b', 'feature']);
-    r.write('b.txt', 'two\n');
-    r.commit('feat: second');
+    r.write("a.txt", "one\n");
+    r.commit("feat: first");
+    r.git(["checkout", "--quiet", "-b", "feature"]);
+    r.write("b.txt", "two\n");
+    r.commit("feat: second");
 
-    const { steps } = explainRange({ cwd: r.dir, base: 'auto' });
-    expect(steps[0]).toBe('auto');
-    expect(steps).toContain('nothing uncommitted');
+    const { steps } = explainRange({ cwd: r.dir, base: "auto" });
+    expect(steps[0]).toBe("auto");
+    expect(steps).toContain("nothing uncommitted");
     expect(steps.at(-1)).toMatch(/^feature is 1 commit\(s\) ahead of main since [0-9a-f]{7}$/);
   });
 
-  it('says it stopped at the working tree', () => {
+  it("says it stopped at the working tree", () => {
     const r = makeRepo();
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
-    r.write('a.txt', 'two\n');
+    r.write("a.txt", "one\n");
+    r.commit("feat: first");
+    r.write("a.txt", "two\n");
 
-    expect(explainRange({ cwd: r.dir, base: 'auto' }).steps).toContain(
-      'uncommitted changes present: the working tree',
+    expect(explainRange({ cwd: r.dir, base: "auto" }).steps).toContain(
+      "uncommitted changes present: the working tree",
     );
-    expect(explainRange({ cwd: r.dir }).steps).toEqual(['no --base: the working tree']);
+    expect(explainRange({ cwd: r.dir }).steps).toEqual(["no --base: the working tree"]);
   });
 
-  it('says why it had nothing to measure against', () => {
+  it("says why it had nothing to measure against", () => {
     const r = makeRepo();
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
-    r.write('a.txt', 'two\n');
-    r.commit('feat: second');
+    r.write("a.txt", "one\n");
+    r.commit("feat: first");
+    r.write("a.txt", "two\n");
+    r.commit("feat: second");
 
-    const { steps } = explainRange({ cwd: r.dir, base: 'auto' });
-    expect(steps).toContain('on main itself, so there are no branch commits to read');
-    expect(steps).toContain('falling back to the last commit');
+    const { steps } = explainRange({ cwd: r.dir, base: "auto" });
+    expect(steps).toContain("on main itself, so there are no branch commits to read");
+    expect(steps).toContain("falling back to the last commit");
   });
 
-  it('says when the branch is level with the trunk', () => {
+  it("says when the branch is level with the trunk", () => {
     const r = makeRepo();
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
-    r.write('a.txt', 'two\n');
-    r.commit('feat: second');
-    r.git(['checkout', '--quiet', '-b', 'feature']);
+    r.write("a.txt", "one\n");
+    r.commit("feat: first");
+    r.write("a.txt", "two\n");
+    r.commit("feat: second");
+    r.git(["checkout", "--quiet", "-b", "feature"]);
 
-    const { range, steps } = explainRange({ cwd: r.dir, base: 'auto' });
-    expect(steps).toContain('feature is level with main');
-    expect(range).toBe('HEAD~1');
+    const { range, steps } = explainRange({ cwd: r.dir, base: "auto" });
+    expect(steps).toContain("feature is level with main");
+    expect(range).toBe("HEAD~1");
   });
 
-  it('says when there is no common history with the trunk', () => {
+  it("says when there is no common history with the trunk", () => {
     const r = makeRepo();
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
-    r.git(['checkout', '--quiet', '--orphan', 'unrelated']);
-    r.write('b.txt', 'two\n');
-    r.commit('feat: an unrelated root');
+    r.write("a.txt", "one\n");
+    r.commit("feat: first");
+    r.git(["checkout", "--quiet", "--orphan", "unrelated"]);
+    r.write("b.txt", "two\n");
+    r.commit("feat: an unrelated root");
 
-    expect(explainRange({ cwd: r.dir, base: 'auto' }).steps).toContain(
-      'no common history with main',
+    expect(explainRange({ cwd: r.dir, base: "auto" }).steps).toContain(
+      "no common history with main",
     );
   });
 
-  it('says when there is no default branch to measure against', () => {
+  it("says when there is no default branch to measure against", () => {
     const r = makeRepo();
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
-    r.write('a.txt', 'two\n');
-    r.commit('feat: second');
+    r.write("a.txt", "one\n");
+    r.commit("feat: first");
+    r.write("a.txt", "two\n");
+    r.commit("feat: second");
     // No origin/HEAD, and nothing called main, master or develop.
-    r.git(['branch', '--move', 'topic']);
+    r.git(["branch", "--move", "topic"]);
 
     expect(defaultBranch(r.dir)).toBeNull();
-    expect(explainRange({ cwd: r.dir, base: 'auto' }).steps).toContain(
-      'no default branch to measure against',
+    expect(explainRange({ cwd: r.dir, base: "auto" }).steps).toContain(
+      "no default branch to measure against",
     );
   });
 
-  it('says there are no commits at all', () => {
+  it("says there are no commits at all", () => {
     const r = makeRepo();
     expect(explainRange({ cwd: r.dir }).steps).toEqual([
-      'no commits yet: everything in the tree is an addition',
+      "no commits yet: everything in the tree is an addition",
     ]);
   });
 });
 
-describe('rangeScope', () => {
-  it('counts the files and commits a range covers', () => {
+describe("rangeScope", () => {
+  it("counts the files and commits a range covers", () => {
     const r = makeRepo();
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
-    const base = r.git(['rev-parse', 'HEAD']).trim();
+    r.write("a.txt", "one\n");
+    r.commit("feat: first");
+    const base = r.git(["rev-parse", "HEAD"]).trim();
 
-    r.write('b.txt', 'two\n');
-    r.commit('feat: second');
-    r.write('c.txt', 'three\n');
-    r.commit('feat: third');
+    r.write("b.txt", "two\n");
+    r.commit("feat: second");
+    r.write("c.txt", "three\n");
+    r.commit("feat: third");
 
     expect(rangeScope(base, r.dir)).toEqual({ files: 2, commits: 2 });
   });
 
-  it('counts no commits for the working tree or the index', () => {
+  it("counts no commits for the working tree or the index", () => {
     const r = makeRepo();
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
-    r.write('a.txt', 'two\n');
+    r.write("a.txt", "one\n");
+    r.commit("feat: first");
+    r.write("a.txt", "two\n");
 
-    expect(rangeScope('HEAD', r.dir)).toEqual({ files: 1, commits: 0 });
-    r.git(['add', '-A']);
-    expect(rangeScope('--cached', r.dir)).toEqual({ files: 1, commits: 0 });
+    expect(rangeScope("HEAD", r.dir)).toEqual({ files: 1, commits: 0 });
+    r.git(["add", "-A"]);
+    expect(rangeScope("--cached", r.dir)).toEqual({ files: 1, commits: 0 });
   });
 
-  it('reports an empty range as empty', () => {
+  it("reports an empty range as empty", () => {
     const r = makeRepo();
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
+    r.write("a.txt", "one\n");
+    r.commit("feat: first");
 
-    expect(rangeScope('HEAD', r.dir)).toEqual({ files: 0, commits: 0 });
+    expect(rangeScope("HEAD", r.dir)).toEqual({ files: 0, commits: 0 });
   });
 
-  it('counts the whole history against the empty tree', () => {
+  it("counts the whole history against the empty tree", () => {
     const r = makeRepo();
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
+    r.write("a.txt", "one\n");
+    r.commit("feat: first");
 
     // The first commit in a repository is the whole patch, and git is willing
     // to walk from the empty tree to it.
@@ -337,33 +337,33 @@ describe('rangeScope', () => {
   });
 });
 
-describe('readDiff', () => {
-  it('reads the working tree against HEAD', () => {
+describe("readDiff", () => {
+  it("reads the working tree against HEAD", () => {
     const r = makeRepo();
-    r.write('a.test.ts', PASSING_TEST);
-    r.commit('feat: first');
-    r.write('a.test.ts', SKIPPED_TEST);
+    r.write("a.test.ts", PASSING_TEST);
+    r.commit("feat: first");
+    r.write("a.test.ts", SKIPPED_TEST);
 
-    expect(readDiff('HEAD', r.dir)).toContain('it.skip');
+    expect(readDiff("HEAD", r.dir)).toContain("it.skip");
   });
 
-  it('reads staged changes', () => {
+  it("reads staged changes", () => {
     const r = makeRepo();
-    r.write('a.test.ts', PASSING_TEST);
-    r.commit('feat: first');
-    r.write('a.test.ts', SKIPPED_TEST);
-    r.git(['add', '-A']);
+    r.write("a.test.ts", PASSING_TEST);
+    r.commit("feat: first");
+    r.write("a.test.ts", SKIPPED_TEST);
+    r.git(["add", "-A"]);
 
-    expect(readDiff('--cached', r.dir)).toContain('it.skip');
+    expect(readDiff("--cached", r.dir)).toContain("it.skip");
   });
 
-  it('detects a rename rather than an add plus a delete', () => {
+  it("detects a rename rather than an add plus a delete", () => {
     const r = makeRepo();
-    r.write('a.test.ts', PASSING_TEST);
-    r.commit('feat: first');
-    r.git(['mv', 'a.test.ts', 'a.helpers.ts']);
+    r.write("a.test.ts", PASSING_TEST);
+    r.commit("feat: first");
+    r.git(["mv", "a.test.ts", "a.helpers.ts"]);
 
-    expect(readDiff('HEAD', r.dir)).toContain('rename to a.helpers.ts');
+    expect(readDiff("HEAD", r.dir)).toContain("rename to a.helpers.ts");
   });
 });
 
@@ -371,153 +371,153 @@ describe('readDiff', () => {
  * A sibling tool's evidence, committed and uncommitted, beside the agent's own
  * work — the shape that made every Stop hook read a different patch.
  */
-describe('excluded paths', () => {
-  const EXCLUDE = ['.basting', '.saidso'];
+describe("excluded paths", () => {
+  const EXCLUDE = [".basting", ".saidso"];
 
   function repoWithSiblingEvidence(): TempRepo {
     const r = makeRepo();
-    r.write('src/a.test.ts', PASSING_TEST);
-    r.write('.basting/runs/one.jsonl', '{"run":1}\n');
-    r.commit('feat: first');
+    r.write("src/a.test.ts", PASSING_TEST);
+    r.write(".basting/runs/one.jsonl", '{"run":1}\n');
+    r.commit("feat: first");
 
     // A tracked change and untracked files under excluded directories...
-    r.write('.basting/runs/one.jsonl', '{"run":1}\n{"run":2}\n');
-    r.write('.basting/patches/abc.diff', 'diff --git a/x b/x\n');
-    r.write('.saidso/reviews/r.json', '{}\n');
+    r.write(".basting/runs/one.jsonl", '{"run":1}\n{"run":2}\n');
+    r.write(".basting/patches/abc.diff", "diff --git a/x b/x\n");
+    r.write(".saidso/reviews/r.json", "{}\n");
     // ...and the agent's work, tracked and untracked, which must still be read.
-    r.write('src/a.test.ts', SKIPPED_TEST);
-    r.write('notes.txt', 'kept\n');
+    r.write("src/a.test.ts", SKIPPED_TEST);
+    r.write("notes.txt", "kept\n");
     // A name that only starts like an excluded directory is not inside it.
-    r.write('.bastingx', 'kept\n');
+    r.write(".bastingx", "kept\n");
     return r;
   }
 
-  it('leaves excluded tracked changes out of the diff and the file count', () => {
+  it("leaves excluded tracked changes out of the diff and the file count", () => {
     const r = repoWithSiblingEvidence();
 
-    const diff = readDiff('HEAD', r.dir, EXCLUDE);
-    expect(diff).toContain('src/a.test.ts');
-    expect(diff).not.toContain('.basting/');
-    expect(rangeScope('HEAD', r.dir, EXCLUDE)).toEqual({ files: 1, commits: 0 });
+    const diff = readDiff("HEAD", r.dir, EXCLUDE);
+    expect(diff).toContain("src/a.test.ts");
+    expect(diff).not.toContain(".basting/");
+    expect(rangeScope("HEAD", r.dir, EXCLUDE)).toEqual({ files: 1, commits: 0 });
 
     // Without the setting, the sibling's run log is part of the patch.
-    expect(readDiff('HEAD', r.dir)).toContain('.basting/runs/one.jsonl');
-    expect(rangeScope('HEAD', r.dir)).toEqual({ files: 2, commits: 0 });
+    expect(readDiff("HEAD", r.dir)).toContain(".basting/runs/one.jsonl");
+    expect(rangeScope("HEAD", r.dir)).toEqual({ files: 2, commits: 0 });
   });
 
-  it('leaves excluded untracked directories out of the untracked files', () => {
+  it("leaves excluded untracked directories out of the untracked files", () => {
     const r = repoWithSiblingEvidence();
 
-    expect(untrackedFiles(r.dir, EXCLUDE).sort()).toEqual(['.bastingx', 'notes.txt']);
-    expect(untrackedFiles(r.dir)).toContain('.basting/patches/abc.diff');
-    expect(untrackedFiles(r.dir)).toContain('.saidso/reviews/r.json');
+    expect(untrackedFiles(r.dir, EXCLUDE).sort()).toEqual([".bastingx", "notes.txt"]);
+    expect(untrackedFiles(r.dir)).toContain(".basting/patches/abc.diff");
+    expect(untrackedFiles(r.dir)).toContain(".saidso/reviews/r.json");
   });
 
-  it('reads excluded paths from the repository root, whatever the working directory', () => {
+  it("reads excluded paths from the repository root, whatever the working directory", () => {
     const r = repoWithSiblingEvidence();
-    r.write('src/.basting/local.txt', 'kept\n');
+    r.write("src/.basting/local.txt", "kept\n");
 
-    expect(untrackedFiles(join(r.dir, 'src'), EXCLUDE)).toEqual(['.basting/local.txt']);
+    expect(untrackedFiles(join(r.dir, "src"), EXCLUDE)).toEqual([".basting/local.txt"]);
   });
 
-  it('counts a staged excluded change as outside the patch', () => {
+  it("counts a staged excluded change as outside the patch", () => {
     const r = repoWithSiblingEvidence();
-    r.git(['add', '-A']);
+    r.git(["add", "-A"]);
 
-    expect(readDiff('--cached', r.dir, EXCLUDE)).not.toContain('.basting/');
-    expect(rangeScope('--cached', r.dir, EXCLUDE).files).toBe(3);
+    expect(readDiff("--cached", r.dir, EXCLUDE)).not.toContain(".basting/");
+    expect(rangeScope("--cached", r.dir, EXCLUDE).files).toBe(3);
   });
 
-  it('does not let excluded evidence make auto stop at the working tree', () => {
+  it("does not let excluded evidence make auto stop at the working tree", () => {
     const r = makeRepo();
-    r.write('a.test.ts', PASSING_TEST);
-    r.commit('feat: first');
-    r.git(['checkout', '--quiet', '-b', 'feature']);
-    r.write('a.test.ts', SKIPPED_TEST);
-    r.commit('fix: the agent committed its work');
-    r.write('.basting/runs/s.jsonl', '{}\n');
+    r.write("a.test.ts", PASSING_TEST);
+    r.commit("feat: first");
+    r.git(["checkout", "--quiet", "-b", "feature"]);
+    r.write("a.test.ts", SKIPPED_TEST);
+    r.commit("fix: the agent committed its work");
+    r.write(".basting/runs/s.jsonl", "{}\n");
 
-    expect(explainRange({ cwd: r.dir, base: 'auto' }).steps).toContain(
-      'uncommitted changes present: the working tree',
+    expect(explainRange({ cwd: r.dir, base: "auto" }).steps).toContain(
+      "uncommitted changes present: the working tree",
     );
-    const { range, steps } = explainRange({ cwd: r.dir, base: 'auto', exclude: EXCLUDE });
-    expect(steps).toContain('nothing uncommitted');
-    expect(range).not.toBe('HEAD');
+    const { range, steps } = explainRange({ cwd: r.dir, base: "auto", exclude: EXCLUDE });
+    expect(steps).toContain("nothing uncommitted");
+    expect(range).not.toBe("HEAD");
   });
 
-  it('matches an excluded path literally, never as a pattern', () => {
+  it("matches an excluded path literally, never as a pattern", () => {
     const r = makeRepo();
-    r.write('a.txt', 'one\n');
-    r.commit('feat: first');
-    r.write('ab.txt', 'two\n');
+    r.write("a.txt", "one\n");
+    r.commit("feat: first");
+    r.write("ab.txt", "two\n");
 
     // A library caller skips the config's refusal of `*`; git still must not glob.
-    expect(untrackedFiles(r.dir, ['a*'])).toEqual(['ab.txt']);
+    expect(untrackedFiles(r.dir, ["a*"])).toEqual(["ab.txt"]);
   });
 });
 
-describe('readMessages', () => {
-  it('returns the commit messages in the range', () => {
+describe("readMessages", () => {
+  it("returns the commit messages in the range", () => {
     const r = makeRepo();
-    r.write('src/a.test.ts', PASSING_TEST);
-    r.commit('feat: the base');
-    r.write('src/a.test.ts', SKIPPED_TEST);
-    r.git(['add', '-A']);
-    r.git(['commit', '-m', 'chore: quarantine\n\nOverlock-Allow: TEST_SKIPPED_ADDED -- see #412']);
+    r.write("src/a.test.ts", PASSING_TEST);
+    r.commit("feat: the base");
+    r.write("src/a.test.ts", SKIPPED_TEST);
+    r.git(["add", "-A"]);
+    r.git(["commit", "-m", "chore: quarantine\n\nOverlock-Allow: TEST_SKIPPED_ADDED -- see #412"]);
 
-    expect(readMessages('HEAD~1', r.dir)).toContain('Overlock-Allow: TEST_SKIPPED_ADDED');
+    expect(readMessages("HEAD~1", r.dir)).toContain("Overlock-Allow: TEST_SKIPPED_ADDED");
   });
 
   /**
    * The honest answer for uncommitted work, which is the Stop hook's usual
    * case: there is no commit message, so there is no trailer.
    */
-  it('is empty for the working tree, the index and an empty repository', () => {
+  it("is empty for the working tree, the index and an empty repository", () => {
     const r = makeRepo();
-    r.write('src/a.test.ts', PASSING_TEST);
-    r.commit('feat: the base');
+    r.write("src/a.test.ts", PASSING_TEST);
+    r.commit("feat: the base");
 
-    expect(readMessages('HEAD', r.dir)).toBe('');
-    expect(readMessages('--cached', r.dir)).toBe('');
-    expect(readMessages(EMPTY_TREE, r.dir)).toBe('');
+    expect(readMessages("HEAD", r.dir)).toBe("");
+    expect(readMessages("--cached", r.dir)).toBe("");
+    expect(readMessages(EMPTY_TREE, r.dir)).toBe("");
   });
 
-  it('is empty rather than fatal when the range cannot be read', () => {
+  it("is empty rather than fatal when the range cannot be read", () => {
     const r = makeRepo();
-    r.write('src/a.test.ts', PASSING_TEST);
-    r.commit('feat: the base');
+    r.write("src/a.test.ts", PASSING_TEST);
+    r.commit("feat: the base");
 
-    expect(readMessages('no-such-ref', r.dir)).toBe('');
+    expect(readMessages("no-such-ref", r.dir)).toBe("");
   });
 
-  it('refuses a ref that git would read as an option', () => {
+  it("refuses a ref that git would read as an option", () => {
     const r = makeRepo();
-    r.write('src/a.test.ts', PASSING_TEST);
-    r.commit('feat: the base');
+    r.write("src/a.test.ts", PASSING_TEST);
+    r.commit("feat: the base");
 
-    expect(() => readMessages('--output=/tmp/pwned', r.dir)).toThrow(GitError);
+    expect(() => readMessages("--output=/tmp/pwned", r.dir)).toThrow(GitError);
   });
 });
 
-describe('stageEvidence', () => {
-  it('stages the paths it is given and nothing else', () => {
+describe("stageEvidence", () => {
+  it("stages the paths it is given and nothing else", () => {
     const r = makeRepo();
-    r.write('src/a.test.ts', PASSING_TEST);
-    r.commit('feat: the base');
-    r.write('.overlock/runs/session.jsonl', '{"schema":2}\n');
-    r.write('src/a.test.ts', SKIPPED_TEST);
+    r.write("src/a.test.ts", PASSING_TEST);
+    r.commit("feat: the base");
+    r.write(".overlock/runs/session.jsonl", '{"schema":2}\n');
+    r.write("src/a.test.ts", SKIPPED_TEST);
 
-    expect(stageEvidence([join(r.dir, '.overlock/runs/session.jsonl')], r.dir)).toBe(true);
-    expect(r.git(['diff', '--cached', '--name-only'])).toBe('.overlock/runs/session.jsonl\n');
+    expect(stageEvidence([join(r.dir, ".overlock/runs/session.jsonl")], r.dir)).toBe(true);
+    expect(r.git(["diff", "--cached", "--name-only"])).toBe(".overlock/runs/session.jsonl\n");
   });
 
-  it('touches nothing when there is nothing to stage, and reports a refusal', () => {
+  it("touches nothing when there is nothing to stage, and reports a refusal", () => {
     const r = makeRepo();
-    r.write('src/a.test.ts', PASSING_TEST);
-    r.commit('feat: the base');
+    r.write("src/a.test.ts", PASSING_TEST);
+    r.commit("feat: the base");
 
     expect(stageEvidence([], r.dir)).toBe(true);
-    expect(stageEvidence([join(r.dir, '.overlock/runs/absent.jsonl')], r.dir)).toBe(false);
-    expect(r.git(['diff', '--cached', '--name-only'])).toBe('');
+    expect(stageEvidence([join(r.dir, ".overlock/runs/absent.jsonl")], r.dir)).toBe(false);
+    expect(r.git(["diff", "--cached", "--name-only"])).toBe("");
   });
 });

@@ -1,15 +1,15 @@
-import { appendFileSync, mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
-import type { EvaluationRun } from './evaluation-record.js';
-import type { Report, Severity } from './types.js';
+import { appendFileSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+import type { EvaluationRun } from "./evaluation-record.js";
+import type { Report, Severity } from "./types.js";
 
 export interface LedgerEntry {
   ts: string;
   repo: string;
   branch: string;
   base: string;
-  mode: 'check' | 'hook';
+  mode: "check" | "hook";
   ok: boolean;
   /** True when this run actually stopped the agent, not merely reported. */
   blocked: boolean;
@@ -21,14 +21,14 @@ export interface LedgerEntry {
 export function ledgerPath(env: NodeJS.ProcessEnv = process.env): string {
   const override = env.OVERLOCK_LEDGER;
   if (override) return override;
-  return join(env.OVERLOCK_HOME ?? join(homedir(), '.overlock'), 'ledger.jsonl');
+  return join(env.OVERLOCK_HOME ?? join(homedir(), ".overlock"), "ledger.jsonl");
 }
 
 export function toEntry(input: {
   report: Report;
   repo: string;
   branch: string;
-  mode: 'check' | 'hook';
+  mode: "check" | "hook";
   blocked: boolean;
   now?: Date;
 }): LedgerEntry {
@@ -64,7 +64,7 @@ export function toEntry(input: {
 export function appendLedger(entry: LedgerEntry | EvaluationRun, path = ledgerPath()): boolean {
   try {
     mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(path, `${JSON.stringify(entry)}\n`, 'utf8');
+    appendFileSync(path, `${JSON.stringify(entry)}\n`, "utf8");
     return true;
   } catch {
     return false;

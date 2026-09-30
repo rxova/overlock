@@ -1,9 +1,9 @@
-import { statSync } from 'node:fs';
-import { isObjectLike } from '@rxova/ts-utils';
-import { patchClaims, type SuppressionMemory } from './announced.js';
-import { commitBefore } from './git.js';
-import { compact } from './report.js';
-import type { Report } from './types.js';
+import { statSync } from "node:fs";
+import { isObjectLike } from "@rxova/ts-utils";
+import { patchClaims, type SuppressionMemory } from "./announced.js";
+import { commitBefore } from "./git.js";
+import { compact } from "./report.js";
+import type { Report } from "./types.js";
 
 export interface HookOutcome {
   exitCode: number;
@@ -17,7 +17,7 @@ export interface HookOutcome {
    * that called both a retry is the kind of small untruth that makes the
    * evidence useless for the next person reading it.
    */
-  bypass?: 'retry' | 'announced';
+  bypass?: "retry" | "announced";
 }
 
 interface StopPayload {
@@ -44,10 +44,10 @@ interface StopPayload {
  */
 function suppressionNotice(report: Report): string {
   const silenced = report.suppressed_new + report.allowed.length;
-  const lines = [`overlock: this patch silenced ${silenced} of its own findings.`, ''];
+  const lines = [`overlock: this patch silenced ${silenced} of its own findings.`, ""];
 
   for (const s of report.suppressions_new) {
-    const covers = s.target === null ? '' : ` (covering ${s.target})`;
+    const covers = s.target === null ? "" : ` (covering ${s.target})`;
     lines.push(`! ${s.file}:${s.line} ${s.rule}${covers}`);
     lines.push(`   overlock-ignore ... -- ${s.reason}`);
   }
@@ -55,12 +55,12 @@ function suppressionNotice(report: Report): string {
   // A trailer is written by the patch by definition — it lives in the commit
   // message of a commit in the range — so it is quoted back on the same terms.
   for (const a of report.allowed) {
-    const covers = a.target === null ? '' : ` (covering ${a.target})`;
+    const covers = a.target === null ? "" : ` (covering ${a.target})`;
     lines.push(`! commit message ${a.rule}${covers}`);
     lines.push(`   Overlock-Allow: ... -- ${a.reason}`);
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /**
@@ -79,7 +79,7 @@ function suppressionNotice(report: Report): string {
  */
 export function sessionStart(payload: StopPayload): Date | null {
   const path = payload.transcript_path;
-  if (typeof path !== 'string' || path === '') return null;
+  if (typeof path !== "string" || path === "") return null;
 
   try {
     const { birthtime, birthtimeMs } = statSync(path);
@@ -148,15 +148,15 @@ export function stopHookOutcome(
   const reason = laundered ? suppressionNotice(report) : compact(report);
 
   if (report.ok && !laundered) {
-    return { exitCode: 0, stdout: '', stderr: '' };
+    return { exitCode: 0, stdout: "", stderr: "" };
   }
 
   if (payload.stop_hook_active === true) {
     return {
       exitCode: 0,
-      stdout: '',
+      stdout: "",
       stderr: `${reason}\n\n(overlock: already retried once, not blocking again.)\n`,
-      bypass: 'retry',
+      bypass: "retry",
     };
   }
 
@@ -170,14 +170,14 @@ export function stopHookOutcome(
     // Silently, as a directive that predates the patch passes: repeating an
     // answered claim every turn is how a notice becomes something to scroll
     // past. A new directive, or a changed reason, is a new claim and stops.
-    return { exitCode: 0, stdout: '', stderr: '', bypass: 'announced' };
+    return { exitCode: 0, stdout: "", stderr: "", bypass: "announced" };
   }
 
   if (memory && claimed.length > 0) memory.remember(claimed);
 
   const body = {
     hookSpecificOutput: {
-      hookEventName: 'Stop',
+      hookEventName: "Stop",
       blockStopReason: laundered
         ? `${reason}\n\nIf that is right, say so and finish. If not, fix the cause.`
         : `${reason}\n\nFix the cause, not the check, then finish.`,

@@ -1,6 +1,6 @@
-import { performance } from 'node:perf_hooks';
-import { stopHookOutcome, type HookOutcome } from './hook.js';
-import { suppressionMemory } from './announced.js';
+import { performance } from "node:perf_hooks";
+import { stopHookOutcome, type HookOutcome } from "./hook.js";
+import { suppressionMemory } from "./announced.js";
 import {
   BUILD,
   VERSION,
@@ -11,9 +11,9 @@ import {
   persistEvaluation,
   type EvaluationConfig,
   type EvaluationRun,
-} from './evaluation-record.js';
-import { analyze } from './analyze.js';
-import { readFileSync } from 'node:fs';
+} from "./evaluation-record.js";
+import { analyze } from "./analyze.js";
+import { readFileSync } from "node:fs";
 import {
   type BaseMode,
   currentBranch,
@@ -26,9 +26,9 @@ import {
   stageEvidence,
   untrackedDiff,
   untrackedFiles,
-} from './git.js';
-import { appendLedger, toEntry } from './ledger.js';
-import type { Finding, Grade, Report, RuleId, Severity } from './types.js';
+} from "./git.js";
+import { appendLedger, toEntry } from "./ledger.js";
+import type { Finding, Grade, Report, RuleId, Severity } from "./types.js";
 
 export interface RunOptions {
   cwd: string;
@@ -36,11 +36,11 @@ export interface RunOptions {
   /** How an explicit `base` is read. Default `fork-point`. */
   baseMode?: BaseMode | undefined;
   staged?: boolean | undefined;
-  failOn?: Severity | 'none';
+  failOn?: Severity | "none";
   /** Per-rule grade, replacing the built-in one. `off` drops the rule's findings. */
   severities?: Partial<Record<RuleId, Grade>>;
   testGlobs?: RegExp[];
-  mode?: 'check' | 'hook';
+  mode?: "check" | "hook";
   ledger?: boolean;
   evaluation?: EvaluationConfig | undefined;
   env?: NodeJS.ProcessEnv;
@@ -91,10 +91,10 @@ export function run(options: RunOptions): RunResult {
     base,
     baseMode,
     staged,
-    failOn = 'high',
+    failOn = "high",
     severities = {},
     testGlobs = [],
-    mode = 'check',
+    mode = "check",
     ledger = true,
     untracked,
     allowFile,
@@ -113,20 +113,20 @@ export function run(options: RunOptions): RunResult {
     schema: 2,
     ...identity,
     timestamp: new Date().toISOString(),
-    repository: options.evaluation?.repository ?? '',
+    repository: options.evaluation?.repository ?? "",
     version: VERSION,
     build: BUILD,
     source:
       env.OVERLOCK_SOURCE ||
       options.source ||
-      (env.CI ? 'ci' : mode === 'hook' ? 'hook' : 'manual'),
+      (env.CI ? "ci" : mode === "hook" ? "hook" : "manual"),
     branch: null,
     base: null,
     head: null,
     patch: null,
     settings: {
-      base: base ?? 'auto',
-      baseMode: baseMode ?? 'fork-point',
+      base: base ?? "auto",
+      baseMode: baseMode ?? "fork-point",
       staged: staged ?? false,
       failOn,
       failOnEmpty: options.failOnEmpty ?? false,
@@ -137,8 +137,8 @@ export function run(options: RunOptions): RunResult {
     },
     scope: null,
     duration_ms: 0,
-    status: 'error',
-    decision: 'error',
+    status: "error",
+    decision: "error",
     exit_code: 2,
     error: null,
     findings: [],
@@ -153,20 +153,20 @@ export function run(options: RunOptions): RunResult {
     root = repo;
     const branch = currentBranch(cwd);
     record.branch = branch;
-    record.head = revision('HEAD', cwd);
+    record.head = revision("HEAD", cwd);
     const { range, steps } = explainRange({ cwd, base, baseMode, staged, exclude });
 
-    record.base = revision(range === '--cached' ? 'HEAD' : range, cwd);
+    record.base = revision(range === "--cached" ? "HEAD" : range, cwd);
 
     // Untracked files are part of the working tree but not of any diff against
     // it, so they are appended explicitly. Not for `--staged`, where the question
     // asked is specifically what the index holds.
-    const includeUntracked = untracked ?? range !== '--cached';
+    const includeUntracked = untracked ?? range !== "--cached";
     record.settings.untracked = includeUntracked;
-    const untrackedChunk = includeUntracked ? untrackedDiff(cwd, untrackedFiles(cwd, exclude)) : '';
+    const untrackedChunk = includeUntracked ? untrackedDiff(cwd, untrackedFiles(cwd, exclude)) : "";
     const diff = readDiff(range, cwd, exclude) + untrackedChunk;
     record.patch = fingerprint(diff);
-    if (options.evaluation?.captureDiff && env.OVERLOCK_NO_EVALUATION !== '1') {
+    if (options.evaluation?.captureDiff && env.OVERLOCK_NO_EVALUATION !== "1") {
       const captured = captureEvaluationDiff(root, diff, warn);
       if (captured) evidence.push(captured);
     }
@@ -176,7 +176,7 @@ export function run(options: RunOptions): RunResult {
     let allowText = readMessages(range, cwd);
     if (allowFile !== undefined) {
       try {
-        allowText += `\n${readFileSync(allowFile, 'utf8')}`;
+        allowText += `\n${readFileSync(allowFile, "utf8")}`;
       } catch {
         // Nothing to add.
       }
@@ -210,7 +210,7 @@ export function run(options: RunOptions): RunResult {
     };
 
     const outcome =
-      mode === 'hook'
+      mode === "hook"
         ? stopHookOutcome(
             report,
             options.stopPayload ?? {},
@@ -225,24 +225,24 @@ export function run(options: RunOptions): RunResult {
       ledger &&
       !appendLedger(toEntry({ report, repo, branch, mode, blocked: outcome?.exitCode === 2 }))
     )
-      warn('overlock: legacy ledger could not be saved.\n');
+      warn("overlock: legacy ledger could not be saved.\n");
 
     record.scope = report.scope ?? null;
-    record.status = empty ? 'empty' : 'analyzed';
+    record.status = empty ? "empty" : "analyzed";
     record.exit_code = exitCode;
     record.decision = outcome
       ? exitCode === 2
         ? report.ok
-          ? 'suppression_block'
-          : 'block'
-        : outcome.bypass === 'announced'
-          ? 'already_announced'
-          : outcome.bypass === 'retry'
-            ? 'retry_bypass'
-            : 'pass'
+          ? "suppression_block"
+          : "block"
+        : outcome.bypass === "announced"
+          ? "already_announced"
+          : outcome.bypass === "retry"
+            ? "retry_bypass"
+            : "pass"
       : exitCode === 0
-        ? 'pass'
-        : 'fail';
+        ? "pass"
+        : "fail";
     record.findings = evaluationFindings(
       record.repository,
       record.patch,
@@ -253,23 +253,23 @@ export function run(options: RunOptions): RunResult {
     return { report, repo, branch, steps, exitCode, ...(outcome ? { outcome } : {}) };
   } catch (error) {
     // The stack and absolute paths are machine-specific; retain the failure category.
-    record.error = error instanceof Error ? error.name : 'UnknownError';
+    record.error = error instanceof Error ? error.name : "UnknownError";
     throw error;
   } finally {
     record.duration_ms = Math.round(performance.now() - started);
-    if (options.evaluation && env.OVERLOCK_NO_EVALUATION !== '1') {
+    if (options.evaluation && env.OVERLOCK_NO_EVALUATION !== "1") {
       const persisted = persistEvaluation(root, record, warn);
       if (persisted) evidence.push(persisted);
       if (options.stageRecord && !stageEvidence(evidence, root))
         warn(
-          'overlock: evaluation evidence could not be staged; it is still on disk, and .overlock may be ignored by this repository.\n',
+          "overlock: evaluation evidence could not be staged; it is still on disk, and .overlock may be ignored by this repository.\n",
         );
     } else if (options.stageRecord) {
       // A flag that silently did nothing would leave someone certain their
       // commits carried their own evidence, and finding out otherwise from an
       // empty `overlock evaluate`.
       warn(
-        'overlock: nothing to stage — repository evaluation is off, so this run wrote no record.\n',
+        "overlock: nothing to stage — repository evaluation is off, so this run wrote no record.\n",
       );
     }
   }

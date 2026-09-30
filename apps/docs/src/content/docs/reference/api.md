@@ -6,9 +6,9 @@ sidebar:
 ---
 
 ```ts
-import { analyze } from 'overlock';
+import { analyze } from "overlock";
 
-const report = analyze({ diff: myUnifiedDiff, failOn: 'medium' });
+const report = analyze({ diff: myUnifiedDiff, failOn: "medium" });
 ```
 
 `analyze` takes a unified diff and returns the same [report](json-report.md) the CLI prints with `--json`. It is pure: no git, no filesystem, no network. You hand it text, it hands you findings.
@@ -26,7 +26,7 @@ interface AnalyzeOptions {
   /** Extra patterns that mark a path as a test file. */
   testGlobs?: RegExp[];
   /** Severity at or above which the report is not ok. Default 'high'. */
-  failOn?: Severity | 'none';
+  failOn?: Severity | "none";
   /** Per-rule grade, replacing the built-in one for those rules. */
   severities?: Partial<Record<RuleId, Grade>>;
   /** Commit messages and PR body, searched for `Overlock-Allow:` trailers. */
@@ -43,7 +43,7 @@ interface AnalyzeOptions {
 ## Rule IDs
 
 ```ts
-import { RULE_IDS } from 'overlock';
+import { RULE_IDS } from "overlock";
 ```
 
 The thirteen IDs, in report order. Enumerate them from here rather than hardcoding the list — adding a rule is a minor release, and a hardcoded array silently stops covering the new one.

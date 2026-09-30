@@ -1,6 +1,6 @@
 name: False positive or false negative
 description: A rule fired on a change that did not weaken anything, or missed one that did
-labels: ['rule-accuracy']
+labels: ["rule-accuracy"]
 body:
   - type: markdown
     attributes:
@@ -24,7 +24,7 @@ body:
     attributes:
       label: Rule ID
       description: For a false negative, the rule you would have expected to fire.
-      placeholder: 'ASSERTION_WEAKENED'
+      placeholder: "ASSERTION_WEAKENED"
     validations:
       required: true
 
@@ -32,7 +32,7 @@ body:
     id: version
     attributes:
       label: overlock version
-      placeholder: '0.5.0'
+      placeholder: "0.5.0"
     validations:
       required: true
 

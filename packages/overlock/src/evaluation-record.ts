@@ -1,8 +1,8 @@
-import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { appendLedger } from './ledger.js';
-import type { Finding, Grade, Report, RuleId, Severity } from './types.js';
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { appendLedger } from "./ledger.js";
+import type { Finding, Grade, Report, RuleId, Severity } from "./types.js";
 
 export interface EvaluationConfig {
   repository: string;
@@ -11,7 +11,7 @@ export interface EvaluationConfig {
 export interface EvaluationFinding {
   key: string;
   finding: Finding;
-  disposition: 'standing' | 'suppressed' | 'off';
+  disposition: "standing" | "suppressed" | "off";
 }
 export interface EvaluationRun {
   schema: 2;
@@ -31,7 +31,7 @@ export interface EvaluationRun {
     base: string;
     baseMode: string;
     staged: boolean;
-    failOn: Severity | 'none';
+    failOn: Severity | "none";
     failOnEmpty: boolean;
     severity: Partial<Record<RuleId, Grade>>;
     testGlob: string[];
@@ -44,26 +44,26 @@ export interface EvaluationRun {
   };
   scope: { files: number; commits: number } | null;
   duration_ms: number;
-  status: 'analyzed' | 'empty' | 'error';
+  status: "analyzed" | "empty" | "error";
   decision:
-    | 'pass'
-    | 'fail'
-    | 'block'
-    | 'suppression_block'
+    | "pass"
+    | "fail"
+    | "block"
+    | "suppression_block"
     /** Stopped once already this turn, and let through rather than looped. */
-    | 'retry_bypass'
+    | "retry_bypass"
     /** The claim in this patch was already put to a person on this branch. */
-    | 'already_announced'
-    | 'error';
+    | "already_announced"
+    | "error";
   exit_code: number;
   error: string | null;
   findings: EvaluationFinding[];
 }
 
-export const VERSION = typeof __OVERLOCK_VERSION__ === 'string' ? __OVERLOCK_VERSION__ : 'source';
-export const BUILD = typeof __OVERLOCK_BUILD__ === 'string' ? __OVERLOCK_BUILD__ : 'source';
+export const VERSION = typeof __OVERLOCK_VERSION__ === "string" ? __OVERLOCK_VERSION__ : "source";
+export const BUILD = typeof __OVERLOCK_BUILD__ === "string" ? __OVERLOCK_BUILD__ : "source";
 export const fingerprint = (text: string): string =>
-  createHash('sha256').update(text).digest('hex');
+  createHash("sha256").update(text).digest("hex");
 
 /** Evidence is opt-in here; the legacy home ledger still never stores source. */
 export function evaluationFindings(
@@ -78,7 +78,7 @@ export function evaluationFindings(
     const grade = severity[original.rule];
     const finding = standing.get(original.id) ?? {
       ...original,
-      severity: grade === 'off' || grade === undefined ? original.severity : grade,
+      severity: grade === "off" || grade === undefined ? original.severity : grade,
     };
     return {
       // No line number: identical reruns and line shifts within the same patch
@@ -94,7 +94,7 @@ export function evaluationFindings(
         ]),
       ),
       finding,
-      disposition: grade === 'off' ? 'off' : standing.has(original.id) ? 'standing' : 'suppressed',
+      disposition: grade === "off" ? "off" : standing.has(original.id) ? "standing" : "suppressed",
     };
   });
 }
@@ -114,7 +114,7 @@ export function evaluationIdentity(
     session: fingerprint(env.OVERLOCK_SESSION_ID || session || randomUUID()).slice(0, 24),
     environment:
       env.OVERLOCK_ENVIRONMENT ||
-      (env.CI ? 'ci' : env.container || existsSync('/.dockerenv') ? 'container' : 'local'),
+      (env.CI ? "ci" : env.container || existsSync("/.dockerenv") ? "container" : "local"),
   };
 }
 
@@ -123,10 +123,10 @@ export function persistEvaluation(
   record: EvaluationRun,
   warn: (message: string) => void,
 ): string | null {
-  const path = join(root, '.overlock', 'runs', `${record.session}.jsonl`);
+  const path = join(root, ".overlock", "runs", `${record.session}.jsonl`);
   if (appendLedger(record, path)) return path;
   warn(
-    'overlock: evaluation record could not be saved; export or mount .overlock before ending this session.\n',
+    "overlock: evaluation record could not be saved; export or mount .overlock before ending this session.\n",
   );
   return null;
 }
@@ -138,14 +138,14 @@ export function captureEvaluationDiff(
   warn: (message: string) => void,
 ): string | null {
   try {
-    const directory = join(root, '.overlock', 'patches');
+    const directory = join(root, ".overlock", "patches");
     mkdirSync(directory, { recursive: true });
     const path = join(directory, `${fingerprint(diff)}.diff`);
     // Concurrent writers have identical content under this content-addressed path.
     writeFileSync(path, diff);
     return path;
   } catch {
-    warn('overlock: evaluation diff could not be saved.\n');
+    warn("overlock: evaluation diff could not be saved.\n");
     return null;
   }
 }

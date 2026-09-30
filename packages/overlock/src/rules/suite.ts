@@ -21,9 +21,9 @@
  * Both rules read config files only. A marker in a test file is a test file's
  * business, and a `|| true` in prose is prose.
  */
-import { isCiConfig, isRunnerConfig } from '../paths.js';
-import type { DiffFile, DiffLine, Finding, Hunk, Severity } from '../types.js';
-import { finding, type Rule, type RuleContext } from './shared.js';
+import { isCiConfig, isRunnerConfig } from "../paths.js";
+import type { DiffFile, DiffLine, Finding, Hunk, Severity } from "../types.js";
+import { finding, type Rule, type RuleContext } from "./shared.js";
 
 /**
  * Commands that run a test suite.
@@ -89,10 +89,10 @@ function isCommented(text: string): boolean {
 
 /** Ways of saying "and if it fails, carry on". */
 const NEUTRALISERS: { re: RegExp; label: string }[] = [
-  { re: /\|\|\s*true\b/, label: '|| true' },
-  { re: /\|\|\s*:(?:\s|$|["',])/, label: '|| :' },
-  { re: /\|\|\s*exit\s+0\b/, label: '|| exit 0' },
-  { re: /;\s*(?:true|exit\s+0)\s*(?:$|["',])/, label: '; true' },
+  { re: /\|\|\s*true\b/, label: "|| true" },
+  { re: /\|\|\s*:(?:\s|$|["',])/, label: "|| :" },
+  { re: /\|\|\s*exit\s+0\b/, label: "|| exit 0" },
+  { re: /;\s*(?:true|exit\s+0)\s*(?:$|["',])/, label: "; true" },
 ];
 
 /** An empty run reported as a passing run. */
@@ -124,7 +124,7 @@ function invokedAnywhere(files: DiffFile[]): Set<string> {
   for (const file of files) {
     for (const h of file.hunks) {
       for (const line of h.lines) {
-        if (line.kind !== 'add' || isCommented(line.text)) continue;
+        if (line.kind !== "add" || isCommented(line.text)) continue;
         for (const key of testKeys(line.text)) keys.add(key);
       }
     }
@@ -149,25 +149,25 @@ function disables(line: DiffLine, hunk: Hunk): Disabled | null {
   const neutraliser = NEUTRALISERS.find((n) => n.re.test(line.text));
   if (neutraliser !== undefined && invokesTests(line.text)) {
     return {
-      severity: 'high',
+      severity: "high",
       message: `Test command made unable to fail — \`${neutraliser.label}\` swallows its exit code.`,
-      fix_hint: 'Let the command fail the build, and fix the tests that fail it.',
+      fix_hint: "Let the command fail the build, and fix the tests that fail it.",
     };
   }
 
   if (PASS_WITH_NO_TESTS.test(line.text)) {
     return {
-      severity: 'medium',
-      message: 'Runner told to pass when it collects no tests — an empty run is now a green run.',
+      severity: "medium",
+      message: "Runner told to pass when it collects no tests — an empty run is now a green run.",
       fix_hint:
-        'Check the runner still collects the tests it did. The flag is only safe where a package genuinely has none.',
+        "Check the runner still collects the tests it did. The flag is only safe where a package genuinely has none.",
     };
   }
 
   const disabler = CONTINUE_ON_ERROR.test(line.text)
-    ? 'continue-on-error: true'
+    ? "continue-on-error: true"
     : NEVER_RUNS.test(line.text)
-      ? 'if: false'
+      ? "if: false"
       : null;
   if (disabler === null) return null;
 
@@ -176,15 +176,15 @@ function disables(line: DiffLine, hunk: Hunk): Disabled | null {
   // tell which — so the grade says which of the two this is.
   return aboutTests(hunk)
     ? {
-        severity: 'high',
+        severity: "high",
         message: `\`${disabler}\` added to a step that runs tests — the suite can fail without failing the build.`,
         fix_hint:
-          'Take it off the test step. A test failure that does not fail the build is not a gate.',
+          "Take it off the test step. A test failure that does not fail the build is not a gate.",
       }
     : {
-        severity: 'medium',
+        severity: "medium",
         message: `\`${disabler}\` added. The diff does not show which step it belongs to.`,
-        fix_hint: 'Check it is not the step that runs the tests.',
+        fix_hint: "Check it is not the step that runs the tests.",
       };
 }
 
@@ -199,7 +199,7 @@ function gateRemoved(file: DiffFile, elsewhere: Set<string>): Finding | null {
   const survives = new Set<string>(elsewhere);
   for (const h of file.hunks) {
     for (const line of h.lines) {
-      if (line.kind === 'del' || isCommented(line.text)) continue;
+      if (line.kind === "del" || isCommented(line.text)) continue;
       for (const key of testKeys(line.text)) survives.add(key);
     }
   }
@@ -207,7 +207,7 @@ function gateRemoved(file: DiffFile, elsewhere: Set<string>): Finding | null {
   const gone: DiffLine[] = [];
   for (const h of file.hunks) {
     for (const line of h.lines) {
-      if (line.kind !== 'del' || isCommented(line.text)) continue;
+      if (line.kind !== "del" || isCommented(line.text)) continue;
       const keys = testKeys(line.text);
       if (keys.length === 0 || keys.some((key) => survives.has(key))) continue;
       gone.push(line);
@@ -217,25 +217,25 @@ function gateRemoved(file: DiffFile, elsewhere: Set<string>): Finding | null {
   const first = gone[0];
   if (first === undefined) return null;
 
-  const what = file.status === 'deleted' ? 'File deleted' : 'Removed';
+  const what = file.status === "deleted" ? "File deleted" : "Removed";
   return finding({
-    rule: 'TEST_GATE_DISABLED',
-    severity: 'high',
+    rule: "TEST_GATE_DISABLED",
+    severity: "high",
     file: file.path,
     // A deleted file has no line to go and look at, and pointing at one sends a
     // reviewer to a file that is not there.
-    line: file.status === 'deleted' ? null : (first.oldLine ?? 1),
+    line: file.status === "deleted" ? null : (first.oldLine ?? 1),
     message:
-      `${what} — ${gone.length} test invocation${gone.length === 1 ? '' : 's'} gone from this ` +
-      'gate, and nothing in this patch runs them instead.',
+      `${what} — ${gone.length} test invocation${gone.length === 1 ? "" : "s"} gone from this ` +
+      "gate, and nothing in this patch runs them instead.",
     before: first.text,
     fix_hint:
-      'Put the invocation back, or point at where the suite runs now. Nothing in the patch does.',
+      "Put the invocation back, or point at where the suite runs now. Nothing in the patch does.",
   });
 }
 
 export const testGateDisabled: Rule = {
-  rule: 'TEST_GATE_DISABLED',
+  rule: "TEST_GATE_DISABLED",
   run(ctx: RuleContext): Finding[] {
     const findings: Finding[] = [];
     const gates = ctx.files.filter((f) => isCiConfig(f.path) || isRunnerConfig(f.path));
@@ -244,13 +244,13 @@ export const testGateDisabled: Rule = {
     for (const file of gates) {
       for (const h of file.hunks) {
         for (const line of h.lines) {
-          if (line.kind !== 'add' || isCommented(line.text)) continue;
+          if (line.kind !== "add" || isCommented(line.text)) continue;
           const verdict = disables(line, h);
           if (verdict === null) continue;
 
           findings.push(
             finding({
-              rule: 'TEST_GATE_DISABLED',
+              rule: "TEST_GATE_DISABLED",
               severity: verdict.severity,
               file: file.path,
               /* c8 ignore next -- an added line always carries a post-image number */
@@ -273,39 +273,39 @@ export const testGateDisabled: Rule = {
 
 /** Keys naming the set a runner collects. */
 const INCLUDE_KEYS = [
-  'include',
-  'testMatch',
-  'testRegex',
-  'testPathPattern',
-  'testPathPatterns',
-  'roots',
-  'testDir',
-  'testDirs',
-  'testpaths',
-  'spec',
-  'specs',
-  'specPattern',
-  'testFiles',
+  "include",
+  "testMatch",
+  "testRegex",
+  "testPathPattern",
+  "testPathPatterns",
+  "roots",
+  "testDir",
+  "testDirs",
+  "testpaths",
+  "spec",
+  "specs",
+  "specPattern",
+  "testFiles",
 ];
 
 /** Keys naming what it leaves out, which is the same set from the other side. */
 const EXCLUDE_KEYS = [
-  'exclude',
-  'excludes',
-  'excludeSpecPattern',
-  'ignore',
-  'ignorePatterns',
-  'testPathIgnorePatterns',
-  'modulePathIgnorePatterns',
-  'coveragePathIgnorePatterns',
-  'norecursedirs',
+  "exclude",
+  "excludes",
+  "excludeSpecPattern",
+  "ignore",
+  "ignorePatterns",
+  "testPathIgnorePatterns",
+  "modulePathIgnorePatterns",
+  "coveragePathIgnorePatterns",
+  "norecursedirs",
 ];
 
-type ListKind = 'include' | 'exclude';
+type ListKind = "include" | "exclude";
 
 function listKind(key: string): ListKind | null {
-  if (INCLUDE_KEYS.includes(key)) return 'include';
-  if (EXCLUDE_KEYS.includes(key)) return 'exclude';
+  if (INCLUDE_KEYS.includes(key)) return "include";
+  if (EXCLUDE_KEYS.includes(key)) return "exclude";
   return null;
 }
 
@@ -337,8 +337,8 @@ function patternsIn(text: string): string[] {
 function globCovers(wide: string, narrow: string): boolean {
   if (wide === narrow) return false;
   const source = wide.replace(/\*\*|\*|[.+^${}()|[\]\\]/g, (token) => {
-    if (token === '**') return '.*';
-    if (token === '*') return '[^/]*';
+    if (token === "**") return ".*";
+    if (token === "*") return "[^/]*";
     return `\\${token}`;
   });
   return new RegExp(`^${source}$`).test(narrow);
@@ -363,13 +363,13 @@ function bucketFor(buckets: Map<string, Bucket>, key: string, kind: ListKind): B
 
 function record(bucket: Bucket, line: DiffLine, values: string[]): void {
   if (values.length === 0) return;
-  if (line.kind === 'del') {
+  if (line.kind === "del") {
     bucket.lost.push(...values);
     bucket.before ??= line.text;
     bucket.from ??= line;
     return;
   }
-  if (line.kind === 'add') {
+  if (line.kind === "add") {
     bucket.gained.push(...values);
     bucket.after ??= line;
   }
@@ -390,12 +390,12 @@ function listChanges(hunk: Hunk): Map<string, Bucket> {
     const opened = opensList(line.text);
     if (opened !== null) {
       record(bucketFor(buckets, opened.key, opened.kind), line, patternsIn(opened.rest));
-      open = opened.rest.includes(']') ? null : { key: opened.key, kind: opened.kind };
+      open = opened.rest.includes("]") ? null : { key: opened.key, kind: opened.kind };
       continue;
     }
     if (open === null) continue;
     record(bucketFor(buckets, open.key, open.kind), line, patternsIn(line.text));
-    if (line.text.includes(']')) open = null;
+    if (line.text.includes("]")) open = null;
   }
 
   return buckets;
@@ -405,32 +405,32 @@ function listVerdict(key: string, bucket: Bucket): string | null {
   const dropped = bucket.lost.filter((p) => !bucket.gained.includes(p));
   const added = bucket.gained.filter((p) => !bucket.lost.includes(p));
 
-  if (bucket.kind === 'exclude') {
+  if (bucket.kind === "exclude") {
     if (added.length === 0 || dropped.length > 0) return null;
-    return `"${key}" now leaves out ${added.length} more: ${added.join(', ')}`;
+    return `"${key}" now leaves out ${added.length} more: ${added.join(", ")}`;
   }
 
   if (dropped.length === 0) return null;
   if (added.length === 0) {
-    return `"${key}" lost ${dropped.length} pattern${dropped.length === 1 ? '' : 's'}: ${dropped.join(', ')}`;
+    return `"${key}" lost ${dropped.length} pattern${dropped.length === 1 ? "" : "s"}: ${dropped.join(", ")}`;
   }
   // Replaced rather than dropped: a finding only when every pattern that
   // arrived is inside one that left, which is a narrowing and not a rewrite.
   if (!added.every((n) => dropped.some((w) => globCovers(w, n)))) return null;
-  return `"${key}" narrowed: ${dropped.join(', ')} -> ${added.join(', ')}`;
+  return `"${key}" narrowed: ${dropped.join(", ")} -> ${added.join(", ")}`;
 }
 
 /** Flags that make a runner collect everything and then run part of it. */
 const NARROWING_FLAGS: { re: RegExp; label: string }[] = [
-  { re: /--testPathPatterns?\b/, label: '--testPathPattern' },
-  { re: /--test(?:Name|-name-)[Pp]attern\b/, label: '--testNamePattern' },
-  { re: /\s-k\s/, label: '-k' },
-  { re: /\s-run\s/, label: '-run' },
-  { re: /--grep\b/, label: '--grep' },
-  { re: /--filter[=\s]/, label: '--filter' },
-  { re: /--project[=\s]/, label: '--project' },
-  { re: /--dir[=\s]/, label: '--dir' },
-  { re: /--spec[=\s]/, label: '--spec' },
+  { re: /--testPathPatterns?\b/, label: "--testPathPattern" },
+  { re: /--test(?:Name|-name-)[Pp]attern\b/, label: "--testNamePattern" },
+  { re: /\s-k\s/, label: "-k" },
+  { re: /\s-run\s/, label: "-run" },
+  { re: /--grep\b/, label: "--grep" },
+  { re: /--filter[=\s]/, label: "--filter" },
+  { re: /--project[=\s]/, label: "--project" },
+  { re: /--dir[=\s]/, label: "--dir" },
+  { re: /--spec[=\s]/, label: "--spec" },
 ];
 
 function narrowingFlag(text: string): { re: RegExp; label: string } | undefined {
@@ -447,11 +447,11 @@ function filterGained(file: DiffFile, hunk: Hunk): Finding[] {
   const findings: Finding[] = [];
   const dels = hunk.lines.filter(
     (l) =>
-      l.kind === 'del' && !isCommented(l.text) && invokesTests(l.text) && !narrowingFlag(l.text),
+      l.kind === "del" && !isCommented(l.text) && invokesTests(l.text) && !narrowingFlag(l.text),
   );
 
   for (const line of hunk.lines) {
-    if (line.kind !== 'add' || isCommented(line.text) || !invokesTests(line.text)) continue;
+    if (line.kind !== "add" || isCommented(line.text) || !invokesTests(line.text)) continue;
     const flag = narrowingFlag(line.text);
     if (flag === undefined) continue;
 
@@ -461,18 +461,18 @@ function filterGained(file: DiffFile, hunk: Hunk): Finding[] {
 
     findings.push(
       finding({
-        rule: 'SUITE_SCOPE_NARROWED',
-        severity: 'medium',
+        rule: "SUITE_SCOPE_NARROWED",
+        severity: "medium",
         file: file.path,
         /* c8 ignore next -- an added line always carries a post-image number */
         line: line.newLine ?? 1,
         message:
           `Test command gained a filter (\`${flag.label}\`) — the runner still collects every ` +
-          'test and runs a subset of them.',
+          "test and runs a subset of them.",
         before: was.text,
         after: line.text,
         fix_hint:
-          'Say where the rest of the suite runs, or take the filter off. A subset that is green says nothing about the rest.',
+          "Say where the rest of the suite runs, or take the filter off. A subset that is green says nothing about the rest.",
       }),
     );
   }
@@ -481,17 +481,17 @@ function filterGained(file: DiffFile, hunk: Hunk): Finding[] {
 }
 
 export const suiteScopeNarrowed: Rule = {
-  rule: 'SUITE_SCOPE_NARROWED',
+  rule: "SUITE_SCOPE_NARROWED",
   run(ctx: RuleContext): Finding[] {
     const findings: Finding[] = [];
 
     for (const file of ctx.files) {
-      if (file.status === 'deleted') continue;
+      if (file.status === "deleted") continue;
       // A file the patch creates has no prior set to shrink. Read line by line
       // an added config is all gains and no losses, which is exactly the shape
       // of a narrowed exclude list — so without this every new package reads as
       // a weakening.
-      if (file.status === 'added') continue;
+      if (file.status === "added") continue;
       const runner = isRunnerConfig(file.path);
       if (!runner && !isCiConfig(file.path)) continue;
 
@@ -506,15 +506,15 @@ export const suiteScopeNarrowed: Rule = {
 
           findings.push(
             finding({
-              rule: 'SUITE_SCOPE_NARROWED',
-              severity: 'high',
+              rule: "SUITE_SCOPE_NARROWED",
+              severity: "high",
               file: file.path,
-              line: (at.kind === 'add' ? at.newLine : at.oldLine) ?? 1,
+              line: (at.kind === "add" ? at.newLine : at.oldLine) ?? 1,
               message: `The set the runner collects shrank: ${verdict}.`,
               ...(bucket.before === null ? {} : { before: bucket.before }),
               ...(bucket.after === null ? {} : { after: bucket.after.text }),
               fix_hint:
-                'Keep the set the runner collected, or say where the tests it no longer reaches are run.',
+                "Keep the set the runner collected, or say where the tests it no longer reaches are run.",
             }),
           );
         }

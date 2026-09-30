@@ -129,10 +129,32 @@ jobs:
           ' > "$notes"
           [ -s "$notes" ] || echo "See packages/overlock/CHANGELOG.md." > "$notes"
 
-          # `--latest`: changesets also releases `overlock@<version>`, and the
-          # Marketplace listing follows the latest release, which has to be the
-          # semver one.
+          # `--latest`: the Marketplace listing follows the latest release, which
+          # has to be the semver one, and changesets' own release for
+          # `overlock@<version>` exists until the next step removes it.
           gh release create "$tag" --target "$sha" --title "$tag" --notes-file "$notes" --latest
+
+      # changesets/action (inside the shared release workflow) also creates a
+      # GitHub release for `overlock@<version>`, the tag it pushes. That is two
+      # releases per version, and only the semver one can carry the listing, so
+      # the other is removed. Its tag stays: changesets reads it to decide what
+      # is already published. Separate from the step above, whose early exit on
+      # a re-run would otherwise skip this.
+      - name: Keep one GitHub release per version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISHED: ${{ needs.release.outputs.published-packages }}
+        run: |
+          set -euo pipefail
+          version=$(echo "$PUBLISHED" | jq -r '.[] | select(.name == "overlock") | .version')
+          duplicate="overlock@$version"
+          if gh release view "$duplicate" > /dev/null 2>&1; then
+            # No --cleanup-tag: the release goes, the tag it was made from stays.
+            gh release delete "$duplicate" --yes
+            echo "removed the $duplicate release; its tag is kept"
+          else
+            echo "no $duplicate release to remove"
+          fi
 
   # Every step above hangs on one output of a third-party action, and when that
   # output once silently went false the release published to npm and tagged

@@ -50,10 +50,9 @@ jobs:
       # reads it.
       create-github-releases: false
 
-  # The action half of this repository. Runs only when the release above
-  # published, and reads the commit to tag from the `overlock@<version>` tag
-  # changesets just wrote, so it names the published commit even if main has
-  # moved since.
+  # The action half of this repository: a `vX.Y.Z` tag and release for the
+  # Marketplace, and the moving `vMAJOR` tag consumers pin. Runs only when the
+  # release above published. The logic is scripts/release/tag-action.ts.
   action-tags:
     name: tag and release the action
     needs: [release]
@@ -66,84 +65,15 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      # The Marketplace lists an action from a *release*, and validates the tag
-      # behind it as semver — `overlock@0.5.1`, the only tag changesets writes in
-      # a monorepo, is not one, so it can never carry a listing. The action
-      # therefore needs a `vX.Y.Z` tag of its own naming the same commit.
-      #
-      # The two version lines can drift: `action.yml` alone can be released as
-      # the action, and take a `v<version>` npm has not reached yet. So this can
-      # find its own tag already present on a different commit, and the tempting
-      # answer — skip, the release exists — is the dangerous one: the tag would
-      # name code from before this publish and the listing would quietly stop
-      # updating. Better to fail and be told to pick a version that is free.
+      - uses: rxova/shared/actions/setup-pnpm@main
       - name: Tag and release the action
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLISHED: ${{ needs.release.outputs.published-packages }}
-        run: |
-          set -euo pipefail
-          version=$(echo "$PUBLISHED" | jq -r '.[] | select(.name == "overlock") | .version')
-          case "$version" in
-            ''|null)
-              echo "::error::could not read overlock's version from publishedPackages: $PUBLISHED"
-              exit 1
-              ;;
-          esac
+        run: node scripts/release/tag-action-cli.ts
 
-          git fetch --tags --force origin
-          sha=$(git rev-list -n 1 "overlock@$version")
-          tag="v$version"
-          tagged=$(git rev-list -n 1 "$tag" 2>/dev/null || true)
-
-          if [ -n "$tagged" ] && [ "$tagged" != "$sha" ]; then
-            echo "::error::$tag already names $tagged, but this release is $sha."
-            echo "::error::The action was released at $version before npm reached it."
-            echo "::error::Bump past it with a changeset, then re-run: a version tag is not moved."
-            exit 1
-          fi
-
-          # Not forced, and only when it is missing: a version tag names one
-          # release for good. An equal `tagged` is this same publish re-run.
-          if [ -z "$tagged" ]; then
-            git tag "$tag" "$sha"
-            git push origin "$tag"
-          fi
-
-          # `rxova/overlock@v0` is a *moving* major tag by GitHub Actions
-          # convention. Read from the published version, so the first 1.0.0
-          # starts writing `v1` without anyone coming back here.
-          major=${version%%.*}
-          echo "pointing v$major at $sha"
-          git tag -f "v$major" "$sha"
-          git push -f origin "v$major"
-
-          if gh release view "$tag" > /dev/null 2>&1; then
-            echo "$tag is already released"
-            exit 0
-          fi
-
-          # The changelog entry changesets just wrote, rather than a generated
-          # list of commit subjects: it is the one written for a reader.
-          notes="$RUNNER_TEMP/notes.md"
-          git show "$sha:packages/overlock/CHANGELOG.md" | awk -v v="## $version" '
-            $0 == v { collecting = 1; next }
-            collecting && /^## / { exit }
-            collecting { print }
-          ' > "$notes"
-          [ -s "$notes" ] || echo "See packages/overlock/CHANGELOG.md." > "$notes"
-
-          # `--latest`: changesets also releases `overlock@<version>`, and the
-          # Marketplace listing follows the latest release, which has to be the
-          # semver one.
-          gh release create "$tag" --target "$sha" --title "$tag" --notes-file "$notes" --latest
-
-  # Every step above hangs on one output of a third-party action, and when that
-  # output once silently went false the release published to npm and tagged
-  # nothing — green. So the last word belongs to the registry: if the version in
-  # the tree is on npm, the tags naming it have to exist. On a run that
-  # published nothing they already do, and this says nothing.
+  # The registry has the last word: if npm serves the version in the tree, the
+  # tags naming it must exist. The logic is scripts/release/check-tags.ts.
   tags-present:
     name: published versions are tagged
     needs: [release, action-tags]
@@ -155,26 +85,6 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
+      - uses: rxova/shared/actions/setup-pnpm@main
       - name: Fail if a published version has no tags
-        run: |
-          set -euo pipefail
-          version=$(node -p "require('./packages/overlock/package.json').version")
-
-          if ! npm view "overlock@$version" version > /dev/null 2>&1; then
-            echo "overlock@$version is not on npm; nothing to tag."
-            exit 0
-          fi
-
-          git fetch --tags --force origin
-          missing=
-          for tag in "overlock@$version" "v$version"; do
-            git rev-parse -q --verify "refs/tags/$tag" > /dev/null || missing="$missing $tag"
-          done
-
-          if [ -n "$missing" ]; then
-            echo "::error::overlock@$version is published, but these tags are missing:$missing"
-            echo "::error::The release is half done: npm has it and this repository cannot point at it."
-            exit 1
-          fi
-
-          echo "overlock@$version is published and tagged."
+        run: node scripts/release/check-tags-cli.ts

@@ -13,4 +13,4 @@ pnpm exec lint-staged
 #
 # The heavier work (build, audit, dedupe, packaging) stays in pre-push; e2e
 # stays in CI.
-pnpm exec turbo run typecheck test
+pnpm exec turbo run typecheck test //#typecheck:scripts //#test:scripts

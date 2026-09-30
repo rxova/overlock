@@ -50,7 +50,8 @@ jobs:
     uses: rxova/shared/.github/workflows/repo-checks.yml@main
     with:
       build-command: pnpm exec turbo run build --filter='!@overlock/docs'
-      extra-command: pnpm run check:llms
+      # The repository scripts are a root task, outside the packages' typecheck.
+      extra-command: pnpm run check:llms && pnpm exec turbo run //#typecheck:scripts
 
   test:
     name: unit

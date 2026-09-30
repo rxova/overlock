@@ -13,4 +13,8 @@ import { baseKnipConfig } from "@rxova/repo-config/knip";
 export default baseKnipConfig({
   // `rxova-repo-config check-exports` runs `attw` from a shell command, where knip cannot see it.
   ignoreDependencies: ["@arethetypeswrong/cli"],
+  workspaces: {
+    // The release job runs these by path; nothing imports them.
+    ".": { entry: ["scripts/release/*-cli.ts"] },
+  },
 });

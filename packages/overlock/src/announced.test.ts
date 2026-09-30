@@ -49,12 +49,12 @@ describe("announcedPath", () => {
 
   it("otherwise sits under the overlock home, beside the ledger", () => {
     expect(announcedPath({ OVERLOCK_HOME: "/home/me/.overlock" })).toBe(
-      "/home/me/.overlock/announced.jsonl",
+      join("/home/me/.overlock", "announced.jsonl"),
     );
   });
 
   it("falls back to the user home directory", () => {
-    expect(announcedPath({})).toMatch(/\.overlock\/announced\.jsonl$/);
+    expect(announcedPath({})).toMatch(/\.overlock[\\/]announced\.jsonl$/);
   });
 });
 

@@ -60,10 +60,6 @@ jobs:
     with:
       # The shared default, named so the suite's invocation stays visible here.
       test-command: pnpm test
-      # Linux only, as before: the e2e job below runs the CLI on macOS and
-      # Windows against real repositories. The unit suite has not been made
-      # path-portable yet (it hard-codes `/` separators and POSIX home paths).
-      operating-systems: '["ubuntu-latest"]'
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 

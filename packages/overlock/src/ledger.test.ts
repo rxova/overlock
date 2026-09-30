@@ -17,12 +17,12 @@ describe("ledgerPath", () => {
 
   it("otherwise sits under the overlock home", () => {
     expect(ledgerPath({ OVERLOCK_HOME: "/home/me/.overlock" })).toBe(
-      "/home/me/.overlock/ledger.jsonl",
+      join("/home/me/.overlock", "ledger.jsonl"),
     );
   });
 
   it("falls back to the user home directory", () => {
-    expect(ledgerPath({})).toMatch(/\.overlock\/ledger\.jsonl$/);
+    expect(ledgerPath({})).toMatch(/\.overlock[\\/]ledger\.jsonl$/);
   });
 });
 

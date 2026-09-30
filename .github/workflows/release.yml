@@ -134,9 +134,8 @@ jobs:
           ' > "$notes"
           [ -s "$notes" ] || echo "See packages/overlock/CHANGELOG.md." > "$notes"
 
-          # `--latest`: changesets also releases `overlock@<version>`, and the
-          # Marketplace listing follows the latest release, which has to be the
-          # semver one.
+          # `--latest`: the Marketplace listing follows the latest release, which
+          # has to be this semver one.
           gh release create "$tag" --target "$sha" --title "$tag" --notes-file "$notes" --latest
 
   # Every step above hangs on one output of a third-party action, and when that
@@ -144,25 +143,70 @@ jobs:
   # nothing — green. So the last word belongs to the registry: if the version in
   # the tree is on npm, the tags naming it have to exist. On a run that
   # published nothing they already do, and this says nothing.
+  #
+  # When this run did publish, "not on npm yet" is not an answer. npm has taken
+  # over thirty minutes to serve a version after `changeset publish` returned,
+  # and a check that passed during that lag verified nothing. So it waits for
+  # the registry, within a bound, and a version that never appears is a failure.
+  # Not `rxova-repo-config post-publish-smoke`: its wait is fixed at ten minutes,
+  # which that lag outlasts.
   tags-present:
     name: published versions are tagged
     needs: [release, action-tags]
     if: always() && needs.release.result == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # The 45-minute registry wait below, plus a checkout and a fetch.
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
       - name: Fail if a published version has no tags
+        env:
+          PUBLISHED: ${{ needs.release.outputs.published }}
+          PUBLISHED_PACKAGES: ${{ needs.release.outputs.published-packages }}
+          # Seconds. Long enough for the worst lag seen, short of the job timeout.
+          REGISTRY_WAIT: "2700"
         run: |
           set -euo pipefail
-          version=$(node -p "require('./packages/overlock/package.json').version")
 
-          if ! npm view "overlock@$version" version > /dev/null 2>&1; then
-            echo "overlock@$version is not on npm; nothing to tag."
-            exit 0
+          served() {
+            [ "$(npm view "overlock@$1" version --prefer-online 2> /dev/null || true)" = "$1" ]
+          }
+
+          if [ "$PUBLISHED" = "true" ]; then
+            # The version changesets reported, not the tree's: main can have
+            # moved on since, and it is this publish that has to be tagged.
+            version=$(echo "$PUBLISHED_PACKAGES" | jq -r '.[] | select(.name == "overlock") | .version')
+            case "$version" in
+              ''|null)
+                echo "::error::this run published, but not overlock: $PUBLISHED_PACKAGES"
+                exit 1
+                ;;
+            esac
+
+            # 15 s, doubling to a 2-minute ceiling: quick when npm is quick,
+            # and about 25 requests across the whole window when it is not.
+            waited=0
+            delay=15
+            until served "$version"; do
+              if [ "$waited" -ge "$REGISTRY_WAIT" ]; then
+                echo "::error::changesets published overlock@$version, but npm still does not serve it after ${waited}s."
+                echo "::error::Check the npm package page before re-running: a publish that never landed needs a new version."
+                exit 1
+              fi
+              echo "npm does not serve overlock@$version yet; checking again in ${delay}s (${waited}s so far)"
+              sleep "$delay"
+              waited=$((waited + delay))
+              delay=$((delay * 2 > 120 ? 120 : delay * 2))
+            done
+          else
+            version=$(node -p "require('./packages/overlock/package.json').version")
+            if ! served "$version"; then
+              echo "overlock@$version is not on npm and this run published nothing; nothing to tag."
+              exit 0
+            fi
           fi
 
           git fetch --tags --force origin

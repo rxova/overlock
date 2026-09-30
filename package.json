@@ -14,8 +14,8 @@
   },
   "scripts": {
     "build": "turbo run build",
-    "test": "turbo run test",
-    "typecheck": "turbo run typecheck",
+    "test": "turbo run test //#test:scripts",
+    "typecheck": "turbo run typecheck //#typecheck:scripts",
     "lint": "turbo run eslint:check",
     "lint:fix": "eslint . --fix --cache --cache-location node_modules/.cache/eslint/.eslintcache",
     "eslint:check": "eslint . --cache --cache-location node_modules/.cache/eslint/.eslintcache",
@@ -34,7 +34,9 @@
     "e2e": "turbo run build --filter=overlock && pnpm --filter overlock run e2e",
     "verify": "rxova-repo-config verify",
     "release": "turbo run build --filter=overlock && changeset publish",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:scripts": "vitest run --coverage",
+    "typecheck:scripts": "tsc -p tsconfig.json"
   },
   "repoConfig": {
     "verify": {
@@ -53,11 +55,11 @@
         },
         {
           "name": "typecheck",
-          "command": "pnpm exec turbo run typecheck"
+          "command": "pnpm exec turbo run typecheck //#typecheck:scripts"
         },
         {
           "name": "unit tests",
-          "command": "pnpm exec turbo run test"
+          "command": "pnpm exec turbo run test //#test:scripts"
         },
         {
           "name": "package exports",

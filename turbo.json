@@ -52,6 +52,17 @@
     // re-push after a docs-only edit replays in seconds. Type-checked lint needs
     // the types Astro generates (`astro:content`, `import.meta.env`), which a
     // fresh checkout does not have yet.
+    // The repository scripts (the release steps), outside any package.
+    "//#test:scripts": {
+      "outputs": ["coverage/**"],
+      "inputs": ["scripts/**", "vitest.config.ts", "tsconfig.json", "package.json"],
+      "outputLogs": "new-only"
+    },
+    "//#typecheck:scripts": {
+      "outputs": [],
+      "inputs": ["scripts/**", "vitest.config.ts", "tsconfig.json", "package.json"],
+      "outputLogs": "new-only"
+    },
     "//#eslint:check": {
       "dependsOn": ["@overlock/docs#sync"],
       "inputs": ["$TURBO_DEFAULT$", "!**/*.{md,mdx,css,svg,png,jpg,jpeg,webp,txt}", "!LICENSE"],

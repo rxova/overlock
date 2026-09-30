@@ -21,6 +21,11 @@ on:
     paths:
       - "apps/docs/**"
       - ".github/workflows/docs.yml"
+      # The Markdown twins and both llms files come from @rxova/docs-kit, a root
+      # dev dependency: a bump to it changes the published dist without touching
+      # apps/docs.
+      - "package.json"
+      - "pnpm-lock.yaml"
   workflow_dispatch:
 
 permissions:

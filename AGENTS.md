@@ -31,12 +31,14 @@ add one. Dev dependencies are fine.
 | `packages/overlock/src/types.ts`        | The wire contract, including the frozen rule IDs                 |
 | `packages/overlock/llms.txt`            | What an agent reads to decide how to use the tool                |
 | `scripts/node-floor-probe.sh`           | Runs the packed CLI on the `engines` floor in CI's compat job    |
+| `apps/docs/`                            | The docs site; `.md` twins and llms files from `@rxova/docs-kit` |
+| `.github/workflows/`                    | Mostly calls to `rxova/shared` reusable workflows, see below     |
 | `action.yml`                            | The GitHub Action, a composite action at the repo root           |
 
 ## Commands
 
 ```bash
-pnpm install                     # pnpm 11, Node >= 22.13 for the toolchain
+pnpm install                     # pnpm 12, Node >= 22.13 for the toolchain
 pnpm exec turbo run build        # tsdown, ESM, with .d.ts
 pnpm test                        # unit suite with per-file coverage thresholds
 pnpm run e2e                     # spawns real git repositories; slow
@@ -95,12 +97,23 @@ not read the filesystem, shell out, or depend on the order the other rules ran.
 - Comments explain _why_, not _what_. If a line's purpose is obvious from the
   code, it does not need a comment.
 - Prettier settings live in `.prettierrc`; do not hand-format around them.
-- The pre-push gate, the changeset and release-scope gates, the commitlint
-  rules, the prettier settings, the tsconfig base and the tsdown base come from
-  `@rxova/repo-config`; the gate's steps are listed in `package.json#repoConfig`.
-  Runtime helpers such as `isRecord` and `errorMessage` come from
-  `@rxova/ts-utils`, which the build inlines. Both are declared once, as root
-  dev dependencies, never in a workspace package.
+- The tooling is shared, not copied. From `@rxova/repo-config`: the pre-push
+  gate (`rxova-repo-config verify`, steps in `package.json#repoConfig.verify`),
+  the changeset and scope gates, `check-llms`, `check-exports`, `pack-smoke`,
+  and the ESLint, Prettier, lint-staged, commitlint, changelog, tsconfig,
+  tsdown, Vitest and Knip presets. From `@rxova/docs-kit`: the docs site's
+  Markdown twins, `llms.txt`, `llms-full.txt`, the link rewriting and
+  `check-md-routes`. Runtime helpers such as `isRecord` and `errorMessage` come
+  from `@rxova/ts-utils`, which the build inlines. All three are declared once,
+  as root dev dependencies, never in a workspace package. Change a preset in
+  rxova/shared rather than overriding it here, unless the difference is
+  genuinely this repository's.
+- CI and release call the reusable workflows and actions in `rxova/shared` at
+  `@main`; Renovate extends its org preset. What stays local is what only this
+  repository has: the e2e matrix, the Node 20 consumer probe (the shared
+  `node-floor-smoke` also `require()`s the package, which Node 20.11 cannot do
+  for an ESM-only one), the dogfood and published-action jobs, and the release
+  follow-ups that tag and release the GitHub Action.
 - Tests are colocated as `*.test.ts` next to the code they cover. Diff fixtures
   in `src/__fixtures__/` are real `git diff` output, not hand-shaped objects, so
   that a parser bug and a rule bug cannot cancel out.

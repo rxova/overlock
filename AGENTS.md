@@ -30,7 +30,7 @@ add one. Dev dependencies are fine.
 | `packages/overlock/src/mcp.ts`          | MCP over stdio, spoken directly                                  |
 | `packages/overlock/src/types.ts`        | The wire contract, including the frozen rule IDs                 |
 | `packages/overlock/llms.txt`            | What an agent reads to decide how to use the tool                |
-| `packages/tooling/`                     | Repo scripts specific to overlock: the `llms.txt` check          |
+| `scripts/node-floor-probe.sh`           | Runs the packed CLI on the `engines` floor in CI's compat job    |
 | `action.yml`                            | The GitHub Action, a composite action at the repo root           |
 
 ## Commands
@@ -57,7 +57,7 @@ To exercise one file: `pnpm --filter overlock exec vitest run src/rules/skip.tes
 **The JSON schema is the API.** Rule IDs in `src/types.ts` are frozen. Adding a
 rule is a minor release; changing what an existing ID means is a breaking one.
 The same applies to `llms.txt`, which `pnpm run check:llms` holds to the rule
-registry.
+registry and the command list (`repoConfig.llms` in `packages/overlock/package.json`).
 
 **Precision over recall.** A gate that blocks wrongly is a gate that gets
 uninstalled. Put a rule at `high` only when a false positive would be

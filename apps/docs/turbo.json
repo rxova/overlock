@@ -17,10 +17,10 @@
     // No `^build` and no coverage: every module under test is plain JavaScript
     // over plain objects, which is the whole reason they are split out from the
     // Astro-only adapter beside them.
-    "test": {
-      "dependsOn": [],
-      "outputs": [],
-      "outputLogs": "new-only"
+    // The generated content and env types, for type-checked lint at the root.
+    "sync": {
+      "outputs": [".astro/**"],
+      "outputLogs": "errors-only"
     },
     "typecheck": {
       "dependsOn": [],

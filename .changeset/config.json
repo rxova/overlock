@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@4.0.1/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "rxova/overlock" }],
+  "changelog": ["@rxova/repo-config/changelog", { "repo": "rxova/overlock" }],
   "commit": false,
   "fixed": [],
   "linked": [],

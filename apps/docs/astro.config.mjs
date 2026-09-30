@@ -1,13 +1,13 @@
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath } from "node:url";
 
-import { defineConfig } from 'astro/config';
-import { unified } from '@astrojs/markdown-remark';
-import starlight from '@astrojs/starlight';
-import starlightLinksValidator from 'starlight-links-validator';
-import sitemap from '@astrojs/sitemap';
-import { sharedStarlightConfig } from '@rxova/astro-ui/starlight';
+import { defineConfig } from "astro/config";
+import { unified } from "@astrojs/markdown-remark";
+import starlight from "@astrojs/starlight";
+import starlightLinksValidator from "starlight-links-validator";
+import sitemap from "@astrojs/sitemap";
+import { sharedStarlightConfig } from "@rxova/astro-ui/starlight";
 
-import { rehypeMdLinks } from './src/lib/rehype-md-links.mjs';
+import { rehypeMdLinks } from "@rxova/docs-kit";
 
 /**
  * The defaults keep a standalone build working — `pnpm --filter @overlock/docs dev`
@@ -17,8 +17,8 @@ import { rehypeMdLinks } from './src/lib/rehype-md-links.mjs';
  * breaks the moment it is mounted, which is why the published build never uses
  * these values.
  */
-const site = process.env.DOCS_URL ?? 'https://rxova.dev';
-const base = process.env.DOCS_BASE_URL ?? '/';
+const site = process.env.DOCS_URL ?? "https://rxova.dev";
+const base = process.env.DOCS_BASE_URL ?? "/";
 
 export default defineConfig({
   site,
@@ -33,7 +33,7 @@ export default defineConfig({
       rehypePlugins: [
         [
           rehypeMdLinks,
-          { base, docsRoot: fileURLToPath(new URL('src/content/docs', import.meta.url)) },
+          { base, docsRoot: fileURLToPath(new URL("src/content/docs", import.meta.url)) },
         ],
       ],
     }),
@@ -56,19 +56,19 @@ export default defineConfig({
       // would hand a search engine three URLs per page and ask it to pick.
       // Agents construct the twin URL from the page URL; they do not need it
       // advertised.
-      filter: (page) => !page.endsWith('.md') && !/\/llms(?:-full)?\.txt$/.test(page),
+      filter: (page) => !page.endsWith(".md") && !/\/llms(?:-full)?\.txt$/.test(page),
     }),
     starlight({
       ...sharedStarlightConfig({
-        project: 'overlock',
+        project: "overlock",
         sidebar: [
-          { label: 'Learn', items: [{ autogenerate: { directory: 'learn' } }] },
-          { label: 'Rules', items: [{ autogenerate: { directory: 'rules' } }] },
-          { label: 'Integrations', items: [{ autogenerate: { directory: 'integrations' } }] },
-          { label: 'Reference', items: [{ autogenerate: { directory: 'reference' } }] },
+          { label: "Learn", items: [{ autogenerate: { directory: "learn" } }] },
+          { label: "Rules", items: [{ autogenerate: { directory: "rules" } }] },
+          { label: "Integrations", items: [{ autogenerate: { directory: "integrations" } }] },
+          { label: "Reference", items: [{ autogenerate: { directory: "reference" } }] },
           {
-            label: 'Under the hood',
-            items: [{ autogenerate: { directory: 'under-the-hood' } }],
+            label: "Under the hood",
+            items: [{ autogenerate: { directory: "under-the-hood" } }],
           },
         ],
       }),

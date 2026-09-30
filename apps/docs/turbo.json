@@ -14,9 +14,6 @@
       "env": ["DOCS_URL", "DOCS_BASE_URL"],
       "outputLogs": "new-only"
     },
-    // No `^build` and no coverage: every module under test is plain JavaScript
-    // over plain objects, which is the whole reason they are split out from the
-    // Astro-only adapter beside them.
     // The generated content and env types, for type-checked lint at the root.
     "sync": {
       "outputs": [".astro/**"],

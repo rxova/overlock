@@ -3,6 +3,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  escapesCorpus,
   evaluationSummary,
   evaluationMarkdown,
   readEvaluation,
@@ -322,4 +323,17 @@ it("rejects invalid corpus oracles and duplicate case identities", () => {
     writeFileSync(path, JSON.stringify(value));
     expect(() => replay(path)).toThrow();
   }
+});
+
+it("treats a climb out of the corpus as an escape under either separator", () => {
+  // `path.relative` answers in the platform's separator, so a Windows escape is
+  // `..\\outside.diff`. The check used to look for `../` only, and let it through.
+  expect(escapesCorpus("../outside.diff")).toBe(true);
+  expect(escapesCorpus("..\\outside.diff")).toBe(true);
+  expect(escapesCorpus("..")).toBe(true);
+  expect(escapesCorpus("/etc/passwd")).toBe(true);
+  expect(escapesCorpus("probes/skip.diff")).toBe(false);
+  expect(escapesCorpus("probes\\skip.diff")).toBe(false);
+  // A name that merely starts with two dots is inside.
+  expect(escapesCorpus("..skip.diff")).toBe(false);
 });

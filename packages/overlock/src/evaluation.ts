@@ -303,6 +303,18 @@ export function evaluationMarkdown(summary: ReturnType<typeof evaluationSummary>
   ].join("\n");
 }
 
+/**
+ * Whether a path relative to the corpus root climbs out of it.
+ *
+ * Split on both separators: `path.relative` answers in the platform's own, so
+ * on Windows an escape reads `..\outside.diff`, and a check for `../` alone
+ * let every such path through. An absolute answer is an escape too — it is what
+ * `relative` returns for a path on another drive.
+ */
+export function escapesCorpus(rel: string): boolean {
+  return rel.split(/[\\/]/)[0] === ".." || isAbsolute(rel);
+}
+
 /** A corpus carries explicit oracles; unlabeled history is never scored as clean. */
 export function replay(manifest: string) {
   const data = jsonFile(manifest);
@@ -328,15 +340,9 @@ export function replay(manifest: string) {
     ids.add(entry.id);
     const candidate = resolve(root, entry.diff);
     const rel = relative(root, candidate);
-    check(
-      rel !== ".." && !rel.startsWith("../") && !isAbsolute(rel),
-      "Replay diffs must stay inside the corpus",
-    );
+    check(!escapesCorpus(rel), "Replay diffs must stay inside the corpus");
     const actual = relative(root, realpathSync(candidate));
-    check(
-      actual !== ".." && !actual.startsWith("../") && !isAbsolute(actual),
-      "Replay diffs must stay inside the corpus",
-    );
+    check(!escapesCorpus(actual), "Replay diffs must stay inside the corpus");
     const diff = readFileSync(candidate, "utf8");
     const report = analyze({ diff });
     const found = [

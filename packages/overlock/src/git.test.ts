@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   EMPTY_TREE,
@@ -36,7 +36,9 @@ describe("repository facts", () => {
     r.commit("feat: first");
 
     // macOS resolves the temp dir through a symlink, so compare the basenames.
-    expect(repoRoot(r.dir).split("/").pop()).toBe(r.dir.split("/").pop());
+    // `basename`, not a split on `/`: git answers `C:/…` on Windows while the
+    // temp dir is spelled `C:\…`, and `basename` reads both.
+    expect(basename(repoRoot(r.dir))).toBe(basename(r.dir));
     expect(currentBranch(r.dir)).toBe("main");
   });
 

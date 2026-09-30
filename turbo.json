@@ -47,6 +47,22 @@
       "outputs": [],
       "cache": false
     },
+    // Root tasks (`//#`): each reads the whole tree in one pass, so there is
+    // nothing to fan out, but caching them makes an unchanged tree free — and a
+    // re-push after a docs-only edit replays in seconds. Type-checked lint needs
+    // the types Astro generates (`astro:content`, `import.meta.env`), which a
+    // fresh checkout does not have yet.
+    "//#eslint:check": {
+      "dependsOn": ["@overlock/docs#sync"],
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.{md,mdx,css,svg,png,jpg,jpeg,webp,txt}", "!LICENSE"],
+      "outputs": [],
+      "outputLogs": "new-only"
+    },
+    "//#prettier:check": {
+      "inputs": ["$TURBO_DEFAULT$", "!pnpm-lock.yaml", "!**/CHANGELOG.md"],
+      "outputs": [],
+      "outputLogs": "new-only"
+    },
     // A root task (`//#`): `pnpm dedupe --check` reads the whole workspace in
     // one pass, so there is nothing to fan out. Keyed on exactly the files that
     // feed it, so source edits replay it while any manifest change re-runs it.

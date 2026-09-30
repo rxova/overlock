@@ -14,8 +14,8 @@
     "@astrojs/markdown-remark": "^7.3.0",
     "@astrojs/sitemap": "^3.7.3",
     "@astrojs/starlight": "^0.42.1",
-    "@rxova/astro-ui": "^0.6.0",
-    "@rxova/brand": "^1.2.0",
+    "@rxova/astro-ui": "^0.6.2",
+    "@rxova/brand": "^1.4.0",
     "astro": "^7.3.3",
     "sharp": "^0.35.0",
     "starlight-links-validator": "^0.26.0"

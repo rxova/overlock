@@ -1,5 +1,15 @@
 # overlock
 
+## 0.10.3
+
+### Patch Changes
+
+- [#56](https://github.com/rxova/overlock/pull/56) [`7c10002`](https://github.com/rxova/overlock/commit/7c1000285b804a024c2b808e9057761c79b6bc54) - Stop reporting a quote-style reformat as changed or weakened assertions. `'high'` and `"high"` now compare as the same value, so a formatter switching quote style no longer produces `EXPECTED_VALUE_CHANGED`, and an assertion whose only change is its quotes is no longer read as removed and paired with its neighbour as `ASSERTION_WEAKENED` or `ASSERTION_NARROWED`. A value that changed along with its quotes is still reported, as written.
+
+- [#51](https://github.com/rxova/overlock/pull/51) [`d8962c1`](https://github.com/rxova/overlock/commit/d8962c14cf1b2270245e01a76c9a594c75642594) - Take the object checks and the thrown-value message from `@rxova/ts-utils`, inlined at build time, so the package still has no runtime dependencies. An error from another realm now prints its message, and a thrown value that cannot be turned into a string no longer escapes the error handler.
+
+- [#55](https://github.com/rxova/overlock/pull/55) [`de9c4cf`](https://github.com/rxova/overlock/commit/de9c4cfbc45ae7871638790f036774525e2e62a7) - Build with the shared rxova toolchain. The JavaScript in the package is unchanged. The sources are reformatted with double quotes, so the type declarations spell their string literal types with double quotes (the types are the same), the embedded source maps change, and so does the build fingerprint written into run and evaluation records. The README's code examples now use double quotes too.
+
 ## 0.10.2
 
 ### Patch Changes

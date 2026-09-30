@@ -73,18 +73,26 @@ jobs:
         run: node scripts/release/tag-action-cli.ts
 
   # The registry has the last word: if npm serves the version in the tree, the
-  # tags naming it must exist. The logic is scripts/release/check-tags.ts.
+  # tags naming it must exist. The logic is scripts/release/check-tags.ts. After a
+  # publish, npm can take over half an hour to serve the version, so the tag
+  # check waits for it first (`repoConfig.postPublish.registryTimeoutMinutes`).
   tags-present:
     name: published versions are tagged
     needs: [release, action-tags]
     if: always() && needs.release.result == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
       - uses: rxova/shared/actions/setup-pnpm@main
+      - run: pnpm install --frozen-lockfile
+      - name: Wait for npm, then install and load what it serves
+        if: needs.release.outputs.published == 'true'
+        env:
+          PUBLISHED_PACKAGES: ${{ needs.release.outputs.published-packages }}
+        run: pnpm exec rxova-repo-config post-publish-smoke
       - name: Fail if a published version has no tags
         run: node scripts/release/check-tags-cli.ts

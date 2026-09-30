@@ -22,7 +22,7 @@ corepack enable
 pnpm install
 ```
 
-The toolchain needs Node.js 22.13 or newer (pnpm 11 requires it). The published
+The toolchain needs Node.js 22.13 or newer (pnpm 12 requires it). The published
 package itself supports Node.js 20.11 and up, which CI verifies by packing the
 tarball and running it under Node 20.
 
@@ -46,6 +46,26 @@ To run a single test file:
 ```bash
 pnpm --filter overlock exec vitest run src/rules/skip.test.ts
 ```
+
+## Shared setup
+
+The repository runs on the rxova org's shared tooling, so most of what would
+otherwise be local configuration is a dependency:
+
+- `@rxova/repo-config` provides the verify gate, the changeset gate,
+  `check-llms`, `check-exports`, `pack-smoke` and the ESLint, Prettier,
+  lint-staged, commitlint, changelog, tsconfig, tsdown, Vitest and Knip presets.
+  The configuration files at the root are a line or two over those presets.
+- `@rxova/docs-kit` builds the docs site's `.md` twins, `llms.txt` and
+  `llms-full.txt`, and checks them after the build.
+- The CI jobs, the PR title check, the docs publish and the release are
+  reusable workflows and actions from [rxova/shared](https://github.com/rxova/shared),
+  and `.github/renovate.json5` extends its org preset.
+
+A change to how the repository is checked usually belongs in rxova/shared.
+What stays here is specific to overlock: the e2e matrix, the Node 20 consumer
+probe in `scripts/`, the jobs that run overlock on its own pull requests, and
+the release steps that tag the GitHub Action.
 
 ## Repository layout
 
@@ -109,8 +129,11 @@ The `skip-changeset` label answers the changeset gate for those.
 
 ## Releases
 
-Releases are automated with Changesets. Merging to `main` opens or updates a
-version pull request; merging that publishes to npm and tags the release.
+Releases are automated with Changesets, through the shared release workflow
+that `.github/workflows/release.yml` calls once CI is green on `main`. Merging
+to `main` opens or updates a version pull request; merging that publishes to npm
+with trusted publishing. Follow-up jobs in the same file then tag and release
+the GitHub Action (`vX.Y.Z`, and the moving `v0`).
 
 ## Code of conduct
 

@@ -785,7 +785,11 @@ pnpm run e2e                # drives the built binary against real git repos
 pnpm run verify             # the pre-push gate: the same list CI runs
 ```
 
-CI runs overlock against this repository's own pull requests.
+The tooling is the rxova org's shared setup rather than a copy of it: the
+presets and the verify gate come from `@rxova/repo-config`, the docs site's
+Markdown twins and `llms.txt` from `@rxova/docs-kit`, and most CI jobs are
+reusable workflows from [rxova/shared](https://github.com/rxova/shared). CI runs
+overlock against this repository's own pull requests.
 
 ## License
 

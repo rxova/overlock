@@ -1,4 +1,4 @@
-import type { DiffFile, Finding, RuleId, Severity } from '../types.js';
+import type { DiffFile, Finding, RuleId, Severity } from "../types.js";
 
 export interface RuleContext {
   files: DiffFile[];
@@ -34,13 +34,13 @@ const MAX_TEXT = 1000;
 
 export function sanitize(text: string): string {
   // eslint-disable-next-line no-control-regex -- stripping control characters is the point
-  const stripped = text.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '');
+  const stripped = text.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "");
   return stripped.length <= MAX_TEXT ? stripped : `${stripped.slice(0, MAX_TEXT)}...`;
 }
 
-const QUOTES = new Set(["'", '"', '`']);
+const QUOTES = new Set(["'", '"', "`"]);
 /** What a regex `.` refuses, so an escape cannot swallow one. */
-const LINE_TERMINATORS = new Set(['\n', '\r', ' ', ' ']);
+const LINE_TERMINATORS = new Set(["\n", "\r", " ", " "]);
 
 /**
  * Blanks the contents of string literals, keeping the quotes.
@@ -58,7 +58,7 @@ const LINE_TERMINATORS = new Set(['\n', '\r', ' ', ' ']);
  */
 export function withoutStringContents(text: string): string {
   const unclosedUntil = new Map<string, number>();
-  let out = '';
+  let out = "";
   let copied = 0;
   let i = 0;
 
@@ -88,7 +88,7 @@ function closingQuote(text: string, open: number): number {
   const quote = text[open];
   let i = open + 1;
   while (i < text.length && text[i] !== quote) {
-    if (text[i] !== '\\') {
+    if (text[i] !== "\\") {
       i += 1;
       continue;
     }
@@ -106,7 +106,7 @@ function closingQuote(text: string, open: number): number {
  */
 export function sanitizePath(path: string): string {
   // eslint-disable-next-line no-control-regex -- stripping control characters is the point
-  const stripped = path.replace(/[\u0000-\u001F\u007F`]/g, '');
+  const stripped = path.replace(/[\u0000-\u001F\u007F`]/g, "");
   return stripped.length <= MAX_TEXT ? stripped : `...${stripped.slice(-MAX_TEXT)}`;
 }
 
@@ -123,7 +123,7 @@ export function finding(input: {
   /** The named thing inside the file this finding is about, when there is one. */
   subject?: string;
 }): Finding {
-  const evidence: Finding['evidence'] = {};
+  const evidence: Finding["evidence"] = {};
   if (input.before !== undefined) evidence.before = sanitize(input.before.trim());
   if (input.after !== undefined) evidence.after = sanitize(input.after.trim());
 
@@ -147,7 +147,7 @@ export function finding(input: {
  * positive here costs a `medium` finding a human glances at, while a miss is
  * the whole failure mode the tool exists to catch.
  */
-const ASSERTION_TOKENS: RegExp[] = [
+const ASSERTION_TOKENS: readonly RegExp[] = [
   /\bexpect\s*\(/,
   /\bassert[A-Za-z_]*\s*\(/,
   /\bassert\s+/,
@@ -158,11 +158,11 @@ const ASSERTION_TOKENS: RegExp[] = [
   /\bt\.(Error|Fatal|Errorf|Fatalf)\s*\(/, // Go's assertion-by-hand
   /\bassert_\w+\s*\(/, // rspec / minitest / pytest plugins
   /\bexpect\s*\{/,
-] as const as RegExp[];
+];
 
 export function countAssertions(text: string): number {
   return ASSERTION_TOKENS.reduce((total, re) => {
-    const global = new RegExp(re.source, 'g');
+    const global = new RegExp(re.source, "g");
     return total + (text.match(global)?.length ?? 0);
   }, 0);
 }
@@ -192,7 +192,7 @@ export function expectSubject(text: string): string | null {
  * are equal here exactly when they hold the same characters.
  */
 export function canonicalQuotes(text: string): string {
-  let out = '';
+  let out = "";
   let i = 0;
 
   while (i < text.length) {
@@ -210,10 +210,10 @@ export function canonicalQuotes(text: string): string {
       break;
     }
 
-    let body = '';
+    let body = "";
     for (let j = i + 1; j < close; j += 1) {
       const char = text[j] as string;
-      if (char === '\\') {
+      if (char === "\\") {
         const escaped = text[j + 1] as string;
         body += escaped === "'" ? "'" : escaped === '"' ? '\\"' : `\\${escaped}`;
         j += 1;
@@ -231,9 +231,9 @@ export function canonicalQuotes(text: string): string {
 /** Numeric and string literals, replaced by a placeholder, for shape comparison. */
 export function normalizeLiterals(text: string): string {
   return text
-    .replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, '<lit>')
-    .replace(/\b\d+(?:\.\d+)?\b/g, '<num>')
-    .replace(/\s+/g, ' ')
+    .replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, "<lit>")
+    .replace(/\b\d+(?:\.\d+)?\b/g, "<num>")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
